@@ -1,0 +1,58 @@
+FROM node:20-bookworm
+
+WORKDIR /qa
+
+# --- System dependencies + git ---
+RUN apt-get update && apt-get install -y \
+    curl \
+    unzip \
+    wget \
+    default-jre \
+    python3 \
+    python3-pip \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Go 1.25 (for running backend unit tests) ---
+RUN curl -sSL https://go.dev/dl/go1.25.0.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+# --- pnpm (for running frontend unit tests) ---
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# --- Newman (API testing) ---
+RUN npm install -g newman newman-reporter-allure
+
+# --- Playwright (UI testing) ---
+RUN npm install -g playwright
+RUN npx playwright install --with-deps chromium
+
+# --- k6 (Performance testing) ---
+RUN curl -sSLo /tmp/k6.deb https://github.com/grafana/k6/releases/download/v0.50.0/k6-v0.50.0-linux-amd64.deb \
+    && dpkg -i /tmp/k6.deb \
+    && rm /tmp/k6.deb
+
+# --- ZAP (Security testing) ---
+RUN pip3 install --break-system-packages zaproxy
+
+# --- Sonar Scanner ---
+RUN curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.2.1.4610-linux-x64.zip \
+    && unzip /tmp/sonar-scanner.zip -d /opt \
+    && mv /opt/sonar-scanner-* /opt/sonar-scanner \
+    && ln -s /opt/sonar-scanner/bin/sonar-scanner /usr/local/bin/sonar-scanner \
+    && rm /tmp/sonar-scanner.zip
+
+# --- QA project dependencies ---
+COPY package.json ./
+RUN npm install
+
+# --- Playwright browsers ---
+RUN npx playwright install --with-deps chromium
+
+# --- Copy QA project files ---
+COPY . .
+
+RUN chmod +x run-tests.sh
+
+CMD ["sh", "run-tests.sh"]

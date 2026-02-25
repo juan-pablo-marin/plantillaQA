@@ -1,0 +1,385 @@
+{
+  "info": {
+    "name": "FUC API Tests",
+    "_postman_id": "fuc-api-collection-v2",
+    "description": "Suite de tests API para Ficha Unica de Caracterizacion — adaptada al modelo real del backend Go",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 — Health Checks",
+      "item": [
+        {
+          "name": "GET /health — Global",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Health global responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Body contiene ok', function () {",
+                  "    pm.expect(pm.response.text()).to.equal('ok');",
+                  "});",
+                  "",
+                  "pm.test('Tiempo de respuesta < 500ms', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/users/health — Users module",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Users health responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta contiene message', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.message).to.equal('user-service-OK');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/general/health — General module",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/general/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "general", "health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('General health responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 — Users CRUD",
+      "item": [
+        {
+          "name": "POST /api/v1/users — Crear usuario valido",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_user\": \"1234567890\",\n  \"first_name\": \"Maria\",\n  \"middle_name\": \"Alejandra\",\n  \"last_name\": \"Rodriguez\",\n  \"second_last_name\": \"Lopez\",\n  \"birth_date\": \"1995-06-15T00:00:00Z\",\n  \"birth_place\": \"Bogota\",\n  \"document_type\": \"CC\",\n  \"issue_place\": \"Bogota\",\n  \"issue_date\": \"2013-06-20T00:00:00Z\",\n  \"phone_type\": \"movil\",\n  \"phone_country_code\": \"+57\",\n  \"phone_number\": \"3001234567\",\n  \"email\": \"maria.rodriguez@test.com\",\n  \"gender\": \"Femenino\",\n  \"lgbtiq_identity\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Crear usuario responde 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta contiene mensaje de exito', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.message).to.equal('Usuario creado exitosamente');",
+                  "});",
+                  "",
+                  "pm.test('Respuesta no contiene error', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.be.undefined;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/users — Usuario duplicado (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_user\": \"1234567890\",\n  \"first_name\": \"Maria\",\n  \"last_name\": \"Rodriguez\",\n  \"birth_date\": \"1995-06-15T00:00:00Z\",\n  \"birth_place\": \"Bogota\",\n  \"issue_place\": \"Bogota\",\n  \"issue_date\": \"2013-06-20T00:00:00Z\",\n  \"email\": \"maria.rodriguez@test.com\",\n  \"gender\": \"Femenino\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Usuario duplicado responde 409', function () {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje indica que ya existe', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.be.true;",
+                  "    pm.expect(json.message).to.include('ya existe');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/users — Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Listar usuarios responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta tiene formato JSONResponse', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('message');",
+                  "    pm.expect(json.message).to.equal('Usuarios recuperados');",
+                  "});",
+                  "",
+                  "pm.test('Data es un array', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Contiene al menos 1 usuario creado', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data.length).to.be.greaterThan(0);",
+                  "    pm.environment.set('testUserId', json.data[0].id_user);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/users/:id — Obtener usuario por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{testUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{testUserId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Obtener usuario responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Data contiene el usuario solicitado', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data).to.have.property('first_name');",
+                  "    pm.expect(json.data).to.have.property('email');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/users/inexistente — Usuario no encontrado (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/usuario-no-existe-999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "usuario-no-existe-999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Usuario inexistente responde 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje indica no encontrado', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.be.true;",
+                  "    pm.expect(json.message).to.include('no encontrado');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 — Geo Module",
+      "item": [
+        {
+          "name": "GET /api/v1/geo — Listar datos geograficos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/geo",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "geo"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Geo responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Tiempo de respuesta < 1000ms', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 — General Module",
+      "item": [
+        {
+          "name": "GET /api/v1/general/sisben — Listar SISBEN",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/general/sisben",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "general", "sisben"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Sisben responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/general/educacion — Listar Educacion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/general/educacion",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "general", "educacion"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Educacion responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://backend:8080"
+    }
+  ]
+}

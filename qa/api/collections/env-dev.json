@@ -1,0 +1,21 @@
+{
+  "id": "fuc-env-dev",
+  "name": "FUC Dev Environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "enabled": true
+    },
+    {
+      "key": "frontendUrl",
+      "value": "http://localhost:3000",
+      "enabled": true
+    },
+    {
+      "key": "testUserId",
+      "value": "",
+      "enabled": true
+    }
+  ]
+}

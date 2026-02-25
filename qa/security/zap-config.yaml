@@ -1,0 +1,45 @@
+# ============================================
+# OWASP ZAP — Configuración de escaneo
+# ============================================
+
+env:
+  contexts:
+    - name: "FUC SENA API"
+      urls:
+        - "http://backend:8080"
+      includePaths:
+        - "http://backend:8080/api/.*"
+      excludePaths:
+        - "http://backend:8080/health"
+
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+jobs:
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+      maxBodySizeInBytesToScan: 10000
+
+  - type: spider
+    parameters:
+      context: "FUC SENA API"
+      maxDuration: 2
+      maxDepth: 5
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+
+  - type: report
+    parameters:
+      template: "traditional-html"
+      reportDir: "/qa/reports"
+      reportFile: "zap-report"
+    risks:
+      - high
+      - medium
+      - low

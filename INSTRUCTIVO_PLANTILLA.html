@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INSTRUCTIVO: Plantilla de Infraestructura QA & DevOps</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #64748b;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --code-bg: #1e293b;
+            --code-text: #f8fafc;
+            --accent: #0ea5e9;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background-color: var(--bg);
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 3rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-light);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+        }
+
+        ul {
+            margin-bottom: 1.5rem;
+            padding-left: 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        code {
+            font-family: 'Fira Code', monospace;
+            background-color: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #be185d;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 1.5rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            position: relative;
+        }
+
+        .copy-badge {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 0.7rem;
+            background: rgba(255,255,255,0.1);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .card {
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 8px;
+            background: #fff;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent);
+        }
+
+        .card h3 {
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            background-color: #dbeafe;
+            color: #1e40af;
+            margin-bottom: 1rem;
+        }
+
+        footer {
+            margin-top: 4rem;
+            text-align: center;
+            font-size: 0.875rem;
+            color: var(--text-light);
+            border-top: 1px solid var(--border);
+            padding-top: 2rem;
+        }
+
+        .step-number {
+            background-color: var(--primary);
+            color: white;
+            width: 24px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="badge">Framework de Infraestructura</div>
+            <h1>INSTRUCTIVO</h1>
+            <p class="subtitle">Guía de Uso: Plantilla de Infraestructura QA & DevOps</p>
+        </header>
+
+        <section>
+            <p>Esta es una plantilla estandarizada para proyectos de desarrollo, diseñada para proporcionar un entorno profesional de <strong>QA</strong>, <strong>Análisis de Calidad</strong> y <strong>Orquestación con Docker</strong> de forma inmediata.</p>
+        </section>
+
+        <h2>📂 Estructura de la Plantilla</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>Automation</h3>
+                <p>Carpeta <code>.github/</code> con flujos de CI/CD para integraciones continuas.</p>
+            </div>
+            <div class="card">
+                <h3>QA Framework</h3>
+                <p>Carpeta <code>qa/</code> estructurada para planes, reportes y herramientas como Playwright.</p>
+            </div>
+            <div class="card">
+                <h3>Containers</h3>
+                <p>Archivos <code>docker-compose</code> para orquestar bases de datos y herramientas de calidad.</p>
+            </div>
+            <div class="card">
+                <h3>Quality Gate</h3>
+                <p>Configuración de SonarQube mediante <code>sonar-project.properties</code>.</p>
+            </div>
+        </div>
+
+        <h2>🚀 Implementación en Proyecto Nuevo</h2>
+        
+        <p><span class="step-number">1</span> <strong>Clonar la Plantilla</strong></p>
+        <pre><span class="copy-badge">PowerShell</span>git clone &lt;url-del-repo&gt; mi-nuevo-proyecto
+cd mi-nuevo-proyecto</pre>
+
+        <p><span class="step-number">2</span> <strong>Integrar Aplicaciones</strong></p>
+        <p>Coloca tus carpetas de aplicación (frontend, backend) dentro de la raíz. Recuerda configurar el <code>.gitignore</code> para decidir si estas aplicaciones tendrán sus propios repositorios o serán parte de este.</p>
+
+        <p><span class="step-number">3</span> <strong>Configuración de Entorno</strong></p>
+        <p>Duplica los archivos <code>.env.example</code> (si existen) o usa los <code>.env.*</code> incluidos para definir tus credenciales locales.</p>
+
+        <p><span class="step-number">4</span> <strong>Levantar Servicios</strong></p>
+        <pre><span class="copy-badge">Docker</span>docker-compose up -d</pre>
+
+        <p><span class="step-number">5</span> <strong>Análisis de Calidad Local</strong></p>
+        <pre><span class="copy-badge">QA</span>docker-compose -f docker-compose.qa.yml up -d</pre>
+
+        <h2>🛠️ Estándares de Calidad</h2>
+        <ul>
+            <li><strong>Pruebas E2E:</strong> Implementar en <code>qa/tests/</code> usando Playwright.</li>
+            <li><strong>Reportes:</strong> Se guardan automáticamente en <code>qa/reports/</code> (ignorados por Git).</li>
+            <li><strong>Documentación:</strong> Mantener casos de prueba actualizados en <code>qa/test-cases/</code>.</li>
+        </ul>
+
+        <footer>
+            <p>&copy; 2026 Infraestructura Profesional de QA - Versión 1.0.0</p>
+            <p>Generado para la estandarización de procesos de desarrollo.</p>
+        </footer>
+    </div>
+</body>
+</html>

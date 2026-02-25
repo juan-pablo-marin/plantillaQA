@@ -1,0 +1,28 @@
+1. Limpieza y Protección
+Limpieza del índice: Eliminé los más de 16,000 archivos que se habían agregado accidentalmente (principalmente la caché de .pnpm-store).
+Actualización de 
+.gitignore
+: Modifiqué el archivo 
+.gitignore
+ para bloquear permanentemente las carpetas de caché de pnpm y los reportes de Playwright (playwright-report/, test-results/). Esto evita que vuelvan a ensuciar tu Git en el futuro.
+2. Gestión de Ramas
+Creación de qa/fichasp1: Creé esta nueva rama local específicamente para tus pruebas profesionales de QA.
+Commit de herramientas de QA: En esta rama he guardado los archivos de infraestructura:
+tests/ (Carpeta de Playwright)
+src/__tests__/ (Pruebas unitarias)
+vitest.config.ts (Configuración de pruebas)
+docker-compose.e2e.yaml (Entorno de contenedores para pruebas)
+Limpieza de dev: Regresé a la rama dev, hice un reset --hard origin/dev y un pull para asegurar que esté 100% limpia y sincronizada con el servidor, sin rastros de los archivos de QA.
+Sincronización: Finalmente, mezclé (merge) los últimos cambios de dev hacia qa/fichasp1, por lo que tu rama de QA ahora tiene el código más reciente y todas tus herramientas listas para usar.
+📋 Estado Actual
+Rama Activa: qa/fichasp1 (Tiene todo: código nuevo + herramientas QA).
+Rama dev: Intacta y limpia (Como si las herramientas de QA nunca hubieran pasado por ahí).
+💡 Recomendaciones para tu flujo de QA
+No hagas push desde QA: Como mencionaste, mantén esta rama local. Git te avisará que la rama no existe en origin, lo cual es normal.
+Para actualizar con nuevos cambios: Cuando tus compañeros suban código a main o dev, simplemente haz:
+powershell
+git checkout dev
+git pull origin dev
+git checkout qa/fichasp1
+git merge dev
+Esto traerá las nuevas funciones a tu entorno de pruebas sin ensuciar la rama de desarrollo.

@@ -1,0 +1,148 @@
+# ============================================
+# docker-compose.qa.yml — QA Completo con SonarQube
+# Uso:
+#   docker compose --env-file .env.qa -f docker-compose.qa.yml up --build --abort-on-container-exit
+# ============================================
+
+services:
+
+  # --- Base de datos — MongoDB ---
+  db:
+    image: mongo:7
+    container_name: fuc-mongodb-qa
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    ports:
+      - "${DB_PORT:-27017}:27017"
+    volumes:
+      - mongodb_qa_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - fuc-qa-network
+
+  # --- Backend — Go API ---
+  backend:
+    build:
+      context: ./fuc-sena
+      dockerfile: Dockerfile
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-qa}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    container_name: fuc-api-qa
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: ${BACKEND_PORT:-8080}
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db:27017/${MONGO_DB}?authSource=admin
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_DB: ${MONGO_DB}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - fuc-qa-network
+
+  # --- Frontend — Next.js ---
+  frontend:
+    build:
+      context: ./fuc-app-web
+      dockerfile: Dockerfile
+      target: dev
+    container_name: fuc-app-web-qa
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8080/api/v1
+    networks:
+      - fuc-qa-network
+
+  # --- SonarQube ---
+  sonarqube:
+    image: sonarqube:community
+    container_name: fuc-sonarqube
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - fuc-qa-network
+
+  # --- QA Runner ---
+  qa-runner:
+    build:
+      context: ./qa
+      dockerfile: Dockerfile.qa
+    container_name: fuc-qa-runner
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+      sonarqube:
+        condition: service_started
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-qa}
+      - BACKEND_URL=http://backend:8080
+      - FRONTEND_URL=http://frontend:3000
+      - SONAR_HOST_URL=${SONAR_HOST_URL:-http://sonarqube:9000}
+      - SONAR_TOKEN=${SONAR_TOKEN}
+      - PROJECT_KEY=${PROJECT_KEY:-fuc-sena}
+      - GIT_PULL_ENABLED=${GIT_PULL_ENABLED:-false}
+      - BACKEND_REPO_URL=${BACKEND_REPO_URL:-}
+      - FRONTEND_REPO_URL=${FRONTEND_REPO_URL:-}
+    volumes:
+      - ./qa/reports:/qa/reports
+      - ./fuc-sena:/src/backend
+      - ./fuc-app-web:/src/frontend
+    command: ["sh", "run-tests.sh"]
+    networks:
+      - fuc-qa-network
+
+  # --- Allure Reports ---
+  allure:
+    image: frankescobar/allure-docker-service
+    container_name: fuc-allure
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./qa/reports:/app/allure-results
+    networks:
+      - fuc-qa-network
+
+volumes:
+  mongodb_qa_data:
+    name: fuc-mongodb-qa-data
+  sonarqube_data:
+    name: fuc-sonarqube-data
+  sonarqube_extensions:
+    name: fuc-sonarqube-extensions
+  sonarqube_logs:
+    name: fuc-sonarqube-logs
+
+networks:
+  fuc-qa-network:
+    name: fuc-qa-network
+    driver: bridge

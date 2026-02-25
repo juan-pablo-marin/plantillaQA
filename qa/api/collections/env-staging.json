@@ -1,0 +1,21 @@
+{
+  "id": "fuc-env-staging",
+  "name": "FUC Staging Environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://backend:8080",
+      "enabled": true
+    },
+    {
+      "key": "frontendUrl",
+      "value": "http://frontend:3000",
+      "enabled": true
+    },
+    {
+      "key": "testUserId",
+      "value": "",
+      "enabled": true
+    }
+  ]
+}

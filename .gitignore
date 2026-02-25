@@ -1,0 +1,63 @@
+# ============================================
+# .gitignore — QA Factory Template
+# ============================================
+
+# --- Dependencias ---
+node_modules/
+vendor/
+
+# --- Build ---
+dist/
+build/
+.next/
+out/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# --- Ambientes (NUNCA subir credenciales reales) ---
+.env
+.env.local
+.env.*.local
+.env.prod
+.env.qa.ci
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- QA Reports (generados automáticamente) ---
+qa/reports/*
+!qa/reports/.gitkeep
+
+# --- Coverage ---
+coverage/
+*.lcov
+coverage.out
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Temporal ---
+tmp/
+temp/
+.cache/
+
+# --- Proyectos (Excluidos de la plantilla) ---
+fuc-app-web/
+fuc-sena/
+.scannerwork/
+.sonar/

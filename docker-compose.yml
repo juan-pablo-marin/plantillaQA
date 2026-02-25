@@ -1,0 +1,85 @@
+# ============================================
+# docker-compose.yml — Desarrollo básico
+# Uso:
+#   docker compose --env-file .env.dev up -d --build
+# ============================================
+
+services:
+
+  # --- Base de datos — MongoDB ---
+  db:
+    image: mongo:7
+    container_name: fuc-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    ports:
+      - "${DB_PORT:-27017}:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - fuc-network
+
+  # --- Backend — Go API ---
+  backend:
+    build:
+      context: ./fuc-sena
+      dockerfile: Dockerfile
+      args:
+        BUILD_VERSION: ${BUILD_VERSION:-dev}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    container_name: fuc-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: ${BACKEND_PORT:-8080}
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db:27017/${MONGO_DB}?authSource=admin
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_DB: ${MONGO_DB}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - fuc-network
+
+  # --- Frontend — Next.js ---
+  frontend:
+    build:
+      context: ./fuc-app-web
+      dockerfile: Dockerfile
+      target: dev
+    container_name: fuc-app-web-dev
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8080/api/v1
+    networks:
+      - fuc-network
+
+volumes:
+  mongodb_data:
+    name: fuc-mongodb-data
+
+networks:
+  fuc-network:
+    name: fuc-network
+    driver: bridge
