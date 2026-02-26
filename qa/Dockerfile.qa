@@ -26,7 +26,6 @@ RUN npm install -g newman newman-reporter-allure
 
 # --- Playwright (UI testing) ---
 RUN npm install -g playwright
-RUN npx playwright install --with-deps chromium
 
 # --- k6 (Performance testing) ---
 RUN curl -sSLo /tmp/k6.deb https://github.com/grafana/k6/releases/download/v0.50.0/k6-v0.50.0-linux-amd64.deb \
@@ -53,6 +52,7 @@ RUN npx playwright install --with-deps chromium
 # --- Copy QA project files ---
 COPY . .
 
-RUN chmod +x run-tests.sh
+# Fix CRLF issues (Windows line endings) that break bash scripts
+RUN sed -i 's/\r$//' run-tests.sh && chmod +x run-tests.sh
 
-CMD ["sh", "run-tests.sh"]
+CMD ["bash", "run-tests.sh"]

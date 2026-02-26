@@ -1,12 +1,37 @@
-# ============================================
-# docker-compose.qa.yml — QA Completo con SonarQube
-# Uso:
-#   docker compose --env-file .env.qa -f docker-compose.qa.yml up --build --abort-on-container-exit
-# ============================================
+# ═══════════════════════════════════════════════════════════════
+#  QA STACK — EXPERT UNIFIED VERSION
+#  Uso: 
+#    - Levantar todo: docker compose --env-file .env.qa -f docker-compose.qa.yml up -d
+#    - Solo Sonar:     docker compose --profile sonar up -d
+#    - Solo E2E:       docker compose --profile test-e2e up
+# ═══════════════════════════════════════════════════════════════
+
+x-common-healthcheck: &common-healthcheck
+  interval: 15s
+  timeout: 10s
+  retries: 5
+  start_period: 30s
+
+networks:
+  fuc-qa-network:
+    name: fuc-qa-network
+    driver: bridge
+
+volumes:
+  mongodb_qa_data:
+    name: fuc-mongodb-qa-data
+  sonarqube_data:
+    name: fuc-sonarqube-data
+  sonarqube_extensions:
+    name: fuc-sonarqube-extensions
+  sonarqube_logs:
+    name: fuc-sonarqube-logs
+  sonarqube_db_data:
+    name: fuc-sonarqube-db-data
 
 services:
 
-  # --- Base de datos — MongoDB ---
+  # --- Base de datos — MongoDB (App) ---
   db:
     image: mongo:7
     container_name: fuc-mongodb-qa
@@ -21,10 +46,7 @@ services:
       - mongodb_qa_data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
+      <<: *common-healthcheck
     networks:
       - fuc-qa-network
 
@@ -33,9 +55,6 @@ services:
     build:
       context: ./fuc-sena
       dockerfile: Dockerfile
-      args:
-        BUILD_VERSION: ${BUILD_VERSION:-qa}
-        BUILD_DATE: ${BUILD_DATE:-unknown}
     container_name: fuc-api-qa
     restart: unless-stopped
     depends_on:
@@ -51,10 +70,7 @@ services:
       - "${BACKEND_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+      <<: *common-healthcheck
     networks:
       - fuc-qa-network
 
@@ -63,7 +79,7 @@ services:
     build:
       context: ./fuc-app-web
       dockerfile: Dockerfile
-      target: dev
+      target: ${FRONTEND_TARGET:-runtime}
     container_name: fuc-app-web-qa
     restart: unless-stopped
     depends_on:
@@ -75,74 +91,88 @@ services:
     networks:
       - fuc-qa-network
 
-  # --- SonarQube ---
+  # --- SonarQube — Database (Postgres) ---
+  sonar-db:
+    image: postgres:15-alpine
+    container_name: fuc-sonar-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonarqube_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
+      <<: *common-healthcheck
+    networks:
+      - fuc-qa-network
+
+  # --- SonarQube — Server ---
   sonarqube:
-    image: sonarqube:community
+    image: sonarqube:10.4-community
     container_name: fuc-sonarqube
+    restart: unless-stopped
+    depends_on:
+      sonar-db:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
     ports:
       - "9000:9000"
-    environment:
-      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_logs:/opt/sonarqube/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
     networks:
       - fuc-qa-network
 
-  # --- QA Runner ---
+  # --- QA Runner (Master Orchestrator) ---
   qa-runner:
     build:
       context: ./qa
       dockerfile: Dockerfile.qa
     container_name: fuc-qa-runner
+    profiles: ["test-e2e", "all"]
     depends_on:
       backend:
         condition: service_healthy
       frontend:
         condition: service_started
       sonarqube:
-        condition: service_started
+        condition: service_healthy
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-qa}
       - BACKEND_URL=http://backend:8080
       - FRONTEND_URL=http://frontend:3000
-      - SONAR_HOST_URL=${SONAR_HOST_URL:-http://sonarqube:9000}
+      - SONAR_HOST_URL=http://sonarqube:9000
       - SONAR_TOKEN=${SONAR_TOKEN}
       - PROJECT_KEY=${PROJECT_KEY:-fuc-sena}
-      - GIT_PULL_ENABLED=${GIT_PULL_ENABLED:-false}
-      - BACKEND_REPO_URL=${BACKEND_REPO_URL:-}
-      - FRONTEND_REPO_URL=${FRONTEND_REPO_URL:-}
     volumes:
       - ./qa/reports:/qa/reports
       - ./fuc-sena:/src/backend
       - ./fuc-app-web:/src/frontend
-    command: ["sh", "run-tests.sh"]
+    command: ["bash", "run-tests.sh"]
     networks:
       - fuc-qa-network
 
-  # --- Allure Reports ---
+  # --- Allure Reports Viewer ---
   allure:
     image: frankescobar/allure-docker-service
     container_name: fuc-allure
+    profiles: ["test-e2e", "all"]
     ports:
       - "5050:5050"
     volumes:
       - ./qa/reports:/app/allure-results
     networks:
       - fuc-qa-network
-
-volumes:
-  mongodb_qa_data:
-    name: fuc-mongodb-qa-data
-  sonarqube_data:
-    name: fuc-sonarqube-data
-  sonarqube_extensions:
-    name: fuc-sonarqube-extensions
-  sonarqube_logs:
-    name: fuc-sonarqube-logs
-
-networks:
-  fuc-qa-network:
-    name: fuc-qa-network
-    driver: bridge

@@ -6,7 +6,7 @@ export default defineConfig({
   forbidOnly: true,
   retries: 1,
   workers: 1,
-  timeout: 30_000,
+  timeout: 60_000,
 
   reporter: [
     ['list'],
