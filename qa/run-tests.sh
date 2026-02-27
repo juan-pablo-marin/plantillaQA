@@ -16,7 +16,7 @@ echo " Sonar:    $SONAR_URL"
 echo "============================================"
 
 # 1. Esperar Backend
-echo "[1/4] Esperando Backend..."
+echo "[1/5] Esperando Backend..."
 for i in $(seq 1 30); do
     if curl -sf "$BACKEND_URL/health" > /dev/null 2>&1; then
         echo " OK: Backend listo."
@@ -26,8 +26,22 @@ for i in $(seq 1 30); do
     sleep 3
 done
 
-# 2. Analisis SonarQube
-echo "[2/4] Analisis SonarQube..."
+# 2. Newman API Tests
+echo "[2/5] Newman API Tests..."
+if [ -f "api/collections/fuc-api.postman_collection.json" ]; then
+    newman run api/collections/fuc-api.postman_collection.json \
+        --environment api/collections/env-qa.json \
+        --env-var "baseUrl=$BACKEND_URL" \
+        --reporters cli,json \
+        --reporter-json-export "$REPORTS_DIR/newman-report.json" \
+        --color on \
+        --delay-request 100 || echo "  WARN: Algunos tests de API fallaron."
+else
+    echo " SKIP: No se encontro la coleccion de Postman."
+fi
+
+# 3. Analisis SonarQube
+echo "[3/5] Analisis SonarQube..."
 echo "  Esperando a que SonarQube este listo (esto puede tardar 1-2 minutos)..."
 SONAR_READY=false
 for i in $(seq 1 60); do
@@ -56,8 +70,8 @@ else
     echo " SKIP: SonarQube no esta listo o falta SONAR_TOKEN."
 fi
 
-# 3. Playwright E2E Tests
-echo "[3/4] Ejecutando Playwright..."
+# 4. Playwright E2E Tests
+echo "[4/5] Ejecutando Playwright..."
 cd /qa
 
 if [ -f "playwright.config.ts" ]; then
@@ -69,8 +83,8 @@ else
     echo " SKIP: No se encontro playwright.config.ts en /qa."
 fi
 
-# 4. Reportes Finales
-echo "[4/4] Finalizando..."
+# 5. Reportes Finales
+echo "[5/5] Finalizando..."
 echo "Reportes guardados en $REPORTS_DIR"
 echo "============================================"
 exit 0

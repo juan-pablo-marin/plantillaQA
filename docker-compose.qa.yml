@@ -100,6 +100,8 @@ services:
       POSTGRES_USER: sonar
       POSTGRES_PASSWORD: sonar
       POSTGRES_DB: sonarqube
+    ports:
+      - "15432:5432"  # 15432 es el puerto interno de SonarQube
     volumes:
       - sonarqube_db_data:/var/lib/postgresql/data
     healthcheck:
