@@ -7,6 +7,9 @@ export default defineConfig({
   retries: 1,
   workers: 1,
   timeout: 60_000,
+  // Guardar artefactos (screenshots, videos, traces) en una ruta montada por Docker
+  // para que el reporte HTML pueda referenciarlos y queden como evidencia en el host.
+  outputDir: './reports/playwright-results',
 
   reporter: [
     ['list'],
@@ -15,7 +18,7 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.FRONTEND_URL || 'http://frontend:3000',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },

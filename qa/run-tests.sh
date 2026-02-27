@@ -5,18 +5,33 @@ BACKEND_URL="${BACKEND_URL:-http://backend:8080}"
 FRONTEND_URL="${FRONTEND_URL:-http://frontend:3000}"
 SONAR_URL="${SONAR_HOST_URL:-http://sonarqube:9000}"
 REPORTS_DIR="/qa/reports"
+RUN_SONAR="${RUN_SONAR:-false}"
+SONAR_WAIT_SECONDS="${SONAR_WAIT_SECONDS:-300}"
+SONAR_SCAN_TIMEOUT="${SONAR_SCAN_TIMEOUT:-15m}"
+RUN_K6="${RUN_K6:-true}"
 
 mkdir -p "$REPORTS_DIR"
+cd /qa
+
+ALLURE_RESULTS_DIR="$REPORTS_DIR/allure-results"
+NEWMAN_DIR="$REPORTS_DIR/newman"
+K6_DIR="$REPORTS_DIR/k6"
 
 echo "============================================"
 echo " FUC QA Runner - Iniciando V4 (CRLF-Fixed)"
 echo " Backend:  $BACKEND_URL"
 echo " Frontend: $FRONTEND_URL"
 echo " Sonar:    $SONAR_URL"
+echo " k6:       RUN_K6=$RUN_K6"
 echo "============================================"
 
+# 0. Preparar reportes
+echo "[0/6] Preparando carpetas de reportes..."
+rm -rf "$ALLURE_RESULTS_DIR" "$NEWMAN_DIR" "$K6_DIR" || true
+mkdir -p "$ALLURE_RESULTS_DIR" "$NEWMAN_DIR" "$K6_DIR"
+
 # 1. Esperar Backend
-echo "[1/5] Esperando Backend..."
+echo "[1/6] Esperando Backend..."
 for i in $(seq 1 30); do
     if curl -sf "$BACKEND_URL/health" > /dev/null 2>&1; then
         echo " OK: Backend listo."
@@ -27,13 +42,14 @@ for i in $(seq 1 30); do
 done
 
 # 2. Newman API Tests
-echo "[2/5] Newman API Tests..."
+echo "[2/6] Newman API Tests..."
 if [ -f "api/collections/fuc-api.postman_collection.json" ]; then
     newman run api/collections/fuc-api.postman_collection.json \
         --environment api/collections/env-qa.json \
         --env-var "baseUrl=$BACKEND_URL" \
-        --reporters cli,json \
-        --reporter-json-export "$REPORTS_DIR/newman-report.json" \
+        --reporters cli,json,allure \
+        --reporter-json-export "$NEWMAN_DIR/newman-report.json" \
+        --reporter-allure-resultsDir "$ALLURE_RESULTS_DIR" \
         --color on \
         --delay-request 100 || echo "  WARN: Algunos tests de API fallaron."
 else
@@ -41,50 +57,77 @@ else
 fi
 
 # 3. Analisis SonarQube
-echo "[3/5] Analisis SonarQube..."
+echo "[3/6] Analisis SonarQube..."
 echo "  Esperando a que SonarQube este listo (esto puede tardar 1-2 minutos)..."
-SONAR_READY=false
-for i in $(seq 1 60); do
-    STATUS=$(curl -sf "$SONAR_URL/api/system/status" 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-    if [ "$STATUS" = "UP" ]; then
-        echo " OK: SonarQube esta UP y listo."
-        SONAR_READY=true
-        break
-    fi
-    echo "  ... SonarQube status: ${STATUS:-DOWN/STARTING} (intento $i/60)"
-    sleep 5
-done
-
-if [ "$SONAR_READY" = true ] && [ -n "${SONAR_TOKEN:-}" ] && [ "$SONAR_TOKEN" != "your-sonar-token-here" ]; then
-    echo "  Iniciando sonar-scanner..."
-    sonar-scanner \
-        -Dsonar.projectBaseDir=/src \
-        -Dsonar.projectKey="${PROJECT_KEY:-fuc-sena}" \
-        -Dsonar.host.url="$SONAR_URL" \
-        -Dsonar.token="$SONAR_TOKEN" \
-        -Dsonar.sources=frontend/src,backend \
-        -Dsonar.exclusions="**/node_modules/**,**/.next/**,**/vendor/**,**/*_test.go" \
-        -Dsonar.javascript.lcov.reportPaths="$REPORTS_DIR/lcov.info" \
-        -Dsonar.go.coverage.reportPaths=backend/coverage.out || echo "  WARN: Fallo el escaneo de Sonar."
+if [ "$RUN_SONAR" != "true" ]; then
+    echo " SKIP: RUN_SONAR=$RUN_SONAR"
 else
-    echo " SKIP: SonarQube no esta listo o falta SONAR_TOKEN."
+    SONAR_READY=false
+    SLEEP_SECONDS=5
+    MAX_ATTEMPTS=$(( (SONAR_WAIT_SECONDS + SLEEP_SECONDS - 1) / SLEEP_SECONDS ))
+    for i in $(seq 1 "$MAX_ATTEMPTS"); do
+        STATUS=$(curl -sf "$SONAR_URL/api/system/status" 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4 || true)
+        if [ "${STATUS:-}" = "UP" ]; then
+            echo " OK: SonarQube esta UP y listo."
+            SONAR_READY=true
+            break
+        fi
+        echo "  ... SonarQube status: ${STATUS:-DOWN/STARTING} (intento $i/$MAX_ATTEMPTS)"
+        sleep "$SLEEP_SECONDS"
+    done
+
+    if [ "$SONAR_READY" = true ] && [ -n "${SONAR_TOKEN:-}" ] && [ "$SONAR_TOKEN" != "your-sonar-token-here" ]; then
+        echo "  Iniciando sonar-scanner (timeout: $SONAR_SCAN_TIMEOUT)..."
+        timeout "$SONAR_SCAN_TIMEOUT" sonar-scanner \
+            -Dsonar.projectBaseDir=/src \
+            -Dsonar.projectKey="${PROJECT_KEY:-fuc-sena}" \
+            -Dsonar.host.url="$SONAR_URL" \
+            -Dsonar.token="$SONAR_TOKEN" \
+            -Dsonar.sources=frontend/src,backend \
+            -Dsonar.exclusions="**/node_modules/**,**/.next/**,**/vendor/**,**/*_test.go,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
+            -Dsonar.scm.disabled=true \
+            -Dsonar.javascript.lcov.reportPaths="$REPORTS_DIR/lcov.info" \
+            -Dsonar.go.coverage.reportPaths=backend/coverage.out \
+            || echo "  WARN: Fallo o timeout el escaneo de Sonar."
+    else
+        echo " SKIP: SonarQube no esta listo o falta SONAR_TOKEN."
+    fi
 fi
 
 # 4. Playwright E2E Tests
-echo "[4/5] Ejecutando Playwright..."
-cd /qa
+echo "[4/6] Ejecutando Playwright..."
 
 if [ -f "playwright.config.ts" ]; then
     echo "  Ejecutando tests desde playwright.config.ts (testDir: ./ui/tests)"
-    PLAYWRIGHT_JSON_OUTPUT_NAME=results.json npx playwright test \
-        --reporter=list,html \
-        --output="$REPORTS_DIR/playwright-results" || echo "  WARN: Algunos tests fallaron."
+    echo "  Limpiando reportes anteriores (HTML + artefactos)..."
+    rm -rf "$REPORTS_DIR/playwright-html" "$REPORTS_DIR/playwright-results" || true
+    mkdir -p "$REPORTS_DIR/playwright-html" "$REPORTS_DIR/playwright-results"
+
+    # No sobreescribir reporter/output por CLI: el config ya define
+    # - reporter HTML -> ./reports/playwright-html
+    # - outputDir (artefactos) -> ./reports/playwright-results
+    # Así el reporte HTML queda con evidencias (screenshots/videos/traces) en rutas montadas al host.
+    PLAYWRIGHT_JSON_OUTPUT_NAME=results.json npx playwright test --config=playwright.config.ts || echo "  WARN: Algunos tests fallaron."
 else
     echo " SKIP: No se encontro playwright.config.ts en /qa."
 fi
 
-# 5. Reportes Finales
-echo "[5/5] Finalizando..."
+# 5. k6 (carga/estrés)
+echo "[5/6] k6 Performance Tests..."
+if [ "$RUN_K6" = "true" ]; then
+    if [ -f "performance/k6-tests.js" ]; then
+        k6 run performance/k6-tests.js -e BACKEND_URL="$BACKEND_URL" \
+          --summary-export "$K6_DIR/summary.json" \
+          || echo "  WARN: k6 fallo o no cumplio thresholds."
+    else
+        echo " SKIP: No se encontro performance/k6-tests.js"
+    fi
+else
+    echo " SKIP: RUN_K6=$RUN_K6"
+fi
+
+# 6. Reportes Finales
+echo "[6/6] Finalizando..."
 echo "Reportes guardados en $REPORTS_DIR"
 echo "============================================"
 exit 0

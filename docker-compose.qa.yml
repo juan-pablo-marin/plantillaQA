@@ -28,6 +28,8 @@ volumes:
     name: fuc-sonarqube-logs
   sonarqube_db_data:
     name: fuc-sonarqube-db-data
+  sonar_scanner_cache:
+    name: fuc-sonar-scanner-cache
 
 services:
 
@@ -151,7 +153,7 @@ services:
       frontend:
         condition: service_started
       sonarqube:
-        condition: service_healthy
+        condition: service_started
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-qa}
       - BACKEND_URL=http://backend:8080
@@ -159,11 +161,39 @@ services:
       - SONAR_HOST_URL=http://sonarqube:9000
       - SONAR_TOKEN=${SONAR_TOKEN}
       - PROJECT_KEY=${PROJECT_KEY:-fuc-sena}
+      - RUN_SONAR=${RUN_SONAR:-false}
+      - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
+      - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-11m}
     volumes:
       - ./qa/reports:/qa/reports
-      - ./fuc-sena:/src/backend
-      - ./fuc-app-web:/src/frontend
+      # Montar config/tests para que el HTML refleje el último run (sin requerir rebuild)
+      - ./qa/run-tests.sh:/qa/run-tests.sh:ro
+      - ./qa/playwright.config.ts:/qa/playwright.config.ts:ro
+      - ./qa/ui/tests:/qa/ui/tests:ro
+      - ./qa/performance:/qa/performance:ro
+      - sonar_scanner_cache:/root/.sonar/cache
+      - ./fuc-sena:/src/backend:ro
+      - ./fuc-app-web:/src/frontend:ro
     command: ["bash", "run-tests.sh"]
+    networks:
+      - fuc-qa-network
+
+  # --- k6 Runner (solo performance) ---
+  k6-runner:
+    build:
+      context: ./qa
+      dockerfile: Dockerfile.qa
+    container_name: fuc-k6-runner
+    profiles: ["perf"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - BACKEND_URL=http://backend:8080
+    volumes:
+      - ./qa/reports:/qa/reports
+      - ./qa/performance:/qa/performance:ro
+    command: ["bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests.js -e BACKEND_URL=$$BACKEND_URL --summary-export /qa/reports/k6/summary.json"]
     networks:
       - fuc-qa-network
 
@@ -175,6 +205,6 @@ services:
     ports:
       - "5050:5050"
     volumes:
-      - ./qa/reports:/app/allure-results
+      - ./qa/reports/allure-results:/app/allure-results
     networks:
       - fuc-qa-network

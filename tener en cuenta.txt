@@ -21,8 +21,81 @@ Rama dev: Intacta y limpia (Como si las herramientas de QA nunca hubieran pasado
 No hagas push desde QA: Como mencionaste, mantén esta rama local. Git te avisará que la rama no existe en origin, lo cual es normal.
 Para actualizar con nuevos cambios: Cuando tus compañeros suban código a main o dev, simplemente haz:
 powershell
+
+
 git checkout dev
 git pull origin dev
 git checkout qa/fichasp1
 git merge dev
 Esto traerá las nuevas funciones a tu entorno de pruebas sin ensuciar la rama de desarrollo.
+
+
+asi se ejecuta sin sonar RUN_SONAR=false en el .env se hace el cambio
+
+docker compose --env-file .env.qa -f docker-compose.qa.yml build qa-runner
+docker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up -d --no-deps --force-recreate qa-runner
+
+
+/////móntarlo completo en otro PC/////
+
+Script PowerShell (Windows) — cargue completo + ejecución QA
+
+Guárdalo como qa-full-run.ps1 en la raíz del proyecto (en el PC destino) y ejecútalo.
+# qa-full-run.ps1$ErrorActionPreference = "Stop"$compose = "docker-compose.qa.yml"$envFile = ".env.qa"Write-Host "== FUC QA Runner: cargue completo (PC con internet) =="# 0) Validaciones básicasdocker version | Out-Nulldocker compose version | Out-Nullif (!(Test-Path $compose)) { throw "No existe $compose en este directorio." }if (!(Test-Path $envFile)) { throw "No existe $envFile. Copialo o crealo antes." }# 1) Build completo (qa-runner + backend + frontend)Write-Host "`n[1/4] Build de imagenes (puede tardar la primera vez)..."docker compose --env-file $envFile -f $compose build# 2) Levantar servicios base (en background)Write-Host "`n[2/4] Levantando stack base..."docker compose --env-file $envFile -f $compose up -d db backend frontend sonar-db sonarqube allure# 3) Ejecutar QA runner (en foreground para ver salida y fallos)Write-Host "`n[3/4] Ejecutando qa-runner (genera reportes en .\qa\reports)..."docker compose --env-file $envFile -f $compose --profile test-e2e up --no-deps --force-recreate qa-runner# 4) Ubicación de reportesWrite-Host "`n[4/4] Listo."Write-Host "Reportes en: .\qa\reports"Write-Host "Allure viewer (si aplica) en: http://localhost:5050"Write-Host "SonarQube en: http://localhost:9000"
+Ejecutarlo
+powershell -ExecutionPolicy Bypass -File .\qa-full-run.ps1
+Si quieres “solo reportes rápidos” (sin Sonar)
+$env:RUN_SONAR="false"powershell -ExecutionPolicy Bypass -File .\qa-full-run.ps1
+Recomendación para el PC destino
+
+/////////////// instalar en Linux /////////
+
+Requisitos en Linux (PC con internet)
+Docker Engine instalado
+Docker Compose v2 (comando docker compose)
+Acceso a internet para descargar imágenes/builds
+Puertos libres (por defecto):
+9000 (SonarQube)
+5050 (Allure)
+8080 (Backend, si lo expones)
+3000 (Frontend, si lo expones)
+15432 (Postgres Sonar, opcional para debug desde host)
+1) Instalar Docker + Compose (Ubuntu/Debian)
+sudo apt updatesudo apt install -y ca-certificates curl gnupg git# Repo oficial Dockersudo install -m 0755 -d /etc/apt/keyringscurl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpgsudo chmod a+r /etc/apt/keyrings/docker.gpgecho \  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \| sudo tee /etc/apt/sources.list.d/docker.list > /dev/nullsudo apt updatesudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin# Habilitar serviciosudo systemctl enable --now docker
+(Opcional) Usar Docker sin sudo
+sudo usermod -aG docker $USERnewgrp docker
+Verifica:
+docker versiondocker compose version
+2) Clonar el proyecto en el servidor Linux
+git clone <TU_REPO_URL> fuc-qacd fuc-qa
+(Usa la URL de tu repo: GitHub/GitLab/etc.)
+3) Preparar .env.qa
+Crea/edita .env.qa (cópialo desde tu PC si ya lo tienes):
+cp .env.qa.example .env.qa 2>/dev/null || truenano .env.qa
+Asegúrate de tener valores reales para lo mínimo:
+MONGO_USER, MONGO_PASSWORD, MONGO_DB
+SONAR_TOKEN (si quieres análisis)
+PROJECT_KEY (opcional)
+4) Levantar el stack y ejecutar fuc-qa-runner
+Cargue completo + ejecución (con Sonar por defecto)
+docker compose --env-file .env.qa -f docker-compose.qa.yml builddocker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up -ddocker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up --no-deps --force-recreate qa-runner
+Corrida rápida (sin Sonar)
+RUN_SONAR=false docker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up --no-deps --force-recreate qa-runner
+5) Dónde ver resultados
+Reportes quedan en el host en: ./qa/reports/
+SonarQube: http://<IP_DEL_SERVIDOR>:9000
+Allure: http://<IP_DEL_SERVIDOR>:5050
+Si tienes firewall (UFW), abre puertos:
+sudo ufw allow 9000/tcpsudo ufw allow 5050/tcp
+6) Operación diaria (sin reinstalar)
+Ver estado:
+docker compose --env-file .env.qa -f docker-compose.qa.yml ps
+Ver logs:
+docker compose --env-file .env.qa -f docker-compose.qa.yml logs -f --tail=200 qa-runner
+Detener sin borrar datos (recomendado):
+docker compose --env-file .env.qa -f docker-compose.qa.yml down
+No uses down -v salvo que quieras borrar completamente las bases/cachés (hará que Sonar vuelva a tardar como la primera vez).
+
+
+
+
