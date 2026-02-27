@@ -29,6 +29,12 @@ git checkout qa/fichasp1
 git merge dev
 Esto traerá las nuevas funciones a tu entorno de pruebas sin ensuciar la rama de desarrollo.
 
+# Parar sin borrar datos
+docker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e --profile all --profile perf --profile sonar down
+
+# Relanzar (SonarQube arranca rápido con datos existentes)
+docker compose --env-file .env.qa -f docker-compose.qa.yml up -d
+
 
 asi se ejecuta sin sonar RUN_SONAR=false en el .env se hace el cambio
 
@@ -69,6 +75,7 @@ docker versiondocker compose version
 2) Clonar el proyecto en el servidor Linux
 git clone <TU_REPO_URL> fuc-qacd fuc-qa
 (Usa la URL de tu repo: GitHub/GitLab/etc.)
+
 3) Preparar .env.qa
 Crea/edita .env.qa (cópialo desde tu PC si ya lo tienes):
 cp .env.qa.example .env.qa 2>/dev/null || truenano .env.qa
@@ -76,11 +83,16 @@ Asegúrate de tener valores reales para lo mínimo:
 MONGO_USER, MONGO_PASSWORD, MONGO_DB
 SONAR_TOKEN (si quieres análisis)
 PROJECT_KEY (opcional)
+
 4) Levantar el stack y ejecutar fuc-qa-runner
+
 Cargue completo + ejecución (con Sonar por defecto)
 docker compose --env-file .env.qa -f docker-compose.qa.yml builddocker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up -ddocker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up --no-deps --force-recreate qa-runner
+
 Corrida rápida (sin Sonar)
+
 RUN_SONAR=false docker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up --no-deps --force-recreate qa-runner
+
 5) Dónde ver resultados
 Reportes quedan en el host en: ./qa/reports/
 SonarQube: http://<IP_DEL_SERVIDOR>:9000
@@ -94,6 +106,7 @@ Ver logs:
 docker compose --env-file .env.qa -f docker-compose.qa.yml logs -f --tail=200 qa-runner
 Detener sin borrar datos (recomendado):
 docker compose --env-file .env.qa -f docker-compose.qa.yml down
+
 No uses down -v salvo que quieras borrar completamente las bases/cachés (hará que Sonar vuelva a tardar como la primera vez).
 
 

@@ -96,11 +96,12 @@ docker compose --env-file .env.qa -f docker-compose.qa.yml up --build --abort-on
 | --------- | ---------------------------- |
 | Backend   | http://localhost:8080         |
 | Frontend  | http://localhost:3000         |
-| Allure    | http://localhost:5050         |
+| Allure UI | http://localhost:5252/allure-docker-service-ui |
+| Allure API| http://localhost:5050         |
 
 ### 4. Ver Reportes
 
-Después de ejecutar QA, los reportes están en `qa/reports/` y en Allure UI en http://localhost:5050.
+Después de ejecutar QA, los reportes están en `qa/reports/` y en Allure UI en http://localhost:5252/allure-docker-service-ui (el API de Allure queda en http://localhost:5050).
 
 ---
 
