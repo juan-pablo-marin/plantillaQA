@@ -16,6 +16,11 @@
       "key": "testUserId",
       "value": "",
       "enabled": true
+    },
+    {
+      "key": "token",
+      "value": "",
+      "enabled": true
     }
   ]
 }

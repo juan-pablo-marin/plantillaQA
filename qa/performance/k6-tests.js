@@ -10,34 +10,34 @@ const errors = new Rate('errors');
 const healthLatency = new Trend('health_latency');
 const usersLatency = new Trend('users_latency');
 
-export const options = {
-  stages: [
-    { duration: '1m',  target: 100 },  // ramp-up suave
-    { duration: '2m',  target: 300 },  // carga media
-    { duration: '2m',  target: 500 },  // carga máxima
-    { duration: '1m',  target: 500 },  // carga sostenida
-    { duration: '1m',  target: 0 },    // ramp-down
-  ],
-  thresholds: {
-    http_req_duration: ['p(95)<500'],
-    errors: ['rate<0.1'],
-    health_latency: ['p(99)<200'],
-  },
-};
-
 // export const options = {
 //   stages: [
-//     { duration: '30s', target: 10 },   // ramp-up
-//     { duration: '1m',  target: 50 },   // carga sostenida
-//     { duration: '30s', target: 100 },  // pico
-//     { duration: '30s', target: 0 },    // ramp-down
+//     { duration: '1m',  target: 100 },  // ramp-up suave
+//     { duration: '2m',  target: 300 },  // carga media
+//     { duration: '2m',  target: 500 },  // carga máxima
+//     { duration: '1m',  target: 500 },  // carga sostenida
+//     { duration: '1m',  target: 0 },    // ramp-down
 //   ],
 //   thresholds: {
-//     http_req_duration: ['p(95)<500'],   // 95% de requests < 500ms
-//     errors: ['rate<0.1'],               // < 10% de errores
-//     health_latency: ['p(99)<200'],      // health check < 200ms
+//     http_req_duration: ['p(95)<500'],
+//     errors: ['rate<0.1'],
+//     health_latency: ['p(99)<200'],
 //   },
 // };
+
+export const options = {
+  stages: [
+    { duration: '30s', target: 10 },   // ramp-up
+    { duration: '1m',  target: 50 },   // carga sostenida
+    { duration: '30s', target: 100 },  // pico
+    { duration: '30s', target: 0 },    // ramp-down
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<500'],   // 95% de requests < 500ms
+    errors: ['rate<0.1'],               // < 10% de errores
+    health_latency: ['p(99)<200'],      // health check < 200ms
+  },
+};
 
 export function setup() {
   if (!AUTH_ID_USER || !AUTH_PASSWORD) {

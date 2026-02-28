@@ -51,7 +51,7 @@ services:
     volumes:
       - mongodb_qa_data:/data/db
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet" ]
       <<: *common-healthcheck
     networks:
       - fuc-qa-network
@@ -75,7 +75,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
       <<: *common-healthcheck
     networks:
       - fuc-qa-network
@@ -107,11 +107,11 @@ services:
       POSTGRES_PASSWORD: sonar
       POSTGRES_DB: sonarqube
     ports:
-      - "15432:5432"  # 15432 es el puerto interno de SonarQube
+      - "15432:5432" # 15432 es el puerto interno de SonarQube
     volumes:
       - sonarqube_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sonar -d sonarqube"]
+      test: [ "CMD-SHELL", "pg_isready -U sonar -d sonarqube" ]
       <<: *common-healthcheck
     networks:
       - fuc-qa-network
@@ -136,7 +136,7 @@ services:
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_logs:/opt/sonarqube/logs
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"]
+      test: [ "CMD-SHELL", "curl -sf http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'" ]
       interval: 20s
       timeout: 10s
       retries: 15
@@ -150,7 +150,7 @@ services:
       context: ./qa
       dockerfile: Dockerfile.qa
     container_name: fuc-qa-runner
-    profiles: ["test-e2e", "all"]
+    profiles: [ "test-e2e", "all" ]
     depends_on:
       backend:
         condition: service_healthy
@@ -168,17 +168,20 @@ services:
       - RUN_SONAR=${RUN_SONAR:-false}
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-11m}
+    ports:
+      - "8181:8181"
     volumes:
       - ./qa/reports:/qa/reports
       # Montar config/tests para que el HTML refleje el último run (sin requerir rebuild)
       - ./qa/run-tests.sh:/qa/run-tests.sh:ro
+      - ./qa/api:/qa/api:ro
       - ./qa/playwright.config.ts:/qa/playwright.config.ts:ro
       - ./qa/ui/tests:/qa/ui/tests:ro
       - ./qa/performance:/qa/performance:ro
       - sonar_scanner_cache:/root/.sonar/cache
       - ./fuc-sena:/src/backend:ro
       - ./fuc-app-web:/src/frontend:ro
-    command: ["bash", "run-tests.sh"]
+    command: [ "bash", "run-tests.sh" ]
     networks:
       - fuc-qa-network
 
@@ -186,7 +189,7 @@ services:
   influxdb:
     image: influxdb:1.8
     container_name: fuc-influxdb
-    profiles: ["perf"]
+    profiles: [ "perf" ]
     environment:
       INFLUXDB_DB: k6
       INFLUXDB_HTTP_AUTH_ENABLED: "false"
@@ -201,7 +204,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: fuc-grafana
-    profiles: ["perf"]
+    profiles: [ "perf" ]
     depends_on:
       - influxdb
     environment:
@@ -225,7 +228,7 @@ services:
       context: ./qa
       dockerfile: Dockerfile.qa
     container_name: fuc-k6-runner
-    profiles: ["perf"]
+    profiles: [ "perf" ]
     depends_on:
       backend:
         condition: service_healthy
@@ -236,7 +239,7 @@ services:
     volumes:
       - ./qa/reports:/qa/reports
       - ./qa/performance:/qa/performance:ro
-    command: ["bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests.js -e BACKEND_URL=$$BACKEND_URL --out influxdb=http://influxdb:8086/k6 --summary-export /qa/reports/k6/summary.json"]
+    command: [ "bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests.js -e BACKEND_URL=$$BACKEND_URL --out influxdb=http://influxdb:8086/k6 --summary-export /qa/reports/k6/summary.json" ]
     networks:
       - fuc-qa-network
 
@@ -246,7 +249,7 @@ services:
     # (UI image is old; some newer API versions can trigger "Network Error" in the UI.)
     image: frankescobar/allure-docker-service:2.13.6
     container_name: fuc-allure
-    profiles: ["test-e2e", "all"]
+    profiles: [ "test-e2e", "all" ]
     environment:
       CHECK_RESULTS_EVERY_SECONDS: 1
       KEEP_HISTORY: 1
@@ -262,7 +265,7 @@ services:
   allure-ui:
     image: frankescobar/allure-docker-service-ui
     container_name: fuc-allure-ui
-    profiles: ["test-e2e", "all"]
+    profiles: [ "test-e2e", "all" ]
     depends_on:
       - allure
     environment:
@@ -277,7 +280,7 @@ services:
   allure-nginx:
     image: nginx:alpine
     container_name: fuc-allure-nginx
-    profiles: ["test-e2e", "all"]
+    profiles: [ "test-e2e", "all" ]
     depends_on:
       - allure
       - allure-ui

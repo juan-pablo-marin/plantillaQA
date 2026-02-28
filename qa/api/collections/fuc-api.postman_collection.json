@@ -16,8 +16,12 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
             }
           },
           "event": [
@@ -46,11 +50,23 @@
           "name": "GET /api/v1/users/health — Users module",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", "health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "health"
+              ]
             }
           },
           "event": [
@@ -79,8 +95,15 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/general/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "general", "health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "general",
+                "health"
+              ]
             }
           },
           "event": [
@@ -107,7 +130,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -115,8 +145,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
             }
           },
           "event": [
@@ -148,7 +184,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
             ],
             "body": {
               "mode": "raw",
@@ -156,8 +199,14 @@
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
             }
           },
           "event": [
@@ -184,11 +233,22 @@
           "name": "GET /api/v1/users — Listar usuarios",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users"
+              ]
             }
           },
           "event": [
@@ -226,11 +286,23 @@
           "name": "GET /api/v1/users/:id — Obtener usuario por ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/{{testUserId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", "{{testUserId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "{{testUserId}}"
+              ]
             }
           },
           "event": [
@@ -257,11 +329,23 @@
           "name": "GET /api/v1/users/inexistente — Usuario no encontrado (404)",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/users/usuario-no-existe-999",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "users", "usuario-no-existe-999"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "usuario-no-existe-999"
+              ]
             }
           },
           "event": [
@@ -296,8 +380,14 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/geo",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "geo"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "geo"
+              ]
             }
           },
           "event": [
@@ -330,8 +420,15 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/general/sisben",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "general", "sisben"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "general",
+                "sisben"
+              ]
             }
           },
           "event": [
@@ -355,8 +452,15 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/general/educacion",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "general", "educacion"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "general",
+                "educacion"
+              ]
             }
           },
           "event": [

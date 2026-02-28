@@ -27,7 +27,17 @@ echo "============================================"
 
 # 0. Preparar reportes
 echo "[0/6] Preparando carpetas de reportes..."
-rm -rf "$ALLURE_RESULTS_DIR" "$NEWMAN_DIR" "$K6_DIR" || true
+
+# Archivar reporte Newman anterior antes de borrarlo
+NEWMAN_HISTORY_DIR="$NEWMAN_DIR/anteriores"
+mkdir -p "$NEWMAN_HISTORY_DIR"
+if [ -f "$NEWMAN_DIR/newman-report.json" ]; then
+    TIMESTAMP=$(date +%Y-%m-%d_%H-%M-%S)
+    mv "$NEWMAN_DIR/newman-report.json" "$NEWMAN_HISTORY_DIR/newman-report-${TIMESTAMP}.json"
+    echo "  Reporte anterior archivado: newman-report-${TIMESTAMP}.json"
+fi
+
+rm -rf "$ALLURE_RESULTS_DIR" "$K6_DIR" || true
 mkdir -p "$ALLURE_RESULTS_DIR" "$NEWMAN_DIR" "$K6_DIR"
 
 # 1. Esperar Backend
@@ -41,17 +51,64 @@ for i in $(seq 1 30); do
     sleep 3
 done
 
+# 1.5. Generar Token JWT de Prueba
+echo "[1.5/6] Generando JWT Token para pruebas backend..."
+export TEST_USER_ID="${TEST_USER_ID:-qa_test_user}"
+export JWT_SECRET="${JWT_SECRET:-secret-key-for-development}"
+
+export TEST_TOKEN=$(python3 -c "import time, hmac, hashlib, base64, json, os;\
+secret=os.environ.get('JWT_SECRET').encode();\
+header={'alg': 'HS256', 'typ': 'JWT'};\
+payload={'user_id': os.environ.get('TEST_USER_ID'), 'exp': int(time.time()) + 86400};\
+b64_header=base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip('=');\
+b64_payload=base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip('=');\
+sig=base64.urlsafe_b64encode(hmac.new(secret, (b64_header + '.' + b64_payload).encode(), hashlib.sha256).digest()).decode().rstrip('=');\
+print(f'{b64_header}.{b64_payload}.{sig}')")
+
+echo "  Token generado correctamente para el usuario: $TEST_USER_ID"
+
 # 2. Newman API Tests
 echo "[2/6] Newman API Tests..."
 if [ -f "api/collections/fuc-api.postman_collection.json" ]; then
     newman run api/collections/fuc-api.postman_collection.json \
         --environment api/collections/env-qa.json \
         --env-var "baseUrl=$BACKEND_URL" \
+        --env-var "token=$TEST_TOKEN" \
         --reporters cli,json,allure \
         --reporter-json-export "$NEWMAN_DIR/newman-report.json" \
         --reporter-allure-resultsDir "$ALLURE_RESULTS_DIR" \
         --color on \
         --delay-request 100 || echo "  WARN: Algunos tests de API fallaron."
+    # Copiar plantilla HTML del reporte al lado del JSON
+    if [ -f "newman-report-template.html" ]; then
+        cp newman-report-template.html "$NEWMAN_DIR/newman-report.html"
+        echo "  HTML report: $NEWMAN_DIR/newman-report.html"
+    fi
+    # Generar manifiesto de reportes (latest + anteriores)
+    echo "  Generando indice de reportes..."
+    node -e "
+      const fs = require('fs');
+      const path = require('path');
+      const dir = '$NEWMAN_DIR';
+      const histDir = path.join(dir, 'anteriores');
+      const reports = [];
+      // Ultimo reporte
+      if (fs.existsSync(path.join(dir, 'newman-report.json'))) {
+        const st = fs.statSync(path.join(dir, 'newman-report.json'));
+        reports.push({ file: 'newman-report.json', label: 'Última ejecución', date: st.mtime.toISOString(), latest: true });
+      }
+      // Anteriores
+      if (fs.existsSync(histDir)) {
+        fs.readdirSync(histDir).filter(f => f.endsWith('.json')).sort().reverse().forEach(f => {
+          const m = f.match(/newman-report-(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})\.json/);
+          const label = m ? m[1] + ' ' + m[2].replace(/-/g, ':') : f;
+          const st = fs.statSync(path.join(histDir, f));
+          reports.push({ file: 'anteriores/' + f, label: label, date: st.mtime.toISOString(), latest: false });
+        });
+      }
+      fs.writeFileSync(path.join(dir, 'reports-index.json'), JSON.stringify(reports, null, 2));
+      console.log('    Indice generado con ' + reports.length + ' reporte(s).');
+    "
 else
     echo " SKIP: No se encontro la coleccion de Postman."
 fi
@@ -116,7 +173,7 @@ fi
 echo "[5/6] k6 Performance Tests..."
 if [ "$RUN_K6" = "true" ]; then
     if [ -f "performance/k6-tests.js" ]; then
-        k6 run performance/k6-tests.js -e BACKEND_URL="$BACKEND_URL" \
+        k6 run performance/k6-tests.js -e BACKEND_URL="$BACKEND_URL" -e TEST_TOKEN="$TEST_TOKEN" \
           --summary-export "$K6_DIR/summary.json" \
           || echo "  WARN: k6 fallo o no cumplio thresholds."
     else
@@ -130,4 +187,6 @@ fi
 echo "[6/6] Finalizando..."
 echo "Reportes guardados en $REPORTS_DIR"
 echo "============================================"
-exit 0
+echo "Servidor de reportes Newman iniciado en http://localhost:8181"
+echo "Presiona Ctrl+C para detener (o detén el contenedor)"
+npx http-server "$NEWMAN_DIR" -p 8181 -c-1 --cors

@@ -32,6 +32,8 @@ Esto traerá las nuevas funciones a tu entorno de pruebas sin ensuciar la rama d
 # Parar sin borrar datos
 docker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e --profile all --profile perf --profile sonar down
 
+docker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e --profile all --profile perf down
+
 # Relanzar (SonarQube arranca rápido con datos existentes)
 docker compose --env-file .env.qa -f docker-compose.qa.yml up -d
 
@@ -87,6 +89,7 @@ PROJECT_KEY (opcional)
 4) Levantar el stack y ejecutar fuc-qa-runner
 
 Cargue completo + ejecución (con Sonar por defecto)
+
 docker compose --env-file .env.qa -f docker-compose.qa.yml builddocker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up -ddocker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up --no-deps --force-recreate qa-runner
 
 Corrida rápida (sin Sonar)
@@ -100,15 +103,35 @@ Allure: http://<IP_DEL_SERVIDOR>:5050
 Si tienes firewall (UFW), abre puertos:
 sudo ufw allow 9000/tcpsudo ufw allow 5050/tcp
 6) Operación diaria (sin reinstalar)
+
 Ver estado:
 docker compose --env-file .env.qa -f docker-compose.qa.yml ps
+
 Ver logs:
 docker compose --env-file .env.qa -f docker-compose.qa.yml logs -f --tail=200 qa-runner
+
 Detener sin borrar datos (recomendado):
 docker compose --env-file .env.qa -f docker-compose.qa.yml down
 
-No uses down -v salvo que quieras borrar completamente las bases/cachés (hará que Sonar vuelva a tardar como la primera vez).
 
+No uses down -v salvo que quieras borrar completamente las bases/cachés (hará que Sonar vuelva a tardar como la primera vez). 
+
+bajar todo
+docker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e --profile all --profile perf down
+
+subir todo
+docker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e --profile all --profile perf up -d
+
+Paso 1 — Levantar la infraestructura primero:
+docker compose --env-file .env.qa -f docker-compose.qa.yml up -d
+
+sto levanta los servicios sin perfil: backend, frontend, db, etc. y espera a que estén healthy.
+Paso 2 — Ejecutar las pruebas:
+# Solo tests E2E + Alluredocker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e up# Solo performance k6docker compose --env-file .env.qa -f docker-compose.qa.yml --profile perf up# Todo juntodocker compose --env-file .env.qa -f docker-compose.qa.yml --profile test-e2e --profile all --profile perf up
+
+crear token para pruebas en insomnia
+
+node -e "const c=require('crypto');const s='secret-key-for-development';const h=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');const p=Buffer.from(JSON.stringify({user_id:'insomnia_user',exp:Math.floor(Date.now()/1000)+86400})).toString('base64url');const sig=c.createHmac('sha256',s).update(h+'.'+p).digest('base64url');console.log(h+'.'+p+'.'+sig)"
 
 
 

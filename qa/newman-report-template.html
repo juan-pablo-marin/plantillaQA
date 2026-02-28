@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FUC — Newman API Test Report</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg-primary: #0f1117;
+            --bg-secondary: #161822;
+            --bg-card: #1c1f2e;
+            --bg-card-hover: #222539;
+            --border: #2a2d3e;
+            --text-primary: #e4e6f0;
+            --text-secondary: #8b8fa3;
+            --text-muted: #5c5f73;
+            --accent: #6c5ce7;
+            --accent-light: #a29bfe;
+            --success: #00b894;
+            --success-bg: rgba(0, 184, 148, 0.1);
+            --fail: #ff6b6b;
+            --fail-bg: rgba(255, 107, 107, 0.1);
+            --warn: #ffa502;
+            --warn-bg: rgba(255, 165, 2, 0.1);
+            --info: #54a0ff;
+            --info-bg: rgba(84, 160, 255, 0.1);
+            --method-get: #00b894;
+            --method-post: #6c5ce7;
+            --method-put: #ffa502;
+            --method-delete: #ff6b6b;
+            --method-patch: #fd79a8;
+            --radius: 12px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+            --sidebar-w: 280px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        /* ── Layout ── */
+        .app {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: var(--sidebar-w);
+            min-width: var(--sidebar-w);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 200;
+            transition: transform 0.3s;
+        }
+
+        .sidebar-header {
+            padding: 20px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-header h2 {
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-header h2 .logo {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .sidebar-header p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .sidebar-section {
+            padding: 12px 12px 6px;
+        }
+
+        .sidebar-section-title {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            font-weight: 700;
+            padding: 0 4px;
+            margin-bottom: 8px;
+        }
+
+        .report-list {
+            list-style: none;
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 12px 12px;
+        }
+
+        .report-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 4px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .report-item:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border);
+        }
+
+        .report-item.active {
+            background: var(--bg-card);
+            border-color: var(--accent);
+        }
+
+        .report-item .ri-label {
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .report-item .ri-date {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .report-item .ri-badge {
+            font-size: 0.6rem;
+            padding: 1px 8px;
+            border-radius: 999px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), var(--accent-light));
+            color: #fff;
+            margin-left: auto;
+        }
+
+        .report-item .ri-rate {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            margin-left: auto;
+        }
+
+        .ri-rate.good {
+            color: var(--success);
+        }
+
+        .ri-rate.bad {
+            color: var(--fail);
+        }
+
+        .ri-rate.mid {
+            color: var(--warn);
+        }
+
+        /* ── Main Content ── */
+        .main {
+            flex: 1;
+            margin-left: var(--sidebar-w);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 20px 28px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header h1 {
+            font-size: 1.15rem;
+            font-weight: 700;
+        }
+
+        .header-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+
+        .header-meta span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 28px;
+        }
+
+        /* ── Stats Grid ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent);
+        }
+
+        .stat-card .label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .stat-card .sub {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .stat-card.success .value {
+            color: var(--success);
+        }
+
+        .stat-card.fail .value {
+            color: var(--fail);
+        }
+
+        .stat-card.info .value {
+            color: var(--info);
+        }
+
+        .stat-card.warn .value {
+            color: var(--warn);
+        }
+
+        /* ── Progress Bar ── */
+        .progress-wrap {
+            margin-bottom: 24px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .progress-bar .pass {
+            background: var(--success);
+            transition: width 0.6s ease;
+        }
+
+        .progress-bar .fail {
+            background: var(--fail);
+            transition: width 0.6s ease;
+        }
+
+        .progress-legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 6px;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+
+        .progress-legend .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
+        /* ── Timings ── */
+        .timings-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .timing-pill {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 6px 16px;
+            font-size: 0.78rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .timing-pill strong {
+            color: var(--accent-light);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ── Failures Summary ── */
+        .failures-summary {
+            background: var(--fail-bg);
+            border: 1px solid rgba(255, 107, 107, 0.25);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .failures-summary h3 {
+            color: var(--fail);
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .failure-item {
+            padding: 8px 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 5px;
+        }
+
+        .failure-item .name {
+            font-weight: 600;
+            font-size: 0.82rem;
+        }
+
+        .failure-item .assertion {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+
+        .failure-item .error {
+            font-size: 0.75rem;
+            color: var(--fail);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+        }
+
+        /* ── Folders ── */
+        .folder {
+            margin-bottom: 16px;
+        }
+
+        .folder-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            user-select: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            transition: background 0.2s;
+        }
+
+        .folder-header:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .folder-header .chevron {
+            transition: transform 0.25s;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .folder-header.open .chevron {
+            transform: rotate(90deg);
+        }
+
+        .folder-header .folder-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            flex: 1;
+        }
+
+        .folder-header .folder-stats {
+            display: flex;
+            gap: 10px;
+            font-size: 0.75rem;
+        }
+
+        .folder-header .folder-stats .pass {
+            color: var(--success);
+        }
+
+        .folder-header .folder-stats .fail {
+            color: var(--fail);
+        }
+
+        .folder-body {
+            padding: 6px 0 0 16px;
+            display: none;
+        }
+
+        .folder-body.open {
+            display: block;
+        }
+
+        .request-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 6px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .request-card:hover {
+            border-color: var(--text-muted);
+        }
+
+        .request-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .method-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            min-width: 48px;
+            text-align: center;
+        }
+
+        .method-GET {
+            background: rgba(0, 184, 148, 0.15);
+            color: var(--method-get);
+        }
+
+        .method-POST {
+            background: rgba(108, 92, 231, 0.15);
+            color: var(--method-post);
+        }
+
+        .method-PUT {
+            background: rgba(255, 165, 2, 0.15);
+            color: var(--method-put);
+        }
+
+        .method-DELETE {
+            background: rgba(255, 107, 107, 0.15);
+            color: var(--method-delete);
+        }
+
+        .method-PATCH {
+            background: rgba(253, 121, 168, 0.15);
+            color: var(--method-patch);
+        }
+
+        .request-name {
+            flex: 1;
+            font-size: 0.84rem;
+            font-weight: 500;
+        }
+
+        .status-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .status-2xx {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .status-3xx {
+            background: var(--info-bg);
+            color: var(--info);
+        }
+
+        .status-4xx {
+            background: var(--warn-bg);
+            color: var(--warn);
+        }
+
+        .status-5xx {
+            background: var(--fail-bg);
+            color: var(--fail);
+        }
+
+        .response-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .request-detail {
+            display: none;
+            padding: 0 14px 12px 14px;
+        }
+
+        .request-detail.open {
+            display: block;
+        }
+
+        .assertions-list {
+            list-style: none;
+        }
+
+        .assertions-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            margin-bottom: 3px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .assertions-list li.pass {
+            background: var(--success-bg);
+        }
+
+        .assertions-list li.fail {
+            background: var(--fail-bg);
+        }
+
+        .assertions-list li .icon {
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .assertions-list li.pass .icon {
+            color: var(--success);
+        }
+
+        .assertions-list li.fail .icon {
+            color: var(--fail);
+        }
+
+        .assertions-list li .error-msg {
+            font-size: 0.72rem;
+            color: var(--fail);
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+        }
+
+        .url-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background: var(--bg-primary);
+            padding: 6px 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+
+        .response-toggle {
+            font-size: 0.75rem;
+            color: var(--accent-light);
+            cursor: pointer;
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: none;
+            border: none;
+            font-family: inherit;
+        }
+
+        .response-toggle:hover {
+            text-decoration: underline;
+        }
+
+        .response-body {
+            display: none;
+            margin-top: 6px;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            padding: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            max-height: 260px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .response-body.open {
+            display: block;
+        }
+
+        /* ── Loading state ── */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            gap: 10px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── Empty state ── */
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state h2 {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state p {
+            font-size: 0.85rem;
+        }
+
+        /* ── Animations ── */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        .animate-in {
+            animation: fadeIn 0.35s ease forwards;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* ── Mobile ── */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .main {
+                margin-left: 0;
+            }
+
+            .mobile-toggle {
+                display: flex !important;
+            }
+        }
+
+        .mobile-toggle {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 300;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(108, 92, 231, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app">
+        <!-- ─── Sidebar ─── -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2><span class="logo">⚡</span> Newman Reports</h2>
+                <p>Historial de ejecuciones API</p>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Ejecuciones</div>
+            </div>
+            <ul class="report-list" id="reportList">
+                <li class="loading"><span class="spinner"></span> Cargando...</li>
+            </ul>
+        </aside>
+
+        <!-- ─── Main ─── -->
+        <div class="main" id="mainArea">
+            <div class="header">
+                <div class="header-inner">
+                    <h1 id="reportTitle">Newman API Report</h1>
+                    <div class="header-meta" id="headerMeta"></div>
+                </div>
+            </div>
+            <div class="container" id="reportContent">
+                <div class="empty-state">
+                    <h2>📊 Selecciona una ejecución</h2>
+                    <p>Carga el historial de reportes desde el panel lateral</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+
+    <script>
+        // ─── Helpers ───
+        const $ = s => document.querySelector(s);
+        const fmt = ms => ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's';
+        const pct = (n, t) => t === 0 ? 0 : Math.round((n / t) * 100);
+        const statusClass = c => c < 300 ? 'status-2xx' : c < 400 ? 'status-3xx' : c < 500 ? 'status-4xx' : 'status-5xx';
+
+        function decodeStream(stream) {
+            if (!stream || !stream.data) return '';
+            try { return String.fromCharCode(...stream.data); } catch { return ''; }
+        }
+
+        function formatDate(ts) {
+            if (!ts) return '—';
+            const d = new Date(ts);
+            return d.toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' })
+                + ' ' + d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+
+        function buildUrl(urlObj) {
+            if (!urlObj) return '—';
+            const proto = urlObj.protocol ? urlObj.protocol + '://' : '';
+            const host = (urlObj.host || []).join('.');
+            const port = urlObj.port ? ':' + urlObj.port : '';
+            const path = '/' + (urlObj.path || []).join('/');
+            return proto + host + port + path;
+        }
+
+        function escapeHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        function tryPrettyJson(s) { try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; } }
+
+        // ─── State ───
+        let reportIndex = [];
+        let activeFile = null;
+
+        // ─── Load Index ───
+        async function loadIndex() {
+            const list = $('#reportList');
+            try {
+                const res = await fetch('reports-index.json');
+                if (!res.ok) throw new Error('No index');
+                reportIndex = await res.json();
+            } catch {
+                // Generate index from what we can find
+                reportIndex = [];
+                try {
+                    const res = await fetch('newman-report.json');
+                    if (res.ok) {
+                        reportIndex.push({ file: 'newman-report.json', label: 'Última ejecución', latest: true, date: new Date().toISOString() });
+                    }
+                } catch { }
+            }
+
+            if (reportIndex.length === 0) {
+                list.innerHTML = '<li style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.82rem;">No hay reportes disponibles.<br>Ejecuta Newman para generar reportes.</li>';
+                return;
+            }
+
+            renderSidebar();
+            // Auto-load the latest
+            selectReport(reportIndex[0].file);
+        }
+
+        // ─── Render Sidebar ───
+        function renderSidebar() {
+            const list = $('#reportList');
+            list.innerHTML = '';
+
+            reportIndex.forEach((r, i) => {
+                const li = document.createElement('li');
+                li.className = 'report-item';
+                li.dataset.file = r.file;
+                li.onclick = () => selectReport(r.file);
+
+                let badge = r.latest ? '<span class="ri-badge">ÚLTIMA</span>' : '';
+                let rateHtml = '';
+                if (r._passRate !== undefined) {
+                    const cls = r._passRate >= 90 ? 'good' : r._passRate >= 60 ? 'mid' : 'bad';
+                    rateHtml = `<span class="ri-rate ${cls}">${r._passRate}%</span>`;
+                }
+
+                li.innerHTML = `
+      <div class="ri-label">
+        <span>${r.latest ? '🟢' : '📄'} ${r.label}</span>
+        ${badge}
+        ${rateHtml}
+      </div>
+      <div class="ri-date">${r.date ? formatDate(r.date) : ''}</div>
+    `;
+                list.appendChild(li);
+            });
+        }
+
+        // ─── Select & Load Report ───
+        async function selectReport(file) {
+            // Update active state
+            activeFile = file;
+            document.querySelectorAll('.report-item').forEach(el => {
+                el.classList.toggle('active', el.dataset.file === file);
+            });
+
+            const content = $('#reportContent');
+            content.innerHTML = '<div class="loading"><span class="spinner"></span> Cargando reporte...</div>';
+
+            try {
+                const res = await fetch(file);
+                if (!res.ok) throw new Error('Error cargando ' + file);
+                const data = await res.json();
+
+                // Update pass rate in sidebar
+                const idx = reportIndex.find(r => r.file === file);
+                if (idx && data.run?.stats?.assertions) {
+                    const total = data.run.stats.assertions.total;
+                    const failed = data.run.stats.assertions.failed;
+                    idx._passRate = pct(total - failed, total);
+                    renderSidebar();
+                    // Re-set active
+                    document.querySelectorAll('.report-item').forEach(el => {
+                        el.classList.toggle('active', el.dataset.file === file);
+                    });
+                }
+
+                renderReport(data);
+            } catch (err) {
+                content.innerHTML = `<div class="empty-state"><h2>❌ Error</h2><p>${err.message}</p></div>`;
+            }
+        }
+
+        // ─── Render Report ───
+        function renderReport(data) {
+            const run = data.run;
+            const stats = run.stats;
+            const timings = run.timings;
+            const executions = run.executions || [];
+            const failures = run.failures || [];
+            const collectionName = data.collection?.info?.name || 'Newman Report';
+
+            // Header
+            $('#reportTitle').textContent = collectionName;
+            $('#headerMeta').innerHTML = `
+    <span>🕐 ${formatDate(timings.started)}</span>
+    <span>⏱ ${fmt(timings.completed - timings.started)}</span>
+  `;
+
+            const content = $('#reportContent');
+            content.innerHTML = '';
+
+            const totalAssertions = stats.assertions.total;
+            const passedAssertions = totalAssertions - stats.assertions.failed;
+            const failedAssertions = stats.assertions.failed;
+            const passRate = pct(passedAssertions, totalAssertions);
+
+            // Stats
+            content.insertAdjacentHTML('beforeend', `
+    <div class="stats-grid animate-in">
+      <div class="stat-card ${passRate === 100 ? 'success' : passRate >= 70 ? 'warn' : 'fail'}">
+        <div class="label">Tasa de Éxito</div>
+        <div class="value">${passRate}%</div>
+        <div class="sub">${passedAssertions} de ${totalAssertions} assertions</div>
+      </div>
+      <div class="stat-card info">
+        <div class="label">Requests</div>
+        <div class="value">${stats.requests.total}</div>
+        <div class="sub">${stats.requests.failed} fallidos</div>
+      </div>
+      <div class="stat-card success">
+        <div class="label">Assertions ✓</div>
+        <div class="value">${passedAssertions}</div>
+        <div class="sub">pasaron</div>
+      </div>
+      <div class="stat-card ${failedAssertions > 0 ? 'fail' : 'success'}">
+        <div class="label">Assertions ✗</div>
+        <div class="value">${failedAssertions}</div>
+        <div class="sub">fallaron</div>
+      </div>
+      <div class="stat-card info">
+        <div class="label">Tiempo Promedio</div>
+        <div class="value">${fmt(Math.round(timings.responseAverage))}</div>
+        <div class="sub">min ${fmt(timings.responseMin)} · max ${fmt(timings.responseMax)}</div>
+      </div>
+      <div class="stat-card info">
+        <div class="label">Iteraciones</div>
+        <div class="value">${stats.iterations.total}</div>
+        <div class="sub">${stats.items.total} items ejecutados</div>
+      </div>
+    </div>
+  `);
+
+            // Progress
+            content.insertAdjacentHTML('beforeend', `
+    <div class="progress-wrap animate-in">
+      <div class="progress-bar">
+        <div class="pass" style="width:${pct(passedAssertions, totalAssertions)}%"></div>
+        <div class="fail" style="width:${pct(failedAssertions, totalAssertions)}%"></div>
+      </div>
+      <div class="progress-legend">
+        <span><span class="dot" style="background:var(--success)"></span>Pasaron: ${passedAssertions}</span>
+        <span><span class="dot" style="background:var(--fail)"></span>Fallaron: ${failedAssertions}</span>
+      </div>
+    </div>
+  `);
+
+            // Timings
+            content.insertAdjacentHTML('beforeend', `
+    <div class="timings-bar animate-in">
+      <div class="timing-pill">⚡ Promedio <strong>${fmt(Math.round(timings.responseAverage))}</strong></div>
+      <div class="timing-pill">⬇ Mínimo <strong>${fmt(timings.responseMin)}</strong></div>
+      <div class="timing-pill">⬆ Máximo <strong>${fmt(timings.responseMax)}</strong></div>
+      <div class="timing-pill">📊 Desv. Est. <strong>${fmt(Math.round(timings.responseSd))}</strong></div>
+    </div>
+  `);
+
+            // Failures
+            if (failures.length > 0) {
+                let failItems = failures.map(f => `
+      <div class="failure-item">
+        <div class="name">${f.source?.name || f.parent?.name || '—'}</div>
+        <div class="assertion">❌ ${f.error?.test || f.error?.name || '—'}</div>
+        <div class="error">${escapeHtml(f.error?.message || '')}</div>
+      </div>
+    `).join('');
+                content.insertAdjacentHTML('beforeend', `
+      <div class="failures-summary animate-in">
+        <h3>⚠️ Resumen de Fallos (${failures.length})</h3>
+        ${failItems}
+      </div>
+    `);
+            }
+
+            // Group by folder
+            const collectionItems = data.collection?.item || [];
+            const folderMap = new Map();
+            collectionItems.forEach(folder => {
+                if (folder.item) folder.item.forEach(item => { folderMap.set(item.id, folder.name); });
+            });
+
+            const folders = new Map();
+            executions.forEach(exec => {
+                const fName = folderMap.get(exec.item?.id) || 'Sin carpeta';
+                if (!folders.has(fName)) folders.set(fName, []);
+                folders.get(fName).push(exec);
+            });
+
+            let folderIdx = 0;
+            folders.forEach((execs, folderName) => {
+                const fPassCount = execs.reduce((s, e) => s + (e.assertions || []).filter(a => !a.error).length, 0);
+                const fFailCount = execs.reduce((s, e) => s + (e.assertions || []).filter(a => a.error).length, 0);
+                const fId = 'folder-' + folderIdx++;
+
+                let requestCards = execs.map((exec, ri) => {
+                    const req = exec.request || {};
+                    const res = exec.response || {};
+                    const method = req.method || 'GET';
+                    const url = buildUrl(req.url);
+                    const code = res.code || 0;
+                    const status = res.status || '—';
+                    const time = res.responseTime || 0;
+                    const size = res.responseSize || 0;
+                    const assertions = exec.assertions || [];
+                    const body = decodeStream(res.stream);
+                    const detailId = fId + '-req-' + ri;
+
+                    let assertionsHtml = assertions.map(a => {
+                        const pass = !a.error;
+                        return `
+          <li class="${pass ? 'pass' : 'fail'}">
+            <span class="icon">${pass ? '✓' : '✗'}</span>
+            <span>${a.assertion}${a.error ? `<span class="error-msg">${escapeHtml(a.error.message || '')}</span>` : ''}</span>
+          </li>`;
+                    }).join('');
+
+                    return `
+        <div class="request-card">
+          <div class="request-header" onclick="toggle('${detailId}')">
+            <span class="method-badge method-${method}">${method}</span>
+            <span class="request-name">${escapeHtml(exec.item?.name || '—')}</span>
+            <span class="status-badge ${statusClass(code)}">${code} ${status}</span>
+            <span class="response-time">${fmt(time)}</span>
+          </div>
+          <div class="request-detail" id="${detailId}">
+            <div class="url-display">${method} ${escapeHtml(url)} — ${size}B · ${fmt(time)}</div>
+            <ul class="assertions-list">${assertionsHtml}</ul>
+            ${body ? `
+              <button class="response-toggle" onclick="toggleBody(this)">▶ Ver Response Body</button>
+              <div class="response-body">${escapeHtml(tryPrettyJson(body))}</div>
+            ` : ''}
+          </div>
+        </div>`;
+                }).join('');
+
+                content.insertAdjacentHTML('beforeend', `
+      <div class="folder animate-in">
+        <div class="folder-header" onclick="toggleFolder(this)">
+          <span class="chevron">▶</span>
+          <span class="folder-name">📁 ${escapeHtml(folderName)}</span>
+          <span class="folder-stats">
+            <span class="pass">✓ ${fPassCount}</span>
+            <span class="fail">✗ ${fFailCount}</span>
+          </span>
+        </div>
+        <div class="folder-body">${requestCards}</div>
+      </div>
+    `);
+            });
+
+            // Auto-expand folders
+            document.querySelectorAll('.folder-header').forEach(h => toggleFolder(h));
+        }
+
+        // ─── UI Toggles ───
+        function toggleFolder(el) { el.classList.toggle('open'); el.nextElementSibling.classList.toggle('open'); }
+        function toggle(id) { document.getElementById(id)?.classList.toggle('open'); }
+        function toggleBody(btn) {
+            const body = btn.nextElementSibling;
+            body.classList.toggle('open');
+            btn.textContent = body.classList.contains('open') ? '▼ Ocultar Response Body' : '▶ Ver Response Body';
+        }
+
+        // ─── Init ───
+        loadIndex();
+    </script>
+
+</body>
+
+</html>
