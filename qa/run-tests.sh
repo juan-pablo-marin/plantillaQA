@@ -81,8 +81,8 @@ if [ -f "api/collections/fuc-api.postman_collection.json" ]; then
         --delay-request 100 || echo "  WARN: Algunos tests de API fallaron."
     # Copiar plantilla HTML del reporte al lado del JSON
     if [ -f "newman-report-template.html" ]; then
-        cp newman-report-template.html "$NEWMAN_DIR/newman-report.html"
-        echo "  HTML report: $NEWMAN_DIR/newman-report.html"
+        cp newman-report-template.html "$NEWMAN_DIR/index.html"
+        echo "  HTML report: $NEWMAN_DIR/index.html"
     fi
     # Generar manifiesto de reportes (latest + anteriores)
     echo "  Generando indice de reportes..."
@@ -187,6 +187,4 @@ fi
 echo "[6/6] Finalizando..."
 echo "Reportes guardados en $REPORTS_DIR"
 echo "============================================"
-echo "Servidor de reportes Newman iniciado en http://localhost:8181"
-echo "Presiona Ctrl+C para detener (o detén el contenedor)"
-npx http-server "$NEWMAN_DIR" -p 8181 -c-1 --cors
+exit 0
