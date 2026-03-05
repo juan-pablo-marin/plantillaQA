@@ -5,10 +5,17 @@ BACKEND_URL="${BACKEND_URL:-http://backend:8080}"
 FRONTEND_URL="${FRONTEND_URL:-http://frontend:3000}"
 SONAR_URL="${SONAR_HOST_URL:-http://sonarqube:9000}"
 REPORTS_DIR="/qa/reports"
-RUN_SONAR="${RUN_SONAR:-false}"
+
+# ── Flags de ejecución ─────────────────────────────────────────────────────
+# Cambia a "true" el servicio que quieras activar; el resto se omite.
+RUN_NEWMAN="${RUN_NEWMAN:-false}"          # Tests de API con Newman/Postman
+RUN_SONAR="${RUN_SONAR:-false}"            # Análisis estático con SonarQube
+RUN_PLAYWRIGHT="${RUN_PLAYWRIGHT:-false}"  # Tests E2E con Playwright
+RUN_K6="${RUN_K6:-false}"                  # Tests de rendimiento con k6
+# ───────────────────────────────────────────────────────────────────────────
+
 SONAR_WAIT_SECONDS="${SONAR_WAIT_SECONDS:-300}"
 SONAR_SCAN_TIMEOUT="${SONAR_SCAN_TIMEOUT:-15m}"
-RUN_K6="${RUN_K6:-true}"
 
 mkdir -p "$REPORTS_DIR"
 cd /qa
@@ -18,11 +25,15 @@ NEWMAN_DIR="$REPORTS_DIR/newman"
 K6_DIR="$REPORTS_DIR/k6"
 
 echo "============================================"
-echo " FUC QA Runner - Iniciando V4 (CRLF-Fixed)"
-echo " Backend:  $BACKEND_URL"
-echo " Frontend: $FRONTEND_URL"
-echo " Sonar:    $SONAR_URL"
-echo " k6:       RUN_K6=$RUN_K6"
+echo " FUC QA Runner - Iniciando V5"
+echo " Backend:    $BACKEND_URL"
+echo " Frontend:   $FRONTEND_URL"
+echo " Sonar:      $SONAR_URL"
+echo "--------------------------------------------"
+echo " Newman:     RUN_NEWMAN=$RUN_NEWMAN"
+echo " SonarQube:  RUN_SONAR=$RUN_SONAR"
+echo " Playwright: RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT"
+echo " k6:         RUN_K6=$RUN_K6"
 echo "============================================"
 
 # 0. Preparar reportes
@@ -69,7 +80,9 @@ echo "  Token generado correctamente para el usuario: $TEST_USER_ID"
 
 # 2. Newman API Tests
 echo "[2/6] Newman API Tests..."
-if [ -f "api/collections/fuc-api.postman_collection.json" ]; then
+if [ "$RUN_NEWMAN" != "true" ]; then
+    echo " SKIP: RUN_NEWMAN=$RUN_NEWMAN"
+elif [ -f "api/collections/fuc-api.postman_collection.json" ]; then
     newman run api/collections/fuc-api.postman_collection.json \
         --environment api/collections/env-qa.json \
         --env-var "baseUrl=$BACKEND_URL" \
@@ -154,7 +167,9 @@ fi
 # 4. Playwright E2E Tests
 echo "[4/6] Ejecutando Playwright..."
 
-if [ -f "playwright.config.ts" ]; then
+if [ "$RUN_PLAYWRIGHT" != "true" ]; then
+    echo " SKIP: RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT"
+elif [ -f "playwright.config.ts" ]; then
     echo "  Ejecutando tests desde playwright.config.ts (testDir: ./ui/tests)"
     echo "  Limpiando reportes anteriores (HTML + artefactos)..."
     rm -rf "$REPORTS_DIR/playwright-html" "$REPORTS_DIR/playwright-results" || true
@@ -171,16 +186,14 @@ fi
 
 # 5. k6 (carga/estrés)
 echo "[5/6] k6 Performance Tests..."
-if [ "$RUN_K6" = "true" ]; then
-    if [ -f "performance/k6-tests.js" ]; then
-        k6 run performance/k6-tests.js -e BACKEND_URL="$BACKEND_URL" -e TEST_TOKEN="$TEST_TOKEN" \
-          --summary-export "$K6_DIR/summary.json" \
-          || echo "  WARN: k6 fallo o no cumplio thresholds."
-    else
-        echo " SKIP: No se encontro performance/k6-tests.js"
-    fi
-else
+if [ "$RUN_K6" != "true" ]; then
     echo " SKIP: RUN_K6=$RUN_K6"
+elif [ -f "performance/k6-tests.js" ]; then
+    k6 run performance/k6-tests.js -e BACKEND_URL="$BACKEND_URL" -e TEST_TOKEN="$TEST_TOKEN" \
+      --summary-export "$K6_DIR/summary.json" \
+      || echo "  WARN: k6 fallo o no cumplio thresholds."
+else
+    echo " SKIP: No se encontro performance/k6-tests.js"
 fi
 
 # 6. Reportes Finales

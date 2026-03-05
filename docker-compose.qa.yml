@@ -1,9 +1,16 @@
 # ═══════════════════════════════════════════════════════════════
 #  QA STACK — EXPERT UNIFIED VERSION
-#  Uso: 
-#    - Levantar todo: docker compose --env-file .env.qa -f docker-compose.qa.yml up -d
-#    - Solo Sonar:     docker compose --profile sonar up -d
-#    - Solo E2E:       docker compose --profile test-e2e up
+#  Uso:
+#    - Levantar todo:    docker compose --env-file .env.qa -f docker-compose.qa.yml up -d
+#    - Solo Sonar:       docker compose --env-file .env.qa -f docker-compose.qa.yml --profile sonar up -d
+#    - Solo E2E + Sonar: docker compose --env-file .env.qa -f docker-compose.qa.yml --profile sonar --profile test-e2e up
+#    - Performance:      docker compose --env-file .env.qa -f docker-compose.qa.yml --profile perf up -d
+#
+#  Flags de pruebas (en .env.qa o como variables de entorno):
+#    RUN_NEWMAN=true      → Activa tests de API con Newman
+#    RUN_SONAR=true       → Activa análisis estático con SonarQube
+#    RUN_PLAYWRIGHT=true  → Activa tests E2E con Playwright
+#    RUN_K6=true          → Activa tests de rendimiento con k6
 # ═══════════════════════════════════════════════════════════════
 
 x-common-healthcheck: &common-healthcheck
@@ -101,13 +108,14 @@ services:
   sonar-db:
     image: postgres:15-alpine
     container_name: fuc-sonar-db
+    profiles: [ "sonar", "all" ]
     restart: unless-stopped
     environment:
       POSTGRES_USER: sonar
       POSTGRES_PASSWORD: sonar
       POSTGRES_DB: sonarqube
     ports:
-      - "15432:5432" # 15432 es el puerto interno de SonarQube
+      - "15432:5432"
     volumes:
       - sonarqube_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -120,6 +128,7 @@ services:
   sonarqube:
     image: sonarqube:10.4-community
     container_name: fuc-sonarqube
+    profiles: [ "sonar", "all" ]
     restart: unless-stopped
     depends_on:
       sonar-db:
@@ -156,16 +165,19 @@ services:
         condition: service_healthy
       frontend:
         condition: service_started
-      sonarqube:
-        condition: service_started
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-qa}
       - BACKEND_URL=http://backend:8080
       - FRONTEND_URL=http://frontend:3000
       - SONAR_HOST_URL=http://sonarqube:9000
-      - SONAR_TOKEN=${SONAR_TOKEN}
+      - SONAR_TOKEN=${SONAR_TOKEN:-}
       - PROJECT_KEY=${PROJECT_KEY:-fuc-sena}
+      # ── Flags de pruebas (false = desactivado, true = activo) ──
+      - RUN_NEWMAN=${RUN_NEWMAN:-false}
       - RUN_SONAR=${RUN_SONAR:-false}
+      - RUN_PLAYWRIGHT=${RUN_PLAYWRIGHT:-false}
+      - RUN_K6=${RUN_K6:-false}
+      # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-11m}
     volumes:
