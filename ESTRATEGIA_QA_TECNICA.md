@@ -1,58 +1,37 @@
-# 🧪 Instructivo Técnico: Implementación y Regresión de QA
+# ESTRATEGIA DE QA TÉCNICA (FÁBRICA DE SOFTWARE)
 
-Este documento detalla el estándar para el equipo de QA sobre cómo crear, organizar y ejecutar pruebas profesionales en el ecosistema de 3 repositorios.
+Como QA Profesional, el objetivo no es solo "que pase la prueba", sino garantizar la **mantenibilidad, escalabilidad y confiabilidad** del código que entregamos al cliente. En una fábrica de software, esto se traduce en métricas de SonarQube que el cliente revisa como indicadores de calidad.
 
-## 🏗️ 1. Estándar de Ramas
-Para no ensuciar las ramas de desarrollo (`dev`, `main`), todo el código de QA debe vivir en:
-- **Frontend:** Rama `test/qa-fichasp1`
-- **Backend:** Rama `test/qa-api`
+## 1. Implementación de Unit Testing
+He creado un ejemplo de arquitectura de pruebas en:
+`fuc-app-web/src/components/ui/button/__tests__/Button.spec.tsx`
 
-## 🛠️ 2. Creación de Pruebas por Sprints
+### ¿Qué archivos se testearon en el ejemplo?
+1.  **Button.tsx**: Es el componente principal. Se validan estados críticos: `loading`, `disabled`, `icons` y el renderizado de `children`.
+2.  **Button.cva.ts**: (Implícito) Al probar el componente, garantizamos que las variantes de estilo (CVA) se apliquen correctamente.
+3.  **class.utils.ts**: (Dependencia) La lógica de concatenación de clases de Tailwind.
 
-### En Frontend (Playwright)
-Las pruebas deben organizarse por módulos y sprints para facilitar la regresión:
-```text
-tests/
-├── sprint-1/
-│   ├── login.spec.ts
-│   └── dashboard.spec.ts
-└── sprint-2/
-    └── caracterizacion-v1.spec.ts
-```
-**Para crear una nueva prueba:**
-1. Crear el archivo `.spec.ts` en la carpeta del sprint correspondiente.
-2. Usar **Page Object Models (POM)** para que si el front cambia, solo actualices un archivo y no todas las pruebas.
+## 2. Cómo interpretar los resultados en SonarQube
 
-### En Backend (API Testing)
-1. Usar la infraestructura de Docker de la **Plantilla** para levantar la DB local.
-2. Implementar pruebas de endpoints validando: Status Code, Estructura de JSON y Lógica de Negocio.
+Tras ejecutar el runner, en la sección de **Frontend** de SonarQube verás:
 
----
+*   **Líneas Cubiertas (Uncovered Lines):** Si el componente `Button.tsx` muestra líneas en rojo, significa que hay lógica de renderizado (ej: el spinner de carga) que nunca se ejecutó en los tests.
+*   **Complejidad Ciclomática:** Si un componente tiene muchos `if` o operadores ternarios (como los iconos o el loader), Sonar nos pedirá más tests para cubrir todas las ramas (Branch Coverage).
+*   **Pruebas Unitarias Exitosas:** Verás el conteo exacto de los tests (ej: 45 tests passed). Si un test falla, Sonar marcará el proyecto en rojo (Failed), permitiéndote ver exactamente qué test falló y por qué (stacktrace).
 
-## 🔄 3. Flujo de Regresión (Nuevos Sprints)
+## 3. Estándar de Fábrica de Software (Definición de Hecho)
 
-Cuando un nuevo Sprint termina y los desarrolladores suben cambios a `dev`, el equipo de QA debe:
+Para que el equipo de desarrollo cumpla con el estándar QA, deben seguir la estructura que he dejado montada:
+1.  **Ubicación:** Guardar los tests en carpetas `__tests__` adyacentes al componente.
+2.  **Extensión:** Usar `.spec.tsx` o `.test.tsx`.
+3.  **Métrica:** El **Quality Gate** está configurado para un mínimo de **80% de cobertura** en componentes de UI compartidos (`src/components/ui`).
 
-1. **Traer cambios nuevos:**
-   ```bash
-   git checkout test/qa-fichasp1
-   git merge dev
-   ```
-2. **Ejecutar Regresión (Lo antiguo):**
-   ```bash
-   npx playwright test
-   ```
-   *Si alguna prueba del Sprint 1 falla con el código del Sprint 2, se reporta un **bug de regresión**.*
+> [!IMPORTANT]
+> He configurado el `qa-runner` para que tome el reporte `fuc-app-web/coverage/lcov.info`. He dejado un archivo mock para que puedas verificar que Sonar ya lo reconoce.
+## 4. Reportes de Ejecución (Passed/Failed)
+He configurado el runner para que genere dos reportes técnicos que Sonar entiende:
+*   **Backend:** `go-test-report.json` (formato nativo de Go).
+*   **Frontend:** `js-test-report.xml` (formato JUnit).
 
-3. **Implementar lo nuevo:**
-   Crear la carpeta `tests/sprint-X/` y añadir los nuevos casos.
-
----
-
-## 📊 4. Análisis de Calidad (SonarQube)
-Cada vez que se complete un Sprint, se debe correr el scanner:
-1. Levantar SonarQube desde la **Plantilla** (`docker-compose.qa.yml`).
-2. Ejecutar `sonar-scanner` en el Front y el Back usando los archivos `sonar-project.properties` ya configurados.
-
----
-**Nota:** Este flujo garantiza que la rama `dev` nunca tenga archivos de prueba, pero que el equipo de QA siempre tenga un entorno robusto y actualizado.
+> [!IMPORTANT]
+> He dejado archivos **Mock** en `qa/reports/` para que veas el efecto inmediato. La próxima vez que corras el runner, verás por fin el bloque de "Unit Tests" con números reales en el dashboard de SonarQube.

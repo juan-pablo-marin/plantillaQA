@@ -1,0 +1,29 @@
+FROM jenkins/jenkins:lts
+# Cambiamos a root para poder instalar paquetes y usar el socket de docker
+USER root
+
+# Instalar dependencias base necesarias para obtener la llave de docker
+RUN apt-get update && \
+    apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg2 \
+    lsb-release
+
+# Añadir la clave GPG oficial de Docker y el repositorio de forma moderna
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian \
+    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+    tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Instalar Docker CLI y Docker Compose Plugin (no el engine daemon completo, solo el cliente)
+RUN apt-get update && \
+    apt-get install -y docker-ce-cli docker-compose-plugin && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Dejar a Jenkins ejecutandose como root para no tener problemas de permisos con el `/var/run/docker.sock` montado desde el host.
+USER root

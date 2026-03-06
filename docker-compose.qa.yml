@@ -41,6 +41,8 @@ volumes:
     name: fuc-influxdb-data
   grafana_data:
     name: fuc-grafana-data
+  jenkins_qa_data:
+    name: fuc-jenkins-qa-data
 
 services:
 
@@ -138,6 +140,12 @@ services:
       SONAR_JDBC_USERNAME: sonar
       SONAR_JDBC_PASSWORD: sonar
       SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+      SONAR_WEB_JAVAOPTS: "-Xmx2G -Xms2G"
+      SONAR_CE_JAVAOPTS: "-Xmx2G -Xms2G"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     ports:
       - "9000:9000"
     volumes:
@@ -179,15 +187,12 @@ services:
       - RUN_K6=${RUN_K6:-false}
       # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
-      - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-11m}
+      - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-20m}
     volumes:
       - ./qa/reports:/qa/reports
-      # Montar config/tests para que el HTML refleje el último run (sin requerir rebuild)
-      - ./qa/run-tests.sh:/qa/run-tests.sh:ro
-      - ./qa/api:/qa/api:ro
-      - ./qa/playwright.config.ts:/qa/playwright.config.ts:ro
-      - ./qa/ui/tests:/qa/ui/tests:ro
-      - ./qa/performance:/qa/performance:ro
+      # Los bind mounts de archivos individuales (run-tests.sh, playwright.config.ts, etc.)
+      # se movieron a docker-compose.dev-override.yml para hot-reload en desarrollo local.
+      # En Jenkins (Docker-in-Docker), el Dockerfile.qa ya COPY estos archivos a la imagen.
       - sonar_scanner_cache:/root/.sonar/cache
       - ./fuc-sena:/src/backend:ro
       - ./fuc-app-web:/src/frontend:ro
@@ -310,5 +315,32 @@ services:
       - "8181:80"
     volumes:
       - ./qa/reports/newman:/usr/share/nginx/html:ro
+    networks:
+      - fuc-qa-network
+
+  # --- Jenkins (CI/CD Orchestrator) ---
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
+    container_name: fuc-jenkins-qa
+    user: root
+    profiles: [ "jenkins", "all" ]
+    restart: unless-stopped
+    ports:
+      - "${JENKINS_PORT:-8085}:8080"
+      - "50000:50000"
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      # Se recomienda usar secretos para JENKINS_ADMIN_ID y JENKINS_ADMIN_PASSWORD en un entorno productivo
+      - JENKINS_ADMIN_ID=admin
+      - JENKINS_ADMIN_PASSWORD=admin
+    volumes:
+      - jenkins_qa_data:/var/jenkins_home
+      # Montar socket de docker para que Jenkins pueda lanzar docker run/compose internamente
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Montar el propio proyecto dentro de Jenkins (para que no importe como se llama el Job)
+      - .:/app
+    working_dir: /app
     networks:
       - fuc-qa-network

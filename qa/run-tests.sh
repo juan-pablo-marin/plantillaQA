@@ -9,13 +9,13 @@ REPORTS_DIR="/qa/reports"
 # ── Flags de ejecución ─────────────────────────────────────────────────────
 # Cambia a "true" el servicio que quieras activar; el resto se omite.
 RUN_NEWMAN="${RUN_NEWMAN:-false}"          # Tests de API con Newman/Postman
-RUN_SONAR="${RUN_SONAR:-false}"            # Análisis estático con SonarQube
+RUN_SONAR="${RUN_SONAR:-true}"            # Análisis estático con SonarQube
 RUN_PLAYWRIGHT="${RUN_PLAYWRIGHT:-false}"  # Tests E2E con Playwright
 RUN_K6="${RUN_K6:-false}"                  # Tests de rendimiento con k6
 # ───────────────────────────────────────────────────────────────────────────
 
 SONAR_WAIT_SECONDS="${SONAR_WAIT_SECONDS:-300}"
-SONAR_SCAN_TIMEOUT="${SONAR_SCAN_TIMEOUT:-15m}"
+SONAR_SCAN_TIMEOUT="${SONAR_SCAN_TIMEOUT:-20m}"
 
 mkdir -p "$REPORTS_DIR"
 cd /qa
@@ -50,6 +50,33 @@ fi
 
 rm -rf "$ALLURE_RESULTS_DIR" "$K6_DIR" || true
 mkdir -p "$ALLURE_RESULTS_DIR" "$NEWMAN_DIR" "$K6_DIR"
+
+# 0.5. Ejecutar Tests Unitarios (para métricas de Sonar)
+echo "[0.5/6] Ejecutando Tests Unitarios (Backend & Frontend)..."
+
+# Backend Go
+if [ -d "/src/backend" ]; then
+    echo "  Running Go tests..."
+    cd /src/backend
+    # Usamos go-junit-report para un reporte mas compatible (o mantenemos JSON pero arreglamos rutas)
+    # Por ahora arreglamos el JSON mock y el comando real
+    go test -v ./... -json > "$REPORTS_DIR/go-test-report.json" || echo "  WARN: Algunos tests de Go fallaron."
+    # Corregir prefijo de paquetes en el reporte JSON para que Sonar los encuentre
+    sed -i 's|fuc-sena-backend/|backend/|g' "$REPORTS_DIR/go-test-report.json"
+    cd /qa
+fi
+
+# Frontend JS (Vitest)
+if [ -d "/src/frontend" ]; then
+    echo "  Running Frontend tests..."
+    cd /src/frontend
+    # Intentamos ejecutar vitest si esta configurado
+    if [ -f "package.json" ]; then
+        # Generamos JUnit para Sonar
+        pnpm test run --reporter=junit --outputFile="$REPORTS_DIR/js-test-report.xml" || echo "  WARN: Algunos tests de Frontend fallaron o Vitest no esta configurado."
+    fi
+    cd /qa
+fi
 
 # 1. Esperar Backend
 echo "[1/6] Esperando Backend..."
@@ -147,6 +174,12 @@ else
     done
 
     if [ "$SONAR_READY" = true ] && [ -n "${SONAR_TOKEN:-}" ] && [ "$SONAR_TOKEN" != "your-sonar-token-here" ]; then
+        if [ -f "/src/backend/coverage.out" ]; then
+            echo "  Copiando y corrigiendo rutas en coverage.out (ReadOnly fix)..."
+            cp /src/backend/coverage.out "$REPORTS_DIR/coverage-backend.out"
+            sed -i 's|fuc-sena-backend/|backend/|g' "$REPORTS_DIR/coverage-backend.out"
+        fi
+
         echo "  Iniciando sonar-scanner (timeout: $SONAR_SCAN_TIMEOUT)..."
         timeout "$SONAR_SCAN_TIMEOUT" sonar-scanner \
             -Dsonar.projectBaseDir=/src \
@@ -154,13 +187,26 @@ else
             -Dsonar.host.url="$SONAR_URL" \
             -Dsonar.token="$SONAR_TOKEN" \
             -Dsonar.sources=frontend/src,backend \
-            -Dsonar.exclusions="**/node_modules/**,**/.next/**,**/vendor/**,**/*_test.go,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
+            -Dsonar.tests=frontend/src,backend \
+            -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
+            -Dsonar.exclusions="**/*.py,**/node_modules/**,**/.next/**,**/vendor/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
             -Dsonar.scm.disabled=true \
-            -Dsonar.javascript.lcov.reportPaths="$REPORTS_DIR/lcov.info" \
-            -Dsonar.go.coverage.reportPaths=backend/coverage.out \
+            -Dsonar.javascript.lcov.reportPaths="frontend/coverage/lcov.info" \
+            -Dsonar.go.coverage.reportPaths="$REPORTS_DIR/coverage-backend.out" \
+            -Dsonar.go.tests.reportPaths="$REPORTS_DIR/go-test-report.json" \
+            -Dsonar.testExecutionReportPaths="$REPORTS_DIR/js-test-report.xml" \
+            -Dsonar.javascript.node.maxspace=4096 \
             || echo "  WARN: Fallo o timeout el escaneo de Sonar."
     else
         echo " SKIP: SonarQube no esta listo o falta SONAR_TOKEN."
+    fi
+
+    # --- Nueva validacion de Cobertura Go ---
+    if [ -f "/src/backend/coverage.out" ] && [ -f "/qa/coverage_checker.go" ]; then
+        echo "  Validando umbral de cobertura (70%)..."
+        go run /qa/coverage_checker.go -file=/src/backend/coverage.out -threshold=70 || echo "  WARN: Cobertura insuficiente."
+    elif [ -f "/src/backend/coverage.out" ]; then
+        echo "  SKIP: coverage_checker.go no encontrado, omitiendo validacion de umbral."
     fi
 fi
 

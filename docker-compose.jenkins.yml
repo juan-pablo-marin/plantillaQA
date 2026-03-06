@@ -1,0 +1,16 @@
+# ═══════════════════════════════════════════════════════════════
+#  JENKINS OVERRIDE — Reservado para configuraciones exclusivas
+#  de Jenkins en Docker-in-Docker (DinD).
+#
+#  Uso (solo desde Jenkins, vía Jenkinsfile):
+#    docker compose -f docker-compose.qa.yml -f docker-compose.jenkins.yml ...
+#
+#  Actualmente no necesita sobreescribir nada. Los bind mounts
+#  problemáticos ya fueron removidos del archivo base y movidos
+#  a docker-compose.dev-override.yml para desarrollo local.
+#
+#  Este archivo se mantiene como punto de entrada para futuras
+#  configuraciones exclusivas de Jenkins (e.g., timeouts, limits).
+# ═══════════════════════════════════════════════════════════════
+
+services: {}
