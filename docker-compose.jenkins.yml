@@ -13,4 +13,16 @@
 #  configuraciones exclusivas de Jenkins (e.g., timeouts, limits).
 # ═══════════════════════════════════════════════════════════════
 
-services: {}
+services:
+  qa-runner:
+    # ── Jenkins Override ──
+    # En Jenkins (DinD), si dejamos los bind mounts de código fuente (./fuc-sena:/src/backend:ro), 
+    # el daemon de Docker del host intentará montar esas rutas relativas DESDE LA MÁQUINA ANFITRIONA, 
+    # donde el path relativo de Jenkins no existe, resultando en carpetas vacías y "No such file or directory".
+    #
+    # Por lo tanto, en el entorno de Jenkins, le decimos a Compose que ignore los montajes de
+    # código fuente host-to-container porque el Dockerfile.qa ya hizo "COPY . ." en el build.
+    # Solo preservamos el montaje de reportes, caché de sonar y las variables.
+    volumes:
+      - ./qa/reports:/qa/reports
+      - sonar_scanner_cache:/root/.sonar/cache
