@@ -174,6 +174,13 @@ else
     done
 
     if [ "$SONAR_READY" = true ] && [ -n "${SONAR_TOKEN:-}" ] && [ "$SONAR_TOKEN" != "your-sonar-token-here" ]; then
+        echo "  --- Debug: Verificando directorios para Sonar ---"
+        ls -ld /src || echo "  ERROR: /src no existe"
+        ls -ld /src/backend || echo "  ERROR: /src/backend no existe"
+        ls -ld /src/frontend || echo "  ERROR: /src/frontend no existe"
+        ls -ld /src/frontend/src || echo "  ERROR: /src/frontend/src no existe"
+        echo "  ------------------------------------------------"
+
         if [ -f "/src/backend/coverage.out" ]; then
             echo "  Copiando y corrigiendo rutas en coverage.out (ReadOnly fix)..."
             cp /src/backend/coverage.out "$REPORTS_DIR/coverage-backend.out"
@@ -181,13 +188,16 @@ else
         fi
 
         echo "  Iniciando sonar-scanner (timeout: $SONAR_SCAN_TIMEOUT)..."
+        # Optimizamos paths: 
+        # sources: codigo real (backend e frontend/src)
+        # tests: carpetas de tests (frontend/tests e backend para *.test.go)
         timeout "$SONAR_SCAN_TIMEOUT" sonar-scanner \
             -Dsonar.projectBaseDir=/src \
             -Dsonar.projectKey="${PROJECT_KEY:-fuc-sena}" \
             -Dsonar.host.url="$SONAR_URL" \
             -Dsonar.token="$SONAR_TOKEN" \
             -Dsonar.sources=frontend/src,backend \
-            -Dsonar.tests=frontend/src,backend \
+            -Dsonar.tests=frontend/tests,backend \
             -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
             -Dsonar.exclusions="**/*.py,**/node_modules/**,**/.next/**,**/vendor/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
             -Dsonar.scm.disabled=true \

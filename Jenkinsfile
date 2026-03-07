@@ -82,6 +82,7 @@ pipeline {
     post {
         always {
             script {
+                // ── 1. Archivar artefactos en bruto ──────────────────────
                 echo "=> Recolectando resultados de Postman/Newman..."
                 archiveArtifacts artifacts: 'qa/reports/newman/**/*', allowEmptyArchive: true
                 
@@ -91,6 +92,42 @@ pipeline {
                 echo "=> Recolectando Resultados de Jmeter/K6..."
                 archiveArtifacts artifacts: 'qa/reports/k6/**/*', allowEmptyArchive: true
 
+                echo "=> Recolectando reportes de Playwright..."
+                archiveArtifacts artifacts: 'qa/reports/playwright-html/**/*', allowEmptyArchive: true
+
+                // ── 2. Publicar resultados JUnit (Tests Frontend) ────────
+                echo "=> Publicando resultados JUnit..."
+                junit testResults: 'qa/reports/js-test-report.xml', allowEmptyResults: true
+
+                // ── 3. Publicar reportes HTML navegables ─────────────────
+                echo "=> Publicando reporte HTML de Newman..."
+                publishHTML(target: [
+                    reportName: 'Newman API Report',
+                    reportDir: 'qa/reports/newman',
+                    reportFiles: 'index.html',
+                    keepAll: true,
+                    alwaysLinkToLastBuild: true,
+                    allowMissing: true
+                ])
+
+                echo "=> Publicando reporte HTML de Playwright..."
+                publishHTML(target: [
+                    reportName: 'Playwright E2E Report',
+                    reportDir: 'qa/reports/playwright-html',
+                    reportFiles: 'index.html',
+                    keepAll: true,
+                    alwaysLinkToLastBuild: true,
+                    allowMissing: true
+                ])
+
+                // ── 4. Publicar dashboard Allure ─────────────────────────
+                echo "=> Generando dashboard Allure..."
+                allure includeProperties: false,
+                       jdk: '',
+                       results: [[path: 'qa/reports/allure-results']],
+                       reportBuildPolicy: 'ALWAYS'
+
+                // ── 5. Cleanup ───────────────────────────────────────────
                 echo "=> Apagando y limpiando contenedores del Pipeline..."
                 sh '''
                     ${COMPOSE_CMD} stop || true

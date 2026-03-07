@@ -25,5 +25,16 @@ RUN apt-get update && \
     apt-get install -y docker-ce-cli docker-compose-plugin && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Instalar plugins de Jenkins para visualización de reportes QA.
+# - html-publisher:   Publicar reportes HTML (Newman, Playwright) como páginas navegables
+# - junit:            Parsear reportes JUnit XML y mostrar resultados pass/fail con historial
+# - pipeline-stage-view: Vista visual de stages con tiempos de ejecución
+# - allure-jenkins-plugin: Dashboard interactivo de Allure con historial entre builds
+RUN jenkins-plugin-cli --plugins \
+    htmlpublisher \
+    junit \
+    pipeline-stage-view \
+    allure-jenkins-plugin
+
 # Dejar a Jenkins ejecutandose como root para no tener problemas de permisos con el `/var/run/docker.sock` montado desde el host.
 USER root
