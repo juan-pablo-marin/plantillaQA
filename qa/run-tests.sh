@@ -58,11 +58,20 @@ echo "[0.5/6] Ejecutando Tests Unitarios (Backend & Frontend)..."
 if [ -d "/src/backend" ]; then
     echo "  Running Go tests..."
     cd /src/backend
-    # Usamos go-junit-report para un reporte mas compatible (o mantenemos JSON pero arreglamos rutas)
-    # Por ahora arreglamos el JSON mock y el comando real
-    go test -v ./... -json > "$REPORTS_DIR/go-test-report.json" || echo "  WARN: Algunos tests de Go fallaron."
-    # Corregir prefijo de paquetes en el reporte JSON para que Sonar los encuentre
+    
+    # 1. Tests & json report for Sonar + Coverage profile en 1 solo pase
+    go test -v -coverprofile="$REPORTS_DIR/coverage-backend.out" ./... -json > "$REPORTS_DIR/go-test-report.json" || echo "  WARN: Algunos tests de Go fallaron."
     sed -i 's|fuc-sena-backend/|backend/|g' "$REPORTS_DIR/go-test-report.json"
+    
+    # 2. Go Vet para Jenkins Warnings NG Plugin
+    go vet ./... 2> "$REPORTS_DIR/govet.txt" || echo "  WARN: Go vet encontro problemas."
+    
+    # 3. Exportar cobertura a formato XML (Cobertura API)
+    if [ -f "$REPORTS_DIR/coverage-backend.out" ]; then
+        sed -i 's|fuc-sena-backend/|backend/|g' "$REPORTS_DIR/coverage-backend.out"
+        gocover-cobertura < "$REPORTS_DIR/coverage-backend.out" > "$REPORTS_DIR/coverage-backend.xml"
+    fi
+    
     cd /qa
 fi
 

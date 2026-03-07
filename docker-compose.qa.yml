@@ -335,6 +335,7 @@ services:
       # Se recomienda usar secretos para JENKINS_ADMIN_ID y JENKINS_ADMIN_PASSWORD en un entorno productivo
       - JENKINS_ADMIN_ID=admin
       - JENKINS_ADMIN_PASSWORD=admin
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
     volumes:
       - jenkins_qa_data:/var/jenkins_home
       # Montar socket de docker para que Jenkins pueda lanzar docker run/compose internamente

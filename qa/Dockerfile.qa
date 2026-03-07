@@ -17,6 +17,8 @@ RUN apt-get update && apt-get install -y \
 # --- Go 1.25 (for running backend unit tests) ---
 RUN curl -sSL https://go.dev/dl/go1.25.0.linux-amd64.tar.gz | tar -C /usr/local -xzf -
 ENV PATH="/usr/local/go/bin:${PATH}"
+RUN go install github.com/boumenot/gocover-cobertura@latest \
+    && mv /root/go/bin/gocover-cobertura /usr/local/bin/
 
 # --- pnpm (for running frontend unit tests) ---
 RUN corepack enable && corepack prepare pnpm@latest --activate

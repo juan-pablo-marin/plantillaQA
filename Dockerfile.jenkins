@@ -34,7 +34,13 @@ RUN jenkins-plugin-cli --plugins \
     htmlpublisher \
     junit \
     pipeline-stage-view \
-    allure-jenkins-plugin
+    allure-jenkins-plugin \
+    build-monitor-plugin \
+    dashboard-view \
+    code-coverage-api \
+    warnings-ng \
+    performance \
+    discord-notifier
 
 # Dejar a Jenkins ejecutandose como root para no tener problemas de permisos con el `/var/run/docker.sock` montado desde el host.
 USER root

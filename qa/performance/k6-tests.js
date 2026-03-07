@@ -1,6 +1,7 @@
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
+import { jUnit } from 'https://jslib.k6.io/k6-summary/0.0.3/index.js';
 
 const BACKEND_URL = __ENV.BACKEND_URL || 'http://backend:8080';
 const AUTH_ID_USER = __ENV.K6_AUTH_ID_USER;
@@ -109,5 +110,6 @@ export default function (data) {
 export function handleSummary(data) {
   return {
     '/qa/reports/k6-summary.json': JSON.stringify(data, null, 2),
+    '/qa/reports/k6/junit.xml': jUnit(data),
   };
 }
