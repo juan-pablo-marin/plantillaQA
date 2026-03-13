@@ -101,6 +101,10 @@ if [ "$RUN_SONAR" = "true" ]; then
             if grep -q '"test":' package.json; then
                 # Generamos JUnit para Sonar
                 pnpm test run --reporter=junit --outputFile="$REPORTS_DIR/js-test-report.xml" || echo "  WARN: Algunos tests de Frontend fallaron."
+104:                 # Corregir rutas en lcov.info para Sonar (de src/... a fuc-app-web/src/...)
+105:                 if [ -f "coverage/lcov.info" ]; then
+106:                     sed -i 's|SF:src/|SF:fuc-app-web/src/|g' coverage/lcov.info
+107:                 fi
             else
                 echo "  SKIP: No se encontro script 'test' en package.json de frontend."
             fi
@@ -309,7 +313,13 @@ else
             if [ -f "/src/fuc-sena/coverage.out" ]; then
                 echo "  Copiando y corrigiendo rutas en coverage.out (ReadOnly fix)..."
                 cp /src/fuc-sena/coverage.out "$REPORTS_DIR/coverage-backend.out"
+                # Asegurar que las rutas empiecen con fuc-sena/ para que Sonar las encuentre
                 sed -i 's|fuc-sena-backend/|fuc-sena/|g' "$REPORTS_DIR/coverage-backend.out"
+                # Si las rutas no tienen prefijo, agregarlo
+                if ! grep -q "fuc-sena/" "$REPORTS_DIR/coverage-backend.out"; then
+                    sed -i 's|^|fuc-sena/|' "$REPORTS_DIR/coverage-backend.out"
+                    sed -i 's|fuc-sena/mode:|mode:|' "$REPORTS_DIR/coverage-backend.out"
+                fi
             fi
 
             # Construccion dinamica de argumentos para evitar fallos por archivos faltantes
@@ -356,6 +366,7 @@ else
     # --- Nueva validacion de Cobertura Go ---
     if [ -f "$REPORTS_DIR/coverage-backend.out" ] && [ -f "/qa/coverage_checker.go" ]; then
         echo "  Validando umbral de cobertura (70%)..."
+        # Usamos || true para que el pipeline NO se bloquee y permita ver los resultados en Sonar
         go run /qa/coverage_checker.go -file="$REPORTS_DIR/coverage-backend.out" -threshold=70 || echo "  WARN: Cobertura insuficiente."
     elif [ -f "$REPORTS_DIR/coverage-backend.out" ]; then
         echo "  SKIP: coverage_checker.go no encontrado, omitiendo validacion de umbral."
