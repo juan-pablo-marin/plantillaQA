@@ -101,10 +101,11 @@ if [ "$RUN_SONAR" = "true" ]; then
             if grep -q '"test":' package.json; then
                 # Generamos JUnit para Sonar
                 pnpm test run --reporter=junit --outputFile="$REPORTS_DIR/js-test-report.xml" || echo "  WARN: Algunos tests de Frontend fallaron."
-104:                 # Corregir rutas en lcov.info para Sonar (de src/... a fuc-app-web/src/...)
-105:                 if [ -f "coverage/lcov.info" ]; then
-106:                     sed -i 's|SF:src/|SF:fuc-app-web/src/|g' coverage/lcov.info
-107:                 fi
+104:                 # Corregir rutas en lcov.info para Sonar 
+105:                 # Vitest puede usar 'src/' o 'frontend/' segun el contexto; forzamos a 'fuc-app-web/src/'
+106:                 if [ -f "coverage/lcov.info" ]; then
+107:                     sed -i 's|SF:.*src/|SF:fuc-app-web/src/|g' coverage/lcov.info
+108:                 fi
             else
                 echo "  SKIP: No se encontro script 'test' en package.json de frontend."
             fi
