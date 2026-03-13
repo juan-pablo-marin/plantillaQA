@@ -102,7 +102,8 @@ pipeline {
                             sh "mkdir -p /app/qa/reports/"
                             sh "docker cp qa-runner-sonar:/qa/reports/coverage-backend.out /app/qa/reports/ || true"
                             sh "docker cp qa-runner-sonar:/qa/reports/coverage-backend.xml /app/qa/reports/ || true"
-                            sh "docker cp qa-runner-sonar:/qa/reports/coverage-frontend.json /app/qa/reports/ || true"
+                            sh "docker cp qa-runner-sonar:/qa/reports/js-test-report.xml /app/qa/reports/ || true"
+                            sh "docker cp qa-runner-sonar:/app/fuc-app-web/coverage/lcov.info /app/qa/reports/coverage-frontend.lcov || true"
                             sh "docker cp qa-runner-sonar:/qa/reports/govet.txt /app/qa/reports/ || true"
                             
                             sh "docker rm -f qa-runner-sonar || true"

@@ -101,11 +101,11 @@ if [ "$RUN_SONAR" = "true" ]; then
             if grep -q '"test":' package.json; then
                 # Generamos JUnit para Sonar
                 pnpm test run --reporter=junit --outputFile="$REPORTS_DIR/js-test-report.xml" || echo "  WARN: Algunos tests de Frontend fallaron."
-104:                 # Corregir rutas en lcov.info para Sonar 
-105:                 # Vitest puede usar 'src/' o 'frontend/' segun el contexto; forzamos a 'fuc-app-web/src/'
-106:                 if [ -f "coverage/lcov.info" ]; then
-107:                     sed -i 's|SF:.*src/|SF:fuc-app-web/src/|g' coverage/lcov.info
-108:                 fi
+                # Corregir rutas en lcov.info para Sonar 
+                # Vitest puede usar 'src/' o 'frontend/' segun el contexto; forzamos a 'fuc-app-web/src/'
+                if [ -f "coverage/lcov.info" ]; then
+                    sed -i 's|SF:.*src/|SF:fuc-app-web/src/|g' coverage/lcov.info
+                fi
             else
                 echo "  SKIP: No se encontro script 'test' en package.json de frontend."
             fi
@@ -326,7 +326,7 @@ else
             # Construccion dinamica de argumentos para evitar fallos por archivos faltantes
             SONAR_ARGS=""
             
-            if [ -f "fuc-app-web/coverage/lcov.info" ]; then
+            if [ -f "/src/fuc-app-web/coverage/lcov.info" ]; then
                 SONAR_ARGS="$SONAR_ARGS -Dsonar.javascript.lcov.reportPaths=fuc-app-web/coverage/lcov.info"
             fi
             
@@ -379,7 +379,7 @@ echo "[4/6] Ejecutando Playwright..."
 
 if [ "$RUN_PLAYWRIGHT" != "true" ]; then
     echo " SKIP: RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT"
-elif [ -f "playwright.config.ts" ]; then
+elif [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
     echo "  Ejecutando tests desde playwright.config.ts (testDir: ./ui/tests)"
     echo "  Limpiando reportes anteriores (HTML + artefactos)..."
     rm -rf "$REPORTS_DIR/playwright-html" "$REPORTS_DIR/playwright-results" || true
