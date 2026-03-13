@@ -28,6 +28,7 @@ RUN npm install -g newman newman-reporter-allure
 
 # --- Playwright (UI testing) ---
 RUN npm install -g playwright
+RUN npx playwright install --with-deps chromium
 
 # --- k6 (Performance testing) ---
 RUN curl -sSLo /tmp/k6.deb https://github.com/grafana/k6/releases/download/v0.50.0/k6-v0.50.0-linux-amd64.deb \
@@ -45,16 +46,17 @@ RUN curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribut
     && rm /tmp/sonar-scanner.zip
 
 # --- QA project dependencies ---
-COPY package.json ./
+COPY qa/package.json ./
 RUN npm install
 
-# --- Playwright browsers ---
-RUN npx playwright install --with-deps chromium
-
 # --- Copy QA project files ---
-COPY . .
+COPY qa/ /qa/
+
+# Copy sources into image
+COPY fuc-sena/ /src/fuc-sena/
+COPY fuc-app-web/ /src/fuc-app-web/
 
 # Fix CRLF issues (Windows line endings) that break bash scripts
-RUN sed -i 's/\r$//' run-tests.sh && chmod +x run-tests.sh
+RUN sed -i 's/\r$//' /qa/run-tests.sh && chmod +x /qa/run-tests.sh
 
 CMD ["bash", "run-tests.sh"]

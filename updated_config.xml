@@ -1,0 +1,335 @@
+﻿<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
+      <jobProperties/>
+      <triggers>
+        <string>hudson.triggers.TimerTrigger</string>
+      </triggers>
+      <parameters>
+        <string>RUN_NEWMAN</string>
+        <string>RUN_SONAR</string>
+        <string>RUN_PLAYWRIGHT</string>
+        <string>RUN_K6</string>
+      </parameters>
+      <options/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <hudson.model.ParametersDefinitionProperty>
+      <parameterDefinitions>
+        <hudson.model.BooleanParameterDefinition>
+          <name>RUN_NEWMAN</name>
+          <description>Ejecutar pruebas de API con Newman</description>
+          <defaultValue>true</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>RUN_SONAR</name>
+          <description>Ejecutar anÃ¡lisis estÃ¡tico con SonarQube</description>
+          <defaultValue>true</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>RUN_PLAYWRIGHT</name>
+          <description>Ejecutar pruebas End-to-End con Playwright</description>
+          <defaultValue>true</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+        <hudson.model.BooleanParameterDefinition>
+          <name>RUN_K6</name>
+          <description>Ejecutar pruebas de estrÃ©s/rendimiento con k6</description>
+          <defaultValue>false</defaultValue>
+        </hudson.model.BooleanParameterDefinition>
+      </parameterDefinitions>
+    </hudson.model.ParametersDefinitionProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <hudson.triggers.TimerTrigger>
+          <spec>H 1 * * 1-5</spec>
+        </hudson.triggers.TimerTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4257.vb_2e202808577">
+    <script>
+pipeline {
+    agent any
+
+    // --- ParÃ¡metros Visuales (Build with Parameters) ---
+    parameters {
+        booleanParam(name: &apos;RUN_NEWMAN&apos;, defaultValue: true, description: &apos;Ejecutar pruebas de API con Newman&apos;)
+        booleanParam(name: &apos;RUN_SONAR&apos;, defaultValue: true, description: &apos;Ejecutar anÃ¡lisis estÃ¡tico con SonarQube&apos;)
+        booleanParam(name: &apos;RUN_PLAYWRIGHT&apos;, defaultValue: true, description: &apos;Ejecutar pruebas End-to-End con Playwright&apos;)
+        booleanParam(name: &apos;RUN_K6&apos;, defaultValue: false, description: &apos;Ejecutar pruebas de estrÃ©s/rendimiento con k6&apos;)
+    }
+
+    triggers {
+        cron(&apos;H 1 * * 1-5&apos;)
+    }
+
+    options {
+        ansiColor(&apos;xterm&apos;)
+    }
+
+    environment {
+        ENVIRONMENT = &apos;qa&apos;
+        COMPOSE_PROJECT_NAME = &apos;fichacaracterizacionv1&apos;
+        COMPOSE_CMD = &apos;docker compose --env-file /app/.env.qa -f /app/docker-compose.qa.yml -f /app/docker-compose.jenkins.yml&apos;
+        
+        // Agregar credencial si existe, de momento la dejamos como variable de entorno o vacÃ­a
+        // DISCORD_WEBHOOK = credentials(&apos;discord-webhook-qa&apos;) // Para el futuro
+        DISCORD_WEBHOOK = &quot;${env.DISCORD_WEBHOOK_URL ?: &apos;&apos;}&quot;
+        
+        // --- SONAR CONFIG ---
+        // Se asume que el token viene de la configuraciÃ³n de Jenkins o archivo .env.qa
+        SONAR_TOKEN = &quot;${env.SONAR_TOKEN ?: &apos;&apos;}&quot;
+        PROJECT_KEY = &quot;${env.PROJECT_KEY ?: &apos;fuc-sena&apos;}&quot;
+    }
+
+    stages {
+        stage(&apos;Preparar Entorno y Dependencias Docker&apos;) {
+            steps {
+                script {
+                    echo &quot;=&gt; Limpiando entorno previo de QA...&quot;
+                    sh &apos;&apos;&apos;
+                        ${COMPOSE_CMD} stop || true
+                        ${COMPOSE_CMD} rm -f -v || true
+                        # Forzar apagado de contenedores pesados de UI consumiendo recursos del host
+                        docker stop fuc-allure fuc-allure-ui fuc-allure-nginx kiwitcmsdock || true
+                        mkdir -p /app/qa/reports
+                        rm -rf /app/qa/reports/*
+                    &apos;&apos;&apos;
+
+                    echo &quot;=&gt; Levantando perfil Base...&quot;
+                    sh &apos;${COMPOSE_CMD} --profile sonar up -d db backend frontend sonar-db sonarqube influxdb grafana&apos;
+
+                    echo &quot;=&gt; Construyendo QA Runner (Root Context)...&quot;
+                    sh &apos;${COMPOSE_CMD} build qa-runner&apos;
+                }
+            }
+        }
+
+        stage(&apos;Tests en Paralelo&apos;) {
+            parallel {
+                stage(&apos;API (Newman)&apos;) {
+                    when { expression { return params.RUN_NEWMAN } }
+                    steps {
+                        script {
+                            echo &quot;=&gt; Ejecutando Newman Tests...&quot;
+                            // Removemos --rm para poder copiar los artefactos despuÃ©s
+                            sh &quot;&quot;&quot;
+                                ${COMPOSE_CMD} run --name qa-runner-newman \\
+                                -e RUN_NEWMAN=true \\
+                                -e RUN_SONAR=false \\
+                                -e RUN_PLAYWRIGHT=false \\
+                                -e RUN_K6=false \\
+                                qa-runner || true
+                            &quot;&quot;&quot;
+                            
+                            echo &quot;=&gt; Extrayendo reportes Newman al workspace de Jenkins...&quot;
+                            // Usamos rura absoluta /app/qa/reports/ donde esta montado el proyecto
+                            sh &quot;mkdir -p /app/qa/reports/&quot;
+                            sh &quot;docker cp qa-runner-newman:/qa/reports/newman /app/qa/reports/ || true&quot;
+                            
+                            // Limpiamos el contenedor
+                            sh &quot;docker rm -f qa-runner-newman || true&quot;
+                        }
+                    }
+                }
+
+                stage(&apos;AnÃ¡lisis EstÃ¡tico (SonarQube)&apos;) {
+                    when { expression { return params.RUN_SONAR } }
+                    steps {
+                        script {
+                            echo &quot;=&gt; Ejecutando AnÃ¡lisis SonarQube...&quot;
+                            sh &quot;&quot;&quot;
+                                ${COMPOSE_CMD} run --name qa-runner-sonar \\
+                                -e RUN_NEWMAN=false \\
+                                -e RUN_SONAR=true \\
+                                -e RUN_PLAYWRIGHT=false \\
+                                -e RUN_K6=false \\
+                                ${SONAR_TOKEN ? &quot;-e SONAR_TOKEN=${SONAR_TOKEN}&quot; : &quot;&quot;} \\
+                                -e PROJECT_KEY=${PROJECT_KEY} \\
+                                qa-runner || true
+                            &quot;&quot;&quot;
+                            
+                            echo &quot;=&gt; Extrayendo reportes de cobertura al workspace de Jenkins...&quot;
+                            sh &quot;mkdir -p /app/qa/reports/&quot;
+                            sh &quot;docker cp qa-runner-sonar:/qa/reports/coverage-backend.out /app/qa/reports/ || true&quot;
+                            sh &quot;docker cp qa-runner-sonar:/qa/reports/coverage-backend.xml /app/qa/reports/ || true&quot;
+                            sh &quot;docker cp qa-runner-sonar:/qa/reports/coverage-frontend.json /app/qa/reports/ || true&quot;
+                            sh &quot;docker cp qa-runner-sonar:/qa/reports/govet.txt /app/qa/reports/ || true&quot;
+                            
+                            sh &quot;docker rm -f qa-runner-sonar || true&quot;
+                        }
+                    }
+                }
+
+                stage(&apos;End-to-End (Playwright)&apos;) {
+                    when { expression { return params.RUN_PLAYWRIGHT } }
+                    steps {
+                        script {
+                            echo &quot;=&gt; Ejecutando Playwright Tests...&quot;
+                            sh &quot;&quot;&quot;
+                                ${COMPOSE_CMD} run --name qa-runner-e2e \\
+                                -e RUN_NEWMAN=false \\
+                                -e RUN_SONAR=false \\
+                                -e RUN_PLAYWRIGHT=true \\
+                                -e RUN_K6=false \\
+                                qa-runner || true
+                            &quot;&quot;&quot;
+                            
+                            echo &quot;=&gt; Extrayendo reportes Playwright al workspace de Jenkins...&quot;
+                            sh &quot;mkdir -p /app/qa/reports/&quot;
+                            sh &quot;docker cp qa-runner-e2e:/qa/reports/playwright /app/qa/reports/ || true&quot;
+                            sh &quot;docker cp qa-runner-e2e:/qa/reports/playwright-html /app/qa/reports/ || true&quot;
+                            
+                            sh &quot;docker rm -f qa-runner-e2e || true&quot;
+                        }
+                    }
+                }
+
+                stage(&apos;Performance (k6)&apos;) {
+                    when { expression { return params.RUN_K6 } }
+                    steps {
+                        script {
+                            echo &quot;=&gt; Ejecutando k6 Tests...&quot;
+                            sh &quot;&quot;&quot;
+                                ${COMPOSE_CMD} run --name qa-runner-k6 \\
+                                -e RUN_NEWMAN=false \\
+                                -e RUN_SONAR=false \\
+                                -e RUN_PLAYWRIGHT=false \\
+                                -e RUN_K6=true \\
+                                qa-runner || true
+                            &quot;&quot;&quot;
+                            
+                            echo &quot;=&gt; Extrayendo reportes k6 al workspace de Jenkins...&quot;
+                            sh &quot;mkdir -p /app/qa/reports/&quot;
+                            sh &quot;docker cp qa-runner-k6:/qa/reports/k6 /app/qa/reports/ || true&quot;
+                            
+                            sh &quot;docker rm -f qa-runner-k6 || true&quot;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                // DiagnÃ³stico de rutas
+                sh &apos;ls -d /app/qa/reports 2&gt;/dev/null &amp;&amp; ls /app/qa/reports/newman/ 2&gt;/dev/null || echo &quot;qa/reports no encontrado en /app&quot;&apos;
+
+                dir(&apos;/app&apos;) {
+                    // 1. Newman artifacts
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        if (fileExists(&apos;qa/reports/newman/index.html&apos;)) {
+                            archiveArtifacts artifacts: &apos;qa/reports/newman/**/*&apos;, allowEmptyArchive: true
+                        }
+                    }
+
+                    // 2. Cobertura &amp; reportes unitarios (solo si Sonar corriÃ³)
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        if (fileExists(&apos;qa/reports/coverage-backend.xml&apos;)) {
+                            archiveArtifacts artifacts: &apos;qa/reports/coverage-backend.*&apos;, allowEmptyArchive: true
+                            publishCoverage adapters: [
+                                coberturaReportAdapter(path: &apos;qa/reports/coverage-backend.xml&apos;)
+                            ], sourceFileResolver: sourceFiles(&apos;STORE_LAST_BUILD&apos;)
+                        }
+                    }
+
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        if (fileExists(&apos;qa/reports/js-test-report.xml&apos;)) {
+                            archiveArtifacts artifacts: &apos;qa/reports/js-test-report.xml&apos;, allowEmptyArchive: true
+                            junit testResults: &apos;qa/reports/js-test-report.xml&apos;, allowEmptyResults: true
+                        }
+                    }
+
+                    // 3. k6 Performance
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        if (fileExists(&apos;qa/reports/k6/summary.json&apos;)) {
+                            archiveArtifacts artifacts: &apos;qa/reports/k6/**/*&apos;, allowEmptyArchive: true
+                            perfReport filterRegex: &apos;&apos;, sourceDataFiles: &apos;qa/reports/k6/*.xml&apos;
+                        }
+                    }
+
+                    // 4. Go Vet (Warnings NG)
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        if (fileExists(&apos;qa/reports/govet.txt&apos;)) {
+                            archiveArtifacts artifacts: &apos;qa/reports/govet.txt&apos;, allowEmptyArchive: true
+                            recordIssues enabledForFailure: true, tool: goVet(pattern: &apos;qa/reports/govet.txt&apos;)
+                        }
+                    }
+
+                    // 5. Playwright
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        if (fileExists(&apos;qa/reports/playwright-html/index.html&apos;)) {
+                            archiveArtifacts artifacts: &apos;qa/reports/playwright-html/**/*&apos;, allowEmptyArchive: true
+                            publishHTML(target: [
+                                reportName: &apos;Playwright E2E Report&apos;,
+                                reportDir: &apos;qa/reports/playwright-html&apos;,
+                                reportFiles: &apos;index.html&apos;,
+                                keepAll: true,
+                                alwaysLinkToLastBuild: true,
+                                allowMissing: true
+                            ])
+                        }
+                    }
+
+                    // 6. Newman HTML Report (auto-contenido, no necesita servidor)
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        if (fileExists(&apos;qa/reports/newman/index.html&apos;)) {
+                            publishHTML(target: [
+                                reportName: &apos;Newman API Report&apos;,
+                                reportDir: &apos;qa/reports/newman&apos;,
+                                reportFiles: &apos;index.html&apos;,
+                                keepAll: true,
+                                alwaysLinkToLastBuild: true,
+                                allowMissing: true
+                            ])
+                        }
+                    }
+
+                    // 7. Allure
+                    catchError(buildResult: &apos;SUCCESS&apos;, stageResult: &apos;UNSTABLE&apos;) {
+                        if (fileExists(&apos;qa/reports/allure-results&apos;)) {
+                            allure includeProperties: false, jdk: &apos;&apos;, commandline: &apos;allure&apos;, results: [[path: &apos;qa/reports/allure-results&apos;]], reportBuildPolicy: &apos;ALWAYS&apos;
+                        }
+                    }
+                }
+
+                // 8. Cleanup
+                echo &quot;=&gt; Apagando y limpiando contenedores del Pipeline...&quot;
+                sh &apos;&apos;&apos;
+                    ${COMPOSE_CMD} stop || true
+                    ${COMPOSE_CMD} rm -f -v || true
+                &apos;&apos;&apos;
+            }
+        }
+        success {
+            echo &apos;Â¡El pipeline de QA se ejecuto con exito!&apos;
+            script {
+                if (env.DISCORD_WEBHOOK) {
+                    discordSend webhookURL: env.DISCORD_WEBHOOK, title: &quot;âœ… Ã‰xito en Pipeline QA - ${env.JOB_NAME} #${env.BUILD_NUMBER}&quot;, result: currentBuild.currentResult, link: env.BUILD_URL
+                }
+            }
+        }
+        failure {
+            echo &apos;El pipeline de QA fallo. Revisa los logs.&apos;
+            script {
+                if (env.DISCORD_WEBHOOK) {
+                    discordSend webhookURL: env.DISCORD_WEBHOOK, title: &quot;âŒ Fallo en Pipeline QA - ${env.JOB_NAME} #${env.BUILD_NUMBER}&quot;, result: currentBuild.currentResult, link: env.BUILD_URL
+                }
+            }
+        }
+    }
+}
+
+</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

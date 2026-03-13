@@ -847,26 +847,40 @@
         let reportIndex = [];
         let activeFile = null;
 
+        // ─── Inline data cache (populated by run-tests.sh at build time) ───
+        const __inlineData = window.__REPORT_DATA__ || {};
+        const __inlineIndex = window.__REPORT_INDEX__ || null;
+
         // ─── Load Index ───
         async function loadIndex() {
             const list = $('#reportList');
-            try {
-                const res = await fetch('reports-index.json');
-                if (!res.ok) throw new Error('No index');
-                reportIndex = await res.json();
-            } catch {
-                // Generate index from what we can find
-                reportIndex = [];
+
+            // 1. Try inline data first (self-contained mode / Jenkins)
+            if (__inlineIndex && __inlineIndex.length > 0) {
+                reportIndex = __inlineIndex;
+            } else {
+                // 2. Fallback: fetch from server (local dev with pnpm run report:newman)
                 try {
-                    const res = await fetch('newman-report.json');
-                    if (res.ok) {
-                        reportIndex.push({ file: 'newman-report.json', label: 'Última ejecución', latest: true, date: new Date().toISOString() });
-                    }
-                } catch { }
+                    const res = await fetch('reports-index.json');
+                    if (!res.ok) throw new Error('No index');
+                    reportIndex = await res.json();
+                } catch {
+                    reportIndex = [];
+                    try {
+                        const res = await fetch('newman-report.json');
+                        if (res.ok) {
+                            reportIndex.push({ file: 'newman-report.json', label: 'Última ejecución', latest: true, date: new Date().toISOString() });
+                        }
+                    } catch { }
+                }
             }
 
             if (reportIndex.length === 0) {
-                list.innerHTML = '<li style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.82rem;">No hay reportes disponibles.<br>Ejecuta Newman para generar reportes.</li>';
+                const isFileProtocol = window.location.protocol === 'file:';
+                const extra = isFileProtocol
+                    ? '<br><br><strong style="color:var(--accent);">El navegador bloquea fetch con file://</strong><br>Desde la carpeta <code>qa</code> ejecuta:<br><code>pnpm run report:newman</code><br>y abre <a href="http://localhost:8181" target="_blank" rel="noopener" style="color:var(--accent-light);">http://localhost:8181</a>'
+                    : '<br>Ejecuta Newman para generar reportes.';
+                list.innerHTML = '<li style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.82rem;">No hay reportes disponibles.' + extra + '</li>';
                 return;
             }
 
@@ -917,9 +931,16 @@
             content.innerHTML = '<div class="loading"><span class="spinner"></span> Cargando reporte...</div>';
 
             try {
-                const res = await fetch(file);
-                if (!res.ok) throw new Error('Error cargando ' + file);
-                const data = await res.json();
+                let data;
+                // 1. Try inline data first
+                if (__inlineData[file]) {
+                    data = __inlineData[file];
+                } else {
+                    // 2. Fallback: fetch from server
+                    const res = await fetch(file);
+                    if (!res.ok) throw new Error('Error cargando ' + file);
+                    data = await res.json();
+                }
 
                 // Update pass rate in sidebar
                 const idx = reportIndex.find(r => r.file === file);
@@ -1133,6 +1154,8 @@
         // ─── Init ───
         loadIndex();
     </script>
+
+    <!-- __INLINE_DATA__ -->
 
 </body>
 

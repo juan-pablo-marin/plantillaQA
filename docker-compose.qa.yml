@@ -60,8 +60,11 @@ services:
     volumes:
       - mongodb_qa_data:/data/db
     healthcheck:
-      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet" ]
-      <<: *common-healthcheck
+      test: ["CMD-SHELL", "mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval \"db.adminCommand('ping')\" --quiet"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     networks:
       - fuc-qa-network
 
@@ -164,8 +167,8 @@ services:
   # --- QA Runner (Master Orchestrator) ---
   qa-runner:
     build:
-      context: ./qa
-      dockerfile: Dockerfile.qa
+      context: .
+      dockerfile: ./qa/Dockerfile.qa
     container_name: fuc-qa-runner
     profiles: [ "test-e2e", "all" ]
     depends_on:
@@ -188,14 +191,14 @@ services:
       # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-20m}
+    shm_size: '2gb' # Previene crasheos de Chromium en Playwright E2E
     volumes:
       - ./qa/reports:/qa/reports
-      # Los bind mounts de archivos individuales (run-tests.sh, playwright.config.ts, etc.)
-      # se movieron a docker-compose.dev-override.yml para hot-reload en desarrollo local.
-      # En Jenkins (Docker-in-Docker), el Dockerfile.qa ya COPY estos archivos a la imagen.
+      # Se comentan los montajes de codigo para Jenkins (DinD). 
+      # El codigo se incluira en la imagen o se montara via dev-override.
+      # - ./fuc-sena:/src/backend:ro
+      # - ./fuc-app-web:/src/frontend:ro
       - sonar_scanner_cache:/root/.sonar/cache
-      - ./fuc-sena:/src/backend:ro
-      - ./fuc-app-web:/src/frontend:ro
     command: [ "bash", "run-tests.sh" ]
     networks:
       - fuc-qa-network
@@ -204,7 +207,7 @@ services:
   influxdb:
     image: influxdb:1.8
     container_name: fuc-influxdb
-    profiles: [ "perf" ]
+    profiles: [ "perf", "jenkins", "all" ]
     environment:
       INFLUXDB_DB: k6
       INFLUXDB_HTTP_AUTH_ENABLED: "false"
@@ -219,7 +222,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: fuc-grafana
-    profiles: [ "perf" ]
+    profiles: [ "perf", "jenkins", "all" ]
     depends_on:
       - influxdb
     environment:
@@ -240,8 +243,8 @@ services:
   # --- k6 Runner (solo performance) ---
   k6-runner:
     build:
-      context: ./qa
-      dockerfile: Dockerfile.qa
+      context: .
+      dockerfile: ./qa/Dockerfile.qa
     container_name: fuc-k6-runner
     profiles: [ "perf" ]
     depends_on:
@@ -264,7 +267,7 @@ services:
     # (UI image is old; some newer API versions can trigger "Network Error" in the UI.)
     image: frankescobar/allure-docker-service:2.13.6
     container_name: fuc-allure
-    profiles: [ "test-e2e", "all" ]
+    profiles: [ "viewers" ]
     environment:
       CHECK_RESULTS_EVERY_SECONDS: 1
       KEEP_HISTORY: 1
@@ -280,7 +283,7 @@ services:
   allure-ui:
     image: frankescobar/allure-docker-service-ui
     container_name: fuc-allure-ui
-    profiles: [ "test-e2e", "all" ]
+    profiles: [ "viewers" ]
     depends_on:
       - allure
     environment:
@@ -295,7 +298,7 @@ services:
   allure-nginx:
     image: nginx:alpine
     container_name: fuc-allure-nginx
-    profiles: [ "test-e2e", "all" ]
+    profiles: [ "viewers" ]
     depends_on:
       - allure
       - allure-ui
@@ -331,7 +334,7 @@ services:
       - "${JENKINS_PORT:-8085}:8080"
       - "50000:50000"
     environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Dhudson.model.DirectoryBrowserSupport.CSP=
       # Se recomienda usar secretos para JENKINS_ADMIN_ID y JENKINS_ADMIN_PASSWORD en un entorno productivo
       - JENKINS_ADMIN_ID=admin
       - JENKINS_ADMIN_PASSWORD=admin

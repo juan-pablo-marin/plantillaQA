@@ -13,15 +13,22 @@ pipeline {
         cron('H 1 * * 1-5')
     }
 
+    options {
+        ansiColor('xterm')
+    }
+
     environment {
         ENVIRONMENT = 'qa'
-        PROJECT_KEY = 'fuc-sena'
         COMPOSE_PROJECT_NAME = 'fichacaracterizacionv1'
         COMPOSE_CMD = 'docker compose --env-file /app/.env.qa -f /app/docker-compose.qa.yml -f /app/docker-compose.jenkins.yml'
         
         // Agregar credencial si existe, de momento la dejamos como variable de entorno o vacía
         // DISCORD_WEBHOOK = credentials('discord-webhook-qa') // Para el futuro
         DISCORD_WEBHOOK = "${env.DISCORD_WEBHOOK_URL ?: ''}"
+        
+        // --- SONAR CONFIG ---
+        // Se asume que el token viene de la configuración de Jenkins o archivo .env.qa
+        // Referenciados directamente como \${env.SONAR_TOKEN} en los comandos sh
     }
 
     stages {
@@ -32,13 +39,16 @@ pipeline {
                     sh '''
                         ${COMPOSE_CMD} stop || true
                         ${COMPOSE_CMD} rm -f -v || true
+                        # Forzar apagado de contenedores pesados de UI consumiendo recursos del host
+                        docker stop fuc-allure fuc-allure-ui fuc-allure-nginx kiwitcmsdock || true
+                        mkdir -p /app/qa/reports
+                        rm -rf /app/qa/reports/*
                     '''
 
-                    echo "=> Levantando perfil Base (DB, Backend, Frontend, SonarQube DB/Server)..."
-                    // Levantamos todo EXCEPTO los runners interactivos
+                    echo "=> Levantando perfil Base..."
                     sh '${COMPOSE_CMD} --profile sonar up -d db backend frontend sonar-db sonarqube influxdb grafana'
 
-                    echo "=> Pre-construyendo QA Runner (Evita Race Conditions en stage Parallel)..."
+                    echo "=> Construyendo QA Runner (Root Context)..."
                     sh '${COMPOSE_CMD} build qa-runner'
                 }
             }
@@ -51,14 +61,23 @@ pipeline {
                     steps {
                         script {
                             echo "=> Ejecutando Newman Tests..."
+                            // Removemos --rm para poder copiar los artefactos después
                             sh """
-                                ${COMPOSE_CMD} run --rm --name qa-runner-newman \\
+                                ${COMPOSE_CMD} run --name qa-runner-newman \\
                                 -e RUN_NEWMAN=true \\
                                 -e RUN_SONAR=false \\
                                 -e RUN_PLAYWRIGHT=false \\
                                 -e RUN_K6=false \\
-                                qa-runner
+                                qa-runner || true
                             """
+                            
+                            echo "=> Extrayendo reportes Newman al workspace de Jenkins..."
+                            // Usamos rura absoluta /app/qa/reports/ donde esta montado el proyecto
+                            sh "mkdir -p /app/qa/reports/"
+                            sh "docker cp qa-runner-newman:/qa/reports/newman /app/qa/reports/ || true"
+                            
+                            // Limpiamos el contenedor
+                            sh "docker rm -f qa-runner-newman || true"
                         }
                     }
                 }
@@ -69,13 +88,24 @@ pipeline {
                         script {
                             echo "=> Ejecutando Análisis SonarQube..."
                             sh """
-                                ${COMPOSE_CMD} run --rm --name qa-runner-sonar \\
+                                ${COMPOSE_CMD} run --name qa-runner-sonar \\
                                 -e RUN_NEWMAN=false \\
                                 -e RUN_SONAR=true \\
                                 -e RUN_PLAYWRIGHT=false \\
                                 -e RUN_K6=false \\
-                                qa-runner
+                                ${env.SONAR_TOKEN ? "-e SONAR_TOKEN=${env.SONAR_TOKEN}" : ""} \\
+                                -e PROJECT_KEY=${env.PROJECT_KEY ?: 'fuc-sena'} \\
+                                qa-runner || true
                             """
+                            
+                            echo "=> Extrayendo reportes de cobertura al workspace de Jenkins..."
+                            sh "mkdir -p /app/qa/reports/"
+                            sh "docker cp qa-runner-sonar:/qa/reports/coverage-backend.out /app/qa/reports/ || true"
+                            sh "docker cp qa-runner-sonar:/qa/reports/coverage-backend.xml /app/qa/reports/ || true"
+                            sh "docker cp qa-runner-sonar:/qa/reports/coverage-frontend.json /app/qa/reports/ || true"
+                            sh "docker cp qa-runner-sonar:/qa/reports/govet.txt /app/qa/reports/ || true"
+                            
+                            sh "docker rm -f qa-runner-sonar || true"
                         }
                     }
                 }
@@ -86,13 +116,20 @@ pipeline {
                         script {
                             echo "=> Ejecutando Playwright Tests..."
                             sh """
-                                ${COMPOSE_CMD} run --rm --name qa-runner-e2e \\
+                                ${COMPOSE_CMD} run --name qa-runner-e2e \\
                                 -e RUN_NEWMAN=false \\
                                 -e RUN_SONAR=false \\
                                 -e RUN_PLAYWRIGHT=true \\
                                 -e RUN_K6=false \\
-                                qa-runner
+                                qa-runner || true
                             """
+                            
+                            echo "=> Extrayendo reportes Playwright al workspace de Jenkins..."
+                            sh "mkdir -p /app/qa/reports/"
+                            sh "docker cp qa-runner-e2e:/qa/reports/playwright /app/qa/reports/ || true"
+                            sh "docker cp qa-runner-e2e:/qa/reports/playwright-html /app/qa/reports/ || true"
+                            
+                            sh "docker rm -f qa-runner-e2e || true"
                         }
                     }
                 }
@@ -103,13 +140,19 @@ pipeline {
                         script {
                             echo "=> Ejecutando k6 Tests..."
                             sh """
-                                ${COMPOSE_CMD} run --rm --name qa-runner-k6 \\
+                                ${COMPOSE_CMD} run --name qa-runner-k6 \\
                                 -e RUN_NEWMAN=false \\
                                 -e RUN_SONAR=false \\
                                 -e RUN_PLAYWRIGHT=false \\
                                 -e RUN_K6=true \\
-                                qa-runner
+                                qa-runner || true
                             """
+                            
+                            echo "=> Extrayendo reportes k6 al workspace de Jenkins..."
+                            sh "mkdir -p /app/qa/reports/"
+                            sh "docker cp qa-runner-k6:/qa/reports/k6 /app/qa/reports/ || true"
+                            
+                            sh "docker rm -f qa-runner-k6 || true"
                         }
                     }
                 }
@@ -120,47 +163,86 @@ pipeline {
     post {
         always {
             script {
-                // 1. Archivar artefactos en bruto
-                archiveArtifacts artifacts: 'qa/reports/newman/**/*', allowEmptyArchive: true
-                archiveArtifacts artifacts: 'qa/reports/*.out, qa/reports/*.xml, qa/reports/*.json', allowEmptyArchive: true
-                archiveArtifacts artifacts: 'qa/reports/k6/**/*', allowEmptyArchive: true
-                archiveArtifacts artifacts: 'qa/reports/playwright-html/**/*', allowEmptyArchive: true
+                // Diagnóstico de rutas
+                sh 'ls -d /app/qa/reports 2>/dev/null && ls /app/qa/reports/newman/ 2>/dev/null || echo "qa/reports no encontrado en /app"'
 
-                // 2. Publicar resultados JUnit tradicionales
-                junit testResults: 'qa/reports/js-test-report.xml', allowEmptyResults: true
+                dir('/app') {
+                    // 1. Newman artifacts
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists('qa/reports/newman/index.html')) {
+                            archiveArtifacts artifacts: 'qa/reports/newman/**/*', allowEmptyArchive: true
+                        }
+                    }
 
-                // 3. Code Coverage API Plugin (Métricas de Cobertura Go)
-                publishCoverage adapters: [
-                    coberturaAdapter('qa/reports/coverage-backend.xml')
-                ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
-                
-                // 4. Performance Plugin (Resultados de k6)
-                perfReport filterRegex: '', sourceDataFiles: 'qa/reports/k6/*.xml'
+                    // 2. Cobertura & reportes unitarios (solo si Sonar corrió)
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists('qa/reports/coverage-backend.xml')) {
+                            archiveArtifacts artifacts: 'qa/reports/coverage-backend.*', allowEmptyArchive: true
+                            publishCoverage adapters: [
+                                coberturaReportAdapter(path: 'qa/reports/coverage-backend.xml')
+                            ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
+                        }
+                    }
 
-                // 5. Warnings Next Generation Plugin (Análisis Estático)
-                recordIssues enabledForFailure: true, tool: goVet(pattern: 'qa/reports/govet.txt')
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists('qa/reports/js-test-report.xml')) {
+                            archiveArtifacts artifacts: 'qa/reports/js-test-report.xml', allowEmptyArchive: true
+                            junit testResults: 'qa/reports/js-test-report.xml', allowEmptyResults: true
+                        }
+                    }
 
-                // 6. Reportes HTML (Newman, Playwright)
-                publishHTML(target: [
-                    reportName: 'Newman API Report',
-                    reportDir: 'qa/reports/newman',
-                    reportFiles: 'index.html',
-                    keepAll: true,
-                    alwaysLinkToLastBuild: true,
-                    allowMissing: true
-                ])
+                    // 3. k6 Performance
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists('qa/reports/k6/summary.json')) {
+                            archiveArtifacts artifacts: 'qa/reports/k6/**/*', allowEmptyArchive: true
+                            perfReport filterRegex: '', sourceDataFiles: 'qa/reports/k6/*.xml'
+                        }
+                    }
 
-                publishHTML(target: [
-                    reportName: 'Playwright E2E Report',
-                    reportDir: 'qa/reports/playwright-html',
-                    reportFiles: 'index.html',
-                    keepAll: true,
-                    alwaysLinkToLastBuild: true,
-                    allowMissing: true
-                ])
+                    // 4. Go Vet (Warnings NG)
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists('qa/reports/govet.txt')) {
+                            archiveArtifacts artifacts: 'qa/reports/govet.txt', allowEmptyArchive: true
+                            recordIssues enabledForFailure: true, tool: goVet(pattern: 'qa/reports/govet.txt')
+                        }
+                    }
 
-                // 7. Dashboard Allure
-                allure includeProperties: false, jdk: '', results: [[path: 'qa/reports/allure-results']], reportBuildPolicy: 'ALWAYS'
+                    // 5. Playwright
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists('qa/reports/playwright-html/index.html')) {
+                            archiveArtifacts artifacts: 'qa/reports/playwright-html/**/*', allowEmptyArchive: true
+                            publishHTML(target: [
+                                reportName: 'Playwright E2E Report',
+                                reportDir: 'qa/reports/playwright-html',
+                                reportFiles: 'index.html',
+                                keepAll: true,
+                                alwaysLinkToLastBuild: true,
+                                allowMissing: true
+                            ])
+                        }
+                    }
+
+                    // 6. Newman HTML Report (auto-contenido, no necesita servidor)
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists('qa/reports/newman/index.html')) {
+                            publishHTML(target: [
+                                reportName: 'Newman API Report',
+                                reportDir: 'qa/reports/newman',
+                                reportFiles: 'index.html',
+                                keepAll: true,
+                                alwaysLinkToLastBuild: true,
+                                allowMissing: true
+                            ])
+                        }
+                    }
+
+                    // 7. Allure
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists('qa/reports/allure-results')) {
+                            allure includeProperties: false, jdk: '', commandline: 'allure', results: [[path: 'qa/reports/allure-results']], reportBuildPolicy: 'ALWAYS'
+                        }
+                    }
+                }
 
                 // 8. Cleanup
                 echo "=> Apagando y limpiando contenedores del Pipeline..."

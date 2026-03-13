@@ -25,6 +25,12 @@ RUN apt-get update && \
     apt-get install -y docker-ce-cli docker-compose-plugin && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Instalar Allure Commandline para que el plugin de Jenkins pueda generar los reportes sin config manual
+RUN curl -o allure-commandline.zip -L https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.zip && \
+    unzip allure-commandline.zip -d /opt/ && \
+    ln -s /opt/allure-2.27.0/bin/allure /usr/local/bin/allure && \
+    rm allure-commandline.zip
+
 # Instalar plugins de Jenkins para visualización de reportes QA.
 # - html-publisher:   Publicar reportes HTML (Newman, Playwright) como páginas navegables
 # - junit:            Parsear reportes JUnit XML y mostrar resultados pass/fail con historial
@@ -35,6 +41,8 @@ RUN jenkins-plugin-cli --plugins \
     junit \
     pipeline-stage-view \
     allure-jenkins-plugin \
+    blueocean \
+    ansicolor \
     build-monitor-plugin \
     dashboard-view \
     code-coverage-api \

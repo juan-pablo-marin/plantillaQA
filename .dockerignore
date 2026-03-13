@@ -1,0 +1,43 @@
+# Node.js
+**/node_modules/
+**/npm-debug.log
+**/yarn-error.log
+**/.pnpm-store
+**/.next/
+**/out/
+**/build/
+**/dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Go
+bin/
+pkg/
+
+# Docker
+.dockerignore
+Dockerfile*
+
+# Version Control
+.git/
+.gitignore
+
+# QA & Build Artifacts
+qa/reports/
+qa/src_backend/
+qa/src_frontend/
+*coverage.out
+*.xml
+*.json
+
+# IDE
+.vscode/
+.idea/
+
+# Environment Variables
+.env
+.env.*
+!.env.example

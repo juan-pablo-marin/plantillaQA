@@ -134,4 +134,20 @@ crear token para pruebas en insomnia
 node -e "const c=require('crypto');const s='secret-key-for-development';const h=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');const p=Buffer.from(JSON.stringify({user_id:'insomnia_user',exp:Math.floor(Date.now()/1000)+86400})).toString('base64url');const sig=c.createHmac('sha256',s).update(h+'.'+p).digest('base64url');console.log(h+'.'+p+'.'+sig)"
 
 
+docker compose --env-file .env.qa -f docker-compose.qa.yml up -d Jenkins
+
+--cambiar el nombre a una rama
+git branch -m old-name new-name
+
+--quitar el commit de una rama
+$ git checkout -- local_settings.py
+error: path 'local_settings.py' is unmerged
+
+--quitar los últimos commits
+$ git reset --soft HEAD~1
+
+--reiniciar solo el test
+docker compose --env-file .env.qa -f docker-compose.qa.yml build qa-runner
+
+
 
