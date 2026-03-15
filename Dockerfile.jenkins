@@ -9,6 +9,7 @@ RUN apt-get update && \
     ca-certificates \
     curl \
     gnupg2 \
+    jq \
     lsb-release
 
 # Añadir la clave GPG oficial de Docker y el repositorio de forma moderna

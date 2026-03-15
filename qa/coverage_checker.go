@@ -11,7 +11,7 @@ import (
 
 func main() {
 	coverageFile := flag.String("file", "fuc-sena/coverage.out", "Path to the coverage profile file")
-	threshold := flag.Float64("threshold", 70.0, "Minimum coverage percentage required")
+	threshold := flag.Float64("threshold", 80.0, "Minimum coverage percentage required")
 	flag.Parse()
 
 	file, err := os.Open(*coverageFile)

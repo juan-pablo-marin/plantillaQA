@@ -188,14 +188,17 @@
       ]
     }
   ],
-  "refresh": "5s",
+  "refresh": "",
   "schemaVersion": 38,
   "tags": ["k6", "performance", "fuc"],
   "templating": { "list": [] },
-  "time": { "from": "now-10m", "to": "now" },
-  "timepicker": {},
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"],
+    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+  },
   "timezone": "browser",
   "title": "k6 Load Testing — FUC API",
   "uid": "fuc-k6-perf",
-  "version": 2
+  "version": 3
 }

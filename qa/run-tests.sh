@@ -76,14 +76,12 @@ if [ "$RUN_SONAR" = "true" ]; then
         
         # 3. Exportar cobertura a formato XML (Cobertura API)
         if [ -f "$REPORTS_DIR/coverage-backend.out" ] && [ -s "$REPORTS_DIR/coverage-backend.out" ]; then
-            # Eliminar prefijo del modulo Go (fuc-sena-backend/)
-            sed -i 's|fuc-sena-backend/||g' "$REPORTS_DIR/coverage-backend.out"
-            # Validacion adicional: gocover-cobertura suele fallar si el archivo no es valido o esta casi vacio
             if head -n 1 "$REPORTS_DIR/coverage-backend.out" | grep -q "mode:" && [ $(wc -l < "$REPORTS_DIR/coverage-backend.out") -gt 1 ]; then
                 gocover-cobertura < "$REPORTS_DIR/coverage-backend.out" > "$REPORTS_DIR/coverage-backend.xml" || echo "  WARN: gocover-cobertura falló."
             else
                 echo "  WARN: coverage-backend.out esta vacio o es invalido para gocover-cobertura."
             fi
+            sed -i 's|fuc-sena-backend/|fuc-sena/|g' "$REPORTS_DIR/coverage-backend.out"
         else
             echo "  WARN: No se encontro coverage-backend.out o esta vacio. Se omitira la conversion a Cobertura XML."
         fi
@@ -95,14 +93,13 @@ if [ "$RUN_SONAR" = "true" ]; then
     if [ -d "/src/fuc-app-web" ]; then
         echo "  Running Frontend tests..."
         cd /src/fuc-app-web
-        # Intentamos ejecutar vitest si esta configurado
         if [ -f "package.json" ]; then
-            # Verificamos si existe el script de test
+            if ! [ -d "node_modules" ]; then
+                echo "  Instalando dependencias del frontend..."
+                pnpm install --frozen-lockfile 2>/dev/null || pnpm install || echo "  WARN: pnpm install falló."
+            fi
             if grep -q '"test":' package.json; then
-                # Generamos JUnit para Sonar
                 pnpm test run --reporter=junit --outputFile="$REPORTS_DIR/js-test-report.xml" || echo "  WARN: Algunos tests de Frontend fallaron."
-                # Corregir rutas en lcov.info para Sonar 
-                # Vitest puede usar 'src/' o 'frontend/' segun el contexto; forzamos a 'fuc-app-web/src/'
                 if [ -f "coverage/lcov.info" ]; then
                     sed -i 's|SF:.*src/|SF:fuc-app-web/src/|g' coverage/lcov.info
                 fi
@@ -339,7 +336,7 @@ else
             fi
             
             if [ -f "$REPORTS_DIR/js-test-report.xml" ]; then
-                SONAR_ARGS="$SONAR_ARGS -Dsonar.testExecutionReportPaths=$REPORTS_DIR/js-test-report.xml"
+                SONAR_ARGS="$SONAR_ARGS -Dsonar.junit.reportPaths=$REPORTS_DIR/js-test-report.xml"
             fi
 
             echo "  Iniciando sonar-scanner (timeout: $SONAR_SCAN_TIMEOUT)..."
@@ -354,7 +351,7 @@ else
                 -Dsonar.sources=fuc-app-web/src,fuc-sena \
                 -Dsonar.tests=fuc-app-web/src,fuc-sena \
                 -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
-                -Dsonar.exclusions="**/*.py,**/node_modules/**,**/.next/**,**/vendor/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
+                -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
                 -Dsonar.scm.disabled=true \
                 -Dsonar.javascript.node.maxspace=4096 \
                 -Dsonar.javascript.node.bridge.timeout=2400 \
@@ -382,8 +379,9 @@ if [ "$RUN_PLAYWRIGHT" != "true" ]; then
 elif [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
     echo "  Ejecutando tests desde playwright.config.ts (testDir: ./ui/tests)"
     echo "  Limpiando reportes anteriores (HTML + artefactos)..."
-    rm -rf "$REPORTS_DIR/playwright-html" "$REPORTS_DIR/playwright-results" || true
     mkdir -p "$REPORTS_DIR/playwright-html" "$REPORTS_DIR/playwright-results"
+    find "$REPORTS_DIR/playwright-html" -mindepth 1 -delete 2>/dev/null || true
+    find "$REPORTS_DIR/playwright-results" -mindepth 1 -delete 2>/dev/null || true
 
     # No sobreescribir reporter/output por CLI: el config ya define
     # - reporter HTML -> ./reports/playwright-html
@@ -399,8 +397,18 @@ echo "[5/6] k6 Performance Tests..."
 if [ "$RUN_K6" != "true" ]; then
     echo " SKIP: RUN_K6=$RUN_K6"
 elif [ -f "performance/k6-tests.js" ]; then
-    k6 run performance/k6-tests.js -e BACKEND_URL="$BACKEND_URL" -e TEST_TOKEN="$TEST_TOKEN" \
-      --out influxdb=http://influxdb:8086/k6 \
+    # BUILD_NUMBER se inyecta desde Jenkins (-e BUILD_NUMBER=...).
+    # En ejecuciones manuales se genera una etiqueta con timestamp para
+    # que cada run sea siempre identificable en Grafana por historial.
+    BUILD_TAG="${BUILD_NUMBER:-manual_$(date +%Y%m%d_%H%M%S)}"
+    echo "  Etiqueta de build: $BUILD_TAG"
+    echo "  Push interval InfluxDB: ${K6_INFLUXDB_PUSH_INTERVAL:-1s} (K6_INFLUXDB_PUSH_INTERVAL)"
+    k6 run performance/k6-tests.js \
+      -e BACKEND_URL="$BACKEND_URL" \
+      -e TEST_TOKEN="$TEST_TOKEN" \
+      --tag build="${BUILD_TAG}" \
+      --tag environment="qa" \
+      --out "influxdb=http://influxdb:8086/k6" \
       --summary-export "$K6_DIR/summary.json" \
       || echo "  WARN: k6 fallo o no cumplio thresholds."
 else

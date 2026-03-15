@@ -208,13 +208,29 @@ services:
     image: influxdb:1.8
     container_name: fuc-influxdb
     profiles: [ "perf", "jenkins", "all" ]
+    restart: unless-stopped
     environment:
       INFLUXDB_DB: k6
       INFLUXDB_HTTP_AUTH_ENABLED: "false"
+      INFLUXDB_DATA_CACHE_MAX_MEMORY_SIZE: "1073741824"
+      INFLUXDB_DATA_CACHE_SNAPSHOT_MEMORY_SIZE: "52428800"
+      INFLUXDB_DATA_COMPACT_FULL_WRITE_COLD_DURATION: "4h"
+      INFLUXDB_DATA_INDEX_VERSION: "tsi1"
     ports:
       - "8086:8086"
     volumes:
       - influxdb_data:/var/lib/influxdb
+      - ./qa/influxdb/init.iql:/docker-entrypoint-initdb.d/init.iql:ro
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8086/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - fuc-qa-network
 
@@ -223,6 +239,7 @@ services:
     image: grafana/grafana:latest
     container_name: fuc-grafana
     profiles: [ "perf", "jenkins", "all" ]
+    restart: unless-stopped
     depends_on:
       - influxdb
     environment:
@@ -230,13 +247,19 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/k6.json
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: "5s"
     ports:
       - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./qa/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./qa/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health 2>/dev/null | grep -q 'database.*ok'"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - fuc-qa-network
 
@@ -309,15 +332,31 @@ services:
     networks:
       - fuc-qa-network
 
-  # --- Newman Report Viewer (Standalone) ---
+  # --- Newman Report Viewer (Standalone — persiste entre builds) ---
   newman-viewer:
     image: nginx:alpine
     container_name: fuc-newman-viewer
-    profiles: [ "test-e2e", "all", "report" ]
+    profiles: [ "test-e2e", "jenkins", "all", "report" ]
+    restart: unless-stopped
     ports:
       - "8181:80"
     volumes:
       - ./qa/reports/newman:/usr/share/nginx/html:ro
+      - ./qa/nginx-viewer.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - fuc-qa-network
+
+  # --- Playwright Report Viewer (Standalone — persiste entre builds) ---
+  playwright-viewer:
+    image: nginx:alpine
+    container_name: fuc-playwright-viewer
+    profiles: [ "test-e2e", "jenkins", "all", "report" ]
+    restart: unless-stopped
+    ports:
+      - "8182:80"
+    volumes:
+      - ./qa/reports/playwright-html:/usr/share/nginx/html:ro
+      - ./qa/nginx-viewer.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - fuc-qa-network
 

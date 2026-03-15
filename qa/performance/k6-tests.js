@@ -109,7 +109,7 @@ export default function (data) {
 
 export function handleSummary(data) {
   return {
-    '/qa/reports/k6-summary.json': JSON.stringify(data, null, 2),
+    '/qa/reports/k6/summary.json': JSON.stringify(data, null, 2),
     '/qa/reports/k6/junit.xml': jUnit(data),
   };
 }
