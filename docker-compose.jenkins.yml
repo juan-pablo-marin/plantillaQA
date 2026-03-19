@@ -15,14 +15,10 @@
 
 services:
   qa-runner:
-    # ── Jenkins Override ──
-    # En Jenkins (DinD), si dejamos los bind mounts de código fuente (./fuc-sena:/src/backend:ro), 
-    # el daemon de Docker del host intentará montar esas rutas relativas DESDE LA MÁQUINA ANFITRIONA, 
-    # donde el path relativo de Jenkins no existe, resultando en carpetas vacías y "No such file or directory".
-    #
-    # Por lo tanto, en el entorno de Jenkins, le decimos a Compose que ignore los montajes de
-    # código fuente host-to-container porque el Dockerfile.qa ya hizo "COPY . ." en el build.
-    # Solo preservamos el montaje de reportes, caché de sonar y las variables.
+    # En Jenkins (DinD), los bind mounts de código fuente del host no funcionan
+    # porque el daemon Docker del host no tiene las rutas relativas de Jenkins.
+    # El Dockerfile.qa ya hace COPY de BACKEND/ y FRONTEND/ durante el build.
+    # Solo preservamos el montaje de reportes y caché de sonar.
     volumes:
       - ./qa/reports:/qa/reports
       - sonar_scanner_cache:/root/.sonar/cache

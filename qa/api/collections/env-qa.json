@@ -1,6 +1,6 @@
 {
-  "id": "fuc-env-qa",
-  "name": "FUC QA Environment",
+  "id": "env-qa",
+  "name": "QA Environment",
   "values": [
     {
       "key": "baseUrl",

@@ -1,4 +1,4 @@
-﻿<?xml version='1.1' encoding='UTF-8'?>
+<?xml version='1.1' encoding='UTF-8'?>
 <flow-definition plugin="workflow-job@1571.vb_423c255d6d9">
   <actions>
     <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1"/>
@@ -74,7 +74,7 @@ pipeline {
 
     environment {
         ENVIRONMENT = &apos;qa&apos;
-        COMPOSE_PROJECT_NAME = &apos;fichacaracterizacionv1&apos;
+        COMPOSE_PROJECT_NAME = &apos;qa-pipeline&apos;
         COMPOSE_CMD = &apos;docker compose --env-file /app/.env.qa -f /app/docker-compose.qa.yml -f /app/docker-compose.jenkins.yml&apos;
         
         // Agregar credencial si existe, de momento la dejamos como variable de entorno o vacÃ­a
@@ -84,7 +84,7 @@ pipeline {
         // --- SONAR CONFIG ---
         // Se asume que el token viene de la configuraciÃ³n de Jenkins o archivo .env.qa
         SONAR_TOKEN = &quot;${env.SONAR_TOKEN ?: &apos;&apos;}&quot;
-        PROJECT_KEY = &quot;${env.PROJECT_KEY ?: &apos;fuc-sena&apos;}&quot;
+        PROJECT_KEY = &quot;${env.PROJECT_KEY ?: &apos;qa-project&apos;}&quot;
     }
 
     stages {
@@ -96,7 +96,7 @@ pipeline {
                         ${COMPOSE_CMD} stop || true
                         ${COMPOSE_CMD} rm -f -v || true
                         # Forzar apagado de contenedores pesados de UI consumiendo recursos del host
-                        docker stop fuc-allure fuc-allure-ui fuc-allure-nginx kiwitcmsdock || true
+                        docker stop ${PROJECT_NAME}-allure ${PROJECT_NAME}-allure-ui ${PROJECT_NAME}-allure-nginx || true
                         mkdir -p /app/qa/reports
                         rm -rf /app/qa/reports/*
                     &apos;&apos;&apos;

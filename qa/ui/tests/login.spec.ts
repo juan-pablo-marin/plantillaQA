@@ -28,7 +28,7 @@ test.describe('Login — Ficha Única de Caracterización', () => {
   });
 
   test('debe redirigir al home tras login exitoso', async ({ page }, testInfo) => {
-    // Credenciales que coinciden con el "mock" actual del frontend (ver fuc-app-web/src/app/(auth)/login/page.tsx)
+    // Credenciales que coinciden con el "mock" actual del frontend (ver FRONTEND/src/app/(auth)/login/page.tsx)
     await page.fill('input[type="email"], input[name="email"]', 'test@sena.com');
     await page.fill('input[type="password"], input[name="password"]', '123456!@#');
 

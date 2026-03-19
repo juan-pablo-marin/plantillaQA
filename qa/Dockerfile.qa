@@ -52,9 +52,11 @@ RUN npm install
 # --- Copy QA project files ---
 COPY qa/ /qa/
 
-# Copy sources into image
-COPY fuc-sena/ /src/fuc-sena/
-COPY fuc-app-web/ /src/fuc-app-web/
+# --- Copy project sources (configurable via build args) ---
+ARG BACKEND_DIR=BACKEND
+ARG FRONTEND_DIR=FRONTEND
+COPY ${BACKEND_DIR}/ /src/backend/
+COPY ${FRONTEND_DIR}/ /src/frontend/
 
 # Fix CRLF issues (Windows line endings) that break bash scripts
 RUN sed -i 's/\r$//' /qa/run-tests.sh && chmod +x /qa/run-tests.sh

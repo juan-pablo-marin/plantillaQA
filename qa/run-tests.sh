@@ -6,6 +6,10 @@ FRONTEND_URL="${FRONTEND_URL:-http://frontend:3000}"
 SONAR_URL="${SONAR_HOST_URL:-http://sonarqube:9000}"
 REPORTS_DIR="/qa/reports"
 
+# Rutas internas normalizadas (siempre fijas dentro del contenedor)
+SRC_BACKEND="/src/backend"
+SRC_FRONTEND="/src/frontend"
+
 # ── Flags de ejecución ─────────────────────────────────────────────────────
 # Cambia a "true" el servicio que quieras activar; el resto se omite.
 RUN_NEWMAN="${RUN_NEWMAN:-false}"          # Tests de API con Newman/Postman
@@ -25,7 +29,7 @@ NEWMAN_DIR="$REPORTS_DIR/newman"
 K6_DIR="$REPORTS_DIR/k6"
 
 echo "============================================"
-echo " FUC QA Runner - Iniciando V5"
+echo " QA Runner - Iniciando"
 echo " Backend:    $BACKEND_URL"
 echo " Frontend:   $FRONTEND_URL"
 echo " Sonar:      $SONAR_URL"
@@ -63,25 +67,26 @@ echo "[0.5/6] Ejecutando Tests Unitarios (Backend & Frontend)..."
 if [ "$RUN_SONAR" = "true" ]; then
 
     # Backend Go
-    if [ -d "/src/fuc-sena" ]; then
+    if [ -d "$SRC_BACKEND" ]; then
         echo "  Running Go tests..."
-        cd /src/fuc-sena
+        cd "$SRC_BACKEND"
         
-        # 1. Tests & json report for Sonar + Coverage profile en 1 solo pase
+        # Tests & json report for Sonar + Coverage profile en 1 solo pase
         go test -v -coverprofile="$REPORTS_DIR/coverage-backend.out" ./... -json > "$REPORTS_DIR/go-test-report.json" || echo "  WARN: Algunos tests de Go fallaron."
-        sed -i 's|fuc-sena/|fuc-sena/|g' "$REPORTS_DIR/go-test-report.json"
         
-        # 2. Go Vet para Jenkins Warnings NG Plugin
+        # Go Vet para Jenkins Warnings NG Plugin
         go vet ./... 2> "$REPORTS_DIR/govet.txt" || echo "  WARN: Go vet encontro problemas."
         
-        # 3. Exportar cobertura a formato XML (Cobertura API)
+        # Exportar cobertura a formato XML (Cobertura API)
         if [ -f "$REPORTS_DIR/coverage-backend.out" ] && [ -s "$REPORTS_DIR/coverage-backend.out" ]; then
             if head -n 1 "$REPORTS_DIR/coverage-backend.out" | grep -q "mode:" && [ $(wc -l < "$REPORTS_DIR/coverage-backend.out") -gt 1 ]; then
                 gocover-cobertura < "$REPORTS_DIR/coverage-backend.out" > "$REPORTS_DIR/coverage-backend.xml" || echo "  WARN: gocover-cobertura falló."
             else
                 echo "  WARN: coverage-backend.out esta vacio o es invalido para gocover-cobertura."
             fi
-            sed -i 's|fuc-sena-backend/|fuc-sena/|g' "$REPORTS_DIR/coverage-backend.out"
+            # Normalizar rutas del modulo Go al directorio de Sonar (backend/)
+            # Ajusta el patron si tu go.mod usa un nombre de modulo diferente
+            sed -i 's|[^[:space:]]*/\(.*\.go\)|backend/\1|g' "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
         else
             echo "  WARN: No se encontro coverage-backend.out o esta vacio. Se omitira la conversion a Cobertura XML."
         fi
@@ -90,9 +95,9 @@ if [ "$RUN_SONAR" = "true" ]; then
     fi
 
     # Frontend JS (Vitest)
-    if [ -d "/src/fuc-app-web" ]; then
+    if [ -d "$SRC_FRONTEND" ]; then
         echo "  Running Frontend tests..."
-        cd /src/fuc-app-web
+        cd "$SRC_FRONTEND"
         if [ -f "package.json" ]; then
             if ! [ -d "node_modules" ]; then
                 echo "  Instalando dependencias del frontend..."
@@ -101,7 +106,7 @@ if [ "$RUN_SONAR" = "true" ]; then
             if grep -q '"test":' package.json; then
                 pnpm test run --reporter=junit --outputFile="$REPORTS_DIR/js-test-report.xml" || echo "  WARN: Algunos tests de Frontend fallaron."
                 if [ -f "coverage/lcov.info" ]; then
-                    sed -i 's|SF:.*src/|SF:fuc-app-web/src/|g' coverage/lcov.info
+                    sed -i 's|SF:.*src/|SF:frontend/src/|g' coverage/lcov.info
                 fi
             else
                 echo "  SKIP: No se encontro script 'test' en package.json de frontend."
@@ -145,12 +150,12 @@ echo "  Token generado correctamente para el usuario: $TEST_USER_ID"
 echo "[2/6] Newman API Tests..."
 if [ "$RUN_NEWMAN" != "true" ]; then
     echo " SKIP: RUN_NEWMAN=$RUN_NEWMAN"
-elif [ -f "api/collections/fuc-api.postman_collection.json" ]; then
+elif [ -f "api/collections/api.postman_collection.json" ]; then
     # --- Paso 1: CLI + JSON (garantiza que el JSON se genere siempre) ---
     # Newman escribe el JSON en /tmp y luego lo copiamos al volumen montado.
     # Docker Desktop for Windows no siempre sincroniza writes programaticos al host;
     # cp SI funciona de forma confiable en bind mounts.
-    newman run api/collections/fuc-api.postman_collection.json \
+    newman run api/collections/api.postman_collection.json \
         --environment api/collections/env-qa.json \
         --env-var "baseUrl=$BACKEND_URL" \
         --env-var "token=$TEST_TOKEN" \
@@ -170,7 +175,7 @@ elif [ -f "api/collections/fuc-api.postman_collection.json" ]; then
     # --- Paso 2: Allure (independiente, puede fallar sin afectar el JSON) ---
     echo "  Generando resultados Allure..."
     rm -rf /tmp/allure-results
-    newman run api/collections/fuc-api.postman_collection.json \
+    newman run api/collections/api.postman_collection.json \
         --environment api/collections/env-qa.json \
         --env-var "baseUrl=$BACKEND_URL" \
         --env-var "token=$TEST_TOKEN" \
@@ -302,29 +307,22 @@ else
         if [ "$SONAR_READY" = true ] && [ -n "${SONAR_TOKEN:-}" ] && [ "$SONAR_TOKEN" != "your-sonar-token-here" ]; then
             echo "  --- Debug: Verificando directorios para Sonar ---"
             ls -ld /src || echo "  ERROR: /src no existe"
-            ls -ld /src/fuc-sena || echo "  ERROR: /src/fuc-sena no existe"
-            ls -ld /src/fuc-app-web || echo "  ERROR: /src/fuc-app-web no existe"
+            ls -ld "$SRC_BACKEND" || echo "  ERROR: $SRC_BACKEND no existe"
+            ls -ld "$SRC_FRONTEND" || echo "  ERROR: $SRC_FRONTEND no existe"
             echo "  ------------------------------------------------"
 
-            # Redundante si ya se corrigio arriba, pero lo mantenemos como seguridad 
-            # asegurandonos que el path de origen sea el correcto del modulo
-            if [ -f "/src/fuc-sena/coverage.out" ]; then
+            if [ -f "$SRC_BACKEND/coverage.out" ]; then
                 echo "  Copiando y corrigiendo rutas en coverage.out (ReadOnly fix)..."
-                cp /src/fuc-sena/coverage.out "$REPORTS_DIR/coverage-backend.out"
-                # Asegurar que las rutas empiecen con fuc-sena/ para que Sonar las encuentre
-                sed -i 's|fuc-sena-backend/|fuc-sena/|g' "$REPORTS_DIR/coverage-backend.out"
-                # Si las rutas no tienen prefijo, agregarlo
-                if ! grep -q "fuc-sena/" "$REPORTS_DIR/coverage-backend.out"; then
-                    sed -i 's|^|fuc-sena/|' "$REPORTS_DIR/coverage-backend.out"
-                    sed -i 's|fuc-sena/mode:|mode:|' "$REPORTS_DIR/coverage-backend.out"
-                fi
+                cp "$SRC_BACKEND/coverage.out" "$REPORTS_DIR/coverage-backend.out"
+                # Normalizar rutas del modulo Go al directorio de Sonar (backend/)
+                sed -i 's|[^[:space:]]*/\(.*\.go\)|backend/\1|g' "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
             fi
 
             # Construccion dinamica de argumentos para evitar fallos por archivos faltantes
             SONAR_ARGS=""
             
-            if [ -f "/src/fuc-app-web/coverage/lcov.info" ]; then
-                SONAR_ARGS="$SONAR_ARGS -Dsonar.javascript.lcov.reportPaths=fuc-app-web/coverage/lcov.info"
+            if [ -f "$SRC_FRONTEND/coverage/lcov.info" ]; then
+                SONAR_ARGS="$SONAR_ARGS -Dsonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info"
             fi
             
             if [ -f "$REPORTS_DIR/coverage-backend.out" ] && [ -s "$REPORTS_DIR/coverage-backend.out" ]; then
@@ -340,16 +338,13 @@ else
             fi
 
             echo "  Iniciando sonar-scanner (timeout: $SONAR_SCAN_TIMEOUT)..."
-            # Optimizamos paths: 
-            # sources: codigo real (fuc-app-web/src y fuc-sena)
-            # tests: carpetas de tests (fuc-app-web/src y fuc-sena)
             timeout "$SONAR_SCAN_TIMEOUT" sonar-scanner \
                 -Dsonar.projectBaseDir=/src \
-                -Dsonar.projectKey="${PROJECT_KEY:-fuc-sena}" \
+                -Dsonar.projectKey="${PROJECT_KEY:-qa-project}" \
                 -Dsonar.host.url="$SONAR_URL" \
                 -Dsonar.token="$SONAR_TOKEN" \
-                -Dsonar.sources=fuc-app-web/src,fuc-sena \
-                -Dsonar.tests=fuc-app-web/src,fuc-sena \
+                -Dsonar.sources=frontend/src,backend \
+                -Dsonar.tests=frontend/src,backend \
                 -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
                 -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
                 -Dsonar.scm.disabled=true \
@@ -361,10 +356,9 @@ else
         echo " SKIP: SonarQube no esta listo o falta SONAR_TOKEN."
     fi
 
-    # --- Nueva validacion de Cobertura Go ---
+    # --- Validacion de Cobertura Go ---
     if [ -f "$REPORTS_DIR/coverage-backend.out" ] && [ -f "/qa/coverage_checker.go" ]; then
         echo "  Validando umbral de cobertura (70%)..."
-        # Usamos || true para que el pipeline NO se bloquee y permita ver los resultados en Sonar
         go run /qa/coverage_checker.go -file="$REPORTS_DIR/coverage-backend.out" -threshold=70 || echo "  WARN: Cobertura insuficiente."
     elif [ -f "$REPORTS_DIR/coverage-backend.out" ]; then
         echo "  SKIP: coverage_checker.go no encontrado, omitiendo validacion de umbral."
@@ -383,10 +377,6 @@ elif [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
     find "$REPORTS_DIR/playwright-html" -mindepth 1 -delete 2>/dev/null || true
     find "$REPORTS_DIR/playwright-results" -mindepth 1 -delete 2>/dev/null || true
 
-    # No sobreescribir reporter/output por CLI: el config ya define
-    # - reporter HTML -> ./reports/playwright-html
-    # - outputDir (artefactos) -> ./reports/playwright-results
-    # Así el reporte HTML queda con evidencias (screenshots/videos/traces) en rutas montadas al host.
     PLAYWRIGHT_JSON_OUTPUT_NAME=results.json npx playwright test --config=playwright.config.ts || echo "  WARN: Algunos tests fallaron."
 else
     echo " SKIP: No se encontro playwright.config.ts en /qa."
@@ -397,9 +387,6 @@ echo "[5/6] k6 Performance Tests..."
 if [ "$RUN_K6" != "true" ]; then
     echo " SKIP: RUN_K6=$RUN_K6"
 elif [ -f "performance/k6-tests.js" ]; then
-    # BUILD_NUMBER se inyecta desde Jenkins (-e BUILD_NUMBER=...).
-    # En ejecuciones manuales se genera una etiqueta con timestamp para
-    # que cada run sea siempre identificable en Grafana por historial.
     BUILD_TAG="${BUILD_NUMBER:-manual_$(date +%Y%m%d_%H%M%S)}"
     echo "  Etiqueta de build: $BUILD_TAG"
     echo "  Push interval InfluxDB: ${K6_INFLUXDB_PUSH_INTERVAL:-1s} (K6_INFLUXDB_PUSH_INTERVAL)"

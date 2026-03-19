@@ -1,6 +1,6 @@
-# FUC SENA — Ficha Única de Caracterización
+# QA Factory Template
 
-Plantilla corporativa con QA integrado para la **Ficha Única de Caracterización** del SENA.
+Plantilla genérica con QA integrado para orquestar pruebas automatizadas de cualquier proyecto desde Docker + Jenkins.
 
 ---
 
@@ -8,8 +8,8 @@ Plantilla corporativa con QA integrado para la **Ficha Única de Caracterizació
 
 | Componente   | Tecnología                  |
 | ------------ | --------------------------- |
-| Backend      | Go 1.25 + Chi Router        |
-| Frontend     | Next.js 16 + TypeScript     |
+| Backend      | Configurable (Go, Node, etc)|
+| Frontend     | Configurable (Next.js, etc) |
 | Base de datos| MongoDB 7                   |
 | API Testing  | Newman (Postman)            |
 | UI Testing   | Playwright                  |
@@ -17,22 +17,20 @@ Plantilla corporativa con QA integrado para la **Ficha Única de Caracterizació
 | Seguridad    | OWASP ZAP                   |
 | Análisis     | SonarQube                   |
 | Reportes     | Allure                      |
-| CI/CD        | GitHub Actions              |
+| CI/CD        | Jenkins + GitHub Actions    |
 
 ---
 
 ## Estructura del Proyecto
 
 ```
-FICHA CARACTERIZACION V1/
-├── fuc-sena/                    # Backend (Go API)
-│   ├── cmd/api/                 # Punto de entrada
-│   ├── internal/                # Lógica de negocio
+plantillaQA/
+├── BACKEND/                     # Código del Backend (ignorado en git)
+│   ├── ...                      # Estructura propia del proyecto
 │   └── Dockerfile
 │
-├── fuc-app-web/                 # Frontend (Next.js)
+├── FRONTEND/                    # Código del Frontend (ignorado en git)
 │   ├── src/                     # Código fuente
-│   ├── tests/                   # Tests E2E existentes
 │   └── Dockerfile
 │
 ├── qa/                          # Suite de QA completa
@@ -40,19 +38,22 @@ FICHA CARACTERIZACION V1/
 │   ├── ui/tests/                # Tests de UI (Playwright)
 │   ├── performance/             # Tests de rendimiento (k6)
 │   ├── security/                # Config de seguridad (ZAP)
-│   ├── regression/              # Tests de regresión
 │   ├── reports/                 # Reportes generados
 │   ├── Dockerfile.qa            # Imagen Docker del QA Runner
 │   └── run-tests.sh             # Script orquestador
 │
 ├── docker-compose.yml           # Desarrollo básico
 ├── docker-compose.qa.yml        # QA completo
+├── docker-compose.jenkins.yml   # Override para Jenkins DinD
+├── docker-compose.dev-override.yml # Override para hot-reload local
 │
 ├── .env.dev                     # Variables desarrollo
 ├── .env.qa                      # Variables QA
 ├── .env.staging                 # Variables staging
-├── .env.prod                    # Variables producción
+├── .env.example                 # Plantilla de variables
 │
+├── Jenkinsfile                  # Pipeline Jenkins
+├── Dockerfile.jenkins           # Imagen Jenkins personalizada
 ├── sonar-project.properties     # Configuración SonarQube
 └── .github/workflows/
     └── qa-pipeline.yml          # Pipeline CI/CD
@@ -67,12 +68,21 @@ FICHA CARACTERIZACION V1/
 - Docker y Docker Compose instalados
 - Git
 
-### 1. Clonar el Repositorio
+### 1. Clonar y Configurar
 
 ```bash
 git clone <url-del-repo>
-cd "FICHA CARACTERIZACION V1"
+cd plantillaQA
+
+# Copiar y ajustar variables de entorno
+cp .env.example .env.dev
+cp .env.example .env.qa
 ```
+
+Edita los archivos `.env.*` y configura:
+- `PROJECT_NAME` — nombre de tu proyecto (afecta nombres de contenedores)
+- `BACKEND_DIR` — carpeta del backend (default: `BACKEND`)
+- `FRONTEND_DIR` — carpeta del frontend (default: `FRONTEND`)
 
 ### 2. Levantar en Desarrollo
 
@@ -112,7 +122,6 @@ Después de ejecutar QA, los reportes están en `qa/reports/` y en Allure UI en 
 | `.env.dev`     | Desarrollo     | Local, sin security/perf tests     |
 | `.env.qa`      | QA             | Tests completos excepto perf       |
 | `.env.staging` | Pre-producción | Todos los tests incluido perf      |
-| `.env.prod`    | Producción     | Solo con secrets de CI/CD          |
 
 ### Cambiar de Ambiente
 
@@ -136,7 +145,7 @@ docker compose --env-file .env.staging -f docker-compose.qa.yml up --build --abo
 Las colecciones están en `qa/api/collections/`. Para ejecutar manualmente:
 
 ```bash
-newman run qa/api/collections/fuc-api.postman_collection.json \
+newman run qa/api/collections/api.postman_collection.json \
   --environment qa/api/collections/env-dev.json
 ```
 
@@ -176,7 +185,7 @@ zap-baseline.py -t http://localhost:8080 -c qa/security/zap-config.yaml
    docker run -d --name sonarqube -p 9000:9000 sonarqube:community
    ```
 
-2. Crear un proyecto en SonarQube con key `fuc-sena`
+2. Crear un proyecto en SonarQube con key que coincida con `PROJECT_KEY` del `.env`
 
 3. Generar un token de autenticación
 
@@ -184,11 +193,27 @@ zap-baseline.py -t http://localhost:8080 -c qa/security/zap-config.yaml
    ```
    SONAR_HOST_URL=http://localhost:9000
    SONAR_TOKEN=tu-token-aqui
+   PROJECT_KEY=mi-proyecto
    ```
 
 5. Para CI/CD, configurar los secrets en GitHub:
    - `SONAR_HOST_URL`
    - `SONAR_TOKEN`
+
+---
+
+## Variables de Entorno Clave
+
+| Variable          | Descripción                                    | Default      |
+| ----------------- | ---------------------------------------------- | ------------ |
+| `PROJECT_NAME`    | Nombre del proyecto (prefijo de contenedores)  | `qa-project` |
+| `BACKEND_DIR`     | Carpeta del backend en el host                 | `BACKEND`    |
+| `FRONTEND_DIR`    | Carpeta del frontend en el host                | `FRONTEND`   |
+| `PROJECT_KEY`     | Key del proyecto en SonarQube                  | `qa-project` |
+| `RUN_NEWMAN`      | Habilitar tests de API                         | `false`      |
+| `RUN_SONAR`       | Habilitar análisis estático                    | `false`      |
+| `RUN_PLAYWRIGHT`  | Habilitar tests E2E                            | `false`      |
+| `RUN_K6`          | Habilitar tests de rendimiento                 | `false`      |
 
 ---
 
@@ -208,26 +233,15 @@ Los reportes se guardan como artifacts de GitHub Actions por 30 días.
 
 ---
 
-## Crear Nuevo Proyecto Desde Template
+## Adaptar a un Nuevo Proyecto
 
-### GitHub
-
-1. Ir al repositorio template
-2. Click en **"Use this template"** > **"Create a new repository"**
-3. Nombrar el nuevo repositorio
-4. Clonar y configurar los archivos `.env.*`
-
-### GitLab
-
-1. Marcar el proyecto como **Template**
-2. **New project** > **From template** > Seleccionar el template
-3. Configurar variables de CI/CD
-
-### Azure DevOps
-
-1. Crear el repositorio base como template
-2. **New project** > Importar desde template
-3. Configurar pipelines y variable groups
+1. Clonar la plantilla
+2. Colocar el código backend en `BACKEND/` y frontend en `FRONTEND/`
+3. Copiar `.env.example` a `.env.dev`, `.env.qa`, `.env.staging`
+4. Ajustar `PROJECT_NAME`, `BACKEND_DIR`, `FRONTEND_DIR` en los `.env`
+5. Actualizar `.gitignore` si cambias los nombres de carpetas
+6. Personalizar las colecciones Postman en `qa/api/collections/`
+7. Ajustar los tests Playwright en `qa/ui/tests/`
 
 ---
 

@@ -16,5 +16,5 @@ services:
       - ./qa/ui/tests:/qa/ui/tests:ro
       - ./qa/performance:/qa/performance:ro
       # Montajes de codigo para desarrollo local (hot-reload / scans rapidos)
-      - ./fuc-sena:/src/fuc-sena:ro
-      - ./fuc-app-web:/src/fuc-app-web:ro
+      - ./${BACKEND_DIR:-BACKEND}:/src/backend:ro
+      - ./${FRONTEND_DIR:-FRONTEND}:/src/frontend:ro

@@ -22,7 +22,7 @@ pipeline {
 
     environment {
         ENVIRONMENT          = 'qa'
-        COMPOSE_PROJECT_NAME = 'fichacaracterizacionv1'
+        COMPOSE_PROJECT_NAME = 'qa-pipeline'
         COMPOSE_CMD          = 'docker compose --env-file /app/.env.qa -f /app/docker-compose.qa.yml -f /app/docker-compose.jenkins.yml'
         DISCORD_WEBHOOK      = credentials('DISCORD_WEBHOOK_URL')
         CLAUDE_API_KEY       = credentials('CLAUDE_API_KEY')
@@ -37,13 +37,17 @@ pipeline {
             steps {
                 script {
                     echo "════════════════════════════════════════"
-                    echo "🔧 PREPARANDO ENTORNO Y DEPENDENCIAS"
+                    echo "PREPARANDO ENTORNO Y DEPENDENCIAS"
                     echo "════════════════════════════════════════"
                     sh '''
+                        # Leer PROJECT_NAME del .env.qa (fuente unica de verdad)
+                        PROJECT_NAME=$(grep '^PROJECT_NAME=' /app/.env.qa | cut -d'=' -f2)
+                        echo "=> PROJECT_NAME: $PROJECT_NAME"
+
                         echo "=> Limpiando contenedores transientes del build anterior..."
                         ${COMPOSE_CMD} stop db backend frontend || true
                         ${COMPOSE_CMD} rm -f db backend frontend || true
-                        docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 fuc-allure fuc-allure-ui fuc-allure-nginx kiwitcmsdock 2>/dev/null || true
+                        docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 ${PROJECT_NAME}-allure ${PROJECT_NAME}-allure-ui ${PROJECT_NAME}-allure-nginx 2>/dev/null || true
                         mkdir -p /app/qa/reports
                         rm -rf /app/qa/reports/coverage-backend.out /app/qa/reports/coverage-backend.xml /app/qa/reports/govet.txt /app/qa/reports/k6 /app/qa/reports/js-test-report.xml /app/qa/reports/go-test-report.json
 
@@ -54,9 +58,9 @@ pipeline {
                             newman-viewer playwright-viewer
 
                         echo "=> Sincronizando provisioning de Grafana (DinD bind-mount fix)..."
-                        docker cp /app/qa/grafana/provisioning/dashboards/provider.yml fuc-grafana:/etc/grafana/provisioning/dashboards/provider.yml 2>/dev/null || true
-                        docker cp /app/qa/grafana/provisioning/datasources/influxdb.yml fuc-grafana:/etc/grafana/provisioning/datasources/influxdb.yml 2>/dev/null || true
-                        docker cp /app/qa/grafana/dashboards/k6.json fuc-grafana:/var/lib/grafana/dashboards/k6.json 2>/dev/null || true
+                        docker cp /app/qa/grafana/provisioning/dashboards/provider.yml ${PROJECT_NAME}-grafana:/etc/grafana/provisioning/dashboards/provider.yml 2>/dev/null || true
+                        docker cp /app/qa/grafana/provisioning/datasources/influxdb.yml ${PROJECT_NAME}-grafana:/etc/grafana/provisioning/datasources/influxdb.yml 2>/dev/null || true
+                        docker cp /app/qa/grafana/dashboards/k6.json ${PROJECT_NAME}-grafana:/var/lib/grafana/dashboards/k6.json 2>/dev/null || true
 
                         echo "=> Levantando servicios transientes de la aplicación..."
                         ${COMPOSE_CMD} --profile sonar up -d \
@@ -64,13 +68,13 @@ pipeline {
 
                         echo "=> Configurando Grafana home dashboard..."
                         for i in $(seq 1 20); do
-                            if docker exec fuc-influxdb curl -sf http://grafana:3000/api/health 2>/dev/null | grep -q 'database.*ok'; then
-                                docker exec fuc-influxdb curl -sf -X PUT \
+                            if docker exec ${PROJECT_NAME}-influxdb curl -sf http://grafana:3000/api/health 2>/dev/null | grep -q 'database.*ok'; then
+                                docker exec ${PROJECT_NAME}-influxdb curl -sf -X PUT \
                                     -u admin:admin \
                                     -H 'Content-Type: application/json' \
-                                    -d '{"homeDashboardUID":"fuc-k6-perf"}' \
+                                    -d '{"homeDashboardUID":"k6-perf"}' \
                                     http://grafana:3000/api/org/preferences > /dev/null 2>&1 && \
-                                    echo "  Home dashboard configurado: fuc-k6-perf" || \
+                                    echo "  Home dashboard configurado: k6-perf" || \
                                     echo "  WARN: No se pudo configurar el home dashboard"
                                 break
                             fi
@@ -81,7 +85,7 @@ pipeline {
                         echo "=> Construyendo QA Runner (Root Context)..."
                         ${COMPOSE_CMD} build qa-runner
 
-                        echo "✅ Entorno listo"
+                        echo "Entorno listo"
                     '''
                 }
             }
@@ -121,14 +125,14 @@ pipeline {
                                 -e RUN_PLAYWRIGHT=false \\
                                 -e RUN_K6=false \\
                                 ${env.SONAR_TOKEN ? "-e SONAR_TOKEN=${env.SONAR_TOKEN}" : ""} \\
-                                -e PROJECT_KEY=${env.PROJECT_KEY ?: 'fuc-sena'} \\
+                                -e PROJECT_KEY=${env.PROJECT_KEY ?: 'qa-project'} \\
                                 qa-runner || true
                             """
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/"
                             sh "docker cp qa-runner-sonar:${QA_REPORTS_DIR}/coverage-backend.out   ${JENKINS_REPORTS_DIR}/ || true"
                             sh "docker cp qa-runner-sonar:${QA_REPORTS_DIR}/coverage-backend.xml   ${JENKINS_REPORTS_DIR}/ || true"
                             sh "docker cp qa-runner-sonar:${QA_REPORTS_DIR}/js-test-report.xml     ${JENKINS_REPORTS_DIR}/ || true"
-                            sh "docker cp qa-runner-sonar:/src/fuc-app-web/coverage/lcov.info       ${JENKINS_REPORTS_DIR}/coverage-frontend.lcov || true"
+                            sh "docker cp qa-runner-sonar:/src/frontend/coverage/lcov.info          ${JENKINS_REPORTS_DIR}/coverage-frontend.lcov || true"
                             sh "docker cp qa-runner-sonar:${QA_REPORTS_DIR}/govet.txt              ${JENKINS_REPORTS_DIR}/ || true"
                             sh "docker rm -f qa-runner-sonar || true"
                         }
@@ -187,7 +191,7 @@ pipeline {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                     script {
                         echo "════════════════════════════════════════"
-                        echo "🤖 ANALIZANDO RESULTADOS CON CLAUDE API"
+                        echo "ANALIZANDO RESULTADOS CON CLAUDE API"
                         echo "════════════════════════════════════════"
                         sh '''
                             mkdir -p ${JENKINS_REPORTS_DIR}/claude-analysis
@@ -221,7 +225,7 @@ pipeline {
                                 '{"model": $model, "max_tokens": 1024, "messages": [{"role": "user", "content": $content}]}' \
                                 > /tmp/claude-payload.json
 
-                            echo "🔄 Enviando análisis a Claude API..."
+                            echo "Enviando análisis a Claude API..."
 
                             RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
                                 -H "x-api-key: ${CLAUDE_API_KEY}" \
@@ -232,7 +236,7 @@ pipeline {
                             ANALYSIS=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
 
                             if [ -z "$ANALYSIS" ]; then
-                                echo "⚠️  Claude API no devolvió análisis. Respuesta:"
+                                echo "Claude API no devolvió análisis. Respuesta:"
                                 echo "$RESPONSE" | jq '.' || echo "$RESPONSE"
                                 exit 1
                             fi
@@ -245,7 +249,7 @@ pipeline {
                                 '{"timestamp": $ts, "build_number": $bn, "build_url": $bu, "analysis": $an}' \
                                 > ${JENKINS_REPORTS_DIR}/claude-analysis/analysis-report.json
 
-                            echo "✅ Análisis guardado"
+                            echo "Análisis guardado"
                             echo "$ANALYSIS"
                         '''
                     }
@@ -263,14 +267,14 @@ pipeline {
             steps {
                 script {
                     echo "════════════════════════════════════════"
-                    echo "🎨 GENERANDO HTML VISUAL"
+                    echo "GENERANDO HTML VISUAL"
                     echo "════════════════════════════════════════"
                     sh '''
                         REPORT_DIR="${JENKINS_REPORTS_DIR}"
                         ANALYSIS_FILE="${REPORT_DIR}/claude-analysis/analysis-report.json"
 
                         if [ ! -f "$ANALYSIS_FILE" ]; then
-                            echo "❌ Archivo de análisis no encontrado: $ANALYSIS_FILE"
+                            echo "Archivo de análisis no encontrado: $ANALYSIS_FILE"
                             exit 1
                         fi
 
@@ -279,17 +283,17 @@ pipeline {
                         ANALYSIS=$(jq  -r '.analysis'     "$ANALYSIS_FILE")
 
                         if echo "$ANALYSIS" | grep -Eqi "PASS|ÉXITO|SUCCESS|exitoso"; then
-                            STATUS="✅ EXITOSO"
+                            STATUS="EXITOSO"
                             COLOR="28a745"
                             BG="#d4edda"
                             BORDER="#c3e6cb"
                         elif echo "$ANALYSIS" | grep -Eqi "WARN|ATENCIÓN|WARNING"; then
-                            STATUS="⚠️ ATENCIÓN"
+                            STATUS="ATENCIÓN"
                             COLOR="ffc107"
                             BG="#fff3cd"
                             BORDER="#ffeeba"
                         else
-                            STATUS="❌ FALLÓ"
+                            STATUS="FALLÓ"
                             COLOR="dc3545"
                             BG="#f8d7da"
                             BORDER="#f5c6cb"
@@ -384,11 +388,11 @@ pipeline {
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 QA Analysis Report</h1>
+            <h1>QA Analysis Report</h1>
             <p class="subtitle">Análisis Inteligente con Claude AI</p>
             <div class="build-info">
-                <span>🔨 Build #${BUILD_NUM}</span>
-                <span>⏰ ${TIMESTAMP}</span>
+                <span>Build #${BUILD_NUM}</span>
+                <span>${TIMESTAMP}</span>
             </div>
         </div>
         <div class="content">
@@ -397,12 +401,12 @@ pipeline {
                 <div>Análisis completado con Claude AI</div>
             </div>
             <div class="section">
-                <h2>📊 Análisis Completo</h2>
+                <h2>Análisis Completo</h2>
                 <div class="analysis-box">${ANALYSIS_HTML}</div>
             </div>
         </div>
         <div class="footer">
-            <p>🤖 Claude AI QA Pipeline · Análisis Automatizado</p>
+            <p>Claude AI QA Pipeline - Análisis Automatizado</p>
             <p>Generado: ${TIMESTAMP}</p>
         </div>
     </div>
@@ -410,7 +414,7 @@ pipeline {
 </html>
 HTML_EOF
 
-                        echo "✅ HTML generado en ${REPORT_DIR}/claude-analysis/index.html"
+                        echo "HTML generado en ${REPORT_DIR}/claude-analysis/index.html"
                     '''
                 }
             }
@@ -510,16 +514,17 @@ HTML_EOF
                     }
                 }
 
-                echo "=> Aguardando procesamiento CE task de SonarQube..."
-                sh 'sleep 30'
-                echo "=> Apagando solo contenedores transientes de la aplicación..."
-                echo "   Servicios persistentes (activos para revisión post-ejecución):"
-                echo "     - SonarQube    → http://localhost:9000"
-                echo "     - Grafana      → http://localhost:3001"
-                echo "     - Newman       → http://localhost:8181"
-                echo "     - Playwright   → http://localhost:8182"
-                echo "     - InfluxDB     → http://localhost:8086"
                 sh '''
+                    PROJECT_NAME=$(grep '^PROJECT_NAME=' /app/.env.qa | cut -d'=' -f2)
+                    echo "=> Aguardando procesamiento CE task de SonarQube..."
+                    sleep 30
+                    echo "=> Apagando solo contenedores transientes de la aplicación..."
+                    echo "   Servicios persistentes (activos para revisión post-ejecución):"
+                    echo "     - SonarQube    → http://localhost:9000"
+                    echo "     - Grafana      → http://localhost:3001"
+                    echo "     - Newman       → http://localhost:8181"
+                    echo "     - Playwright   → http://localhost:8182"
+                    echo "     - InfluxDB     → http://localhost:8086"
                     ${COMPOSE_CMD} stop db backend frontend || true
                     ${COMPOSE_CMD} rm -f db backend frontend || true
                     docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 2>/dev/null || true
@@ -528,12 +533,12 @@ HTML_EOF
         }
 
         success {
-            echo '¡El pipeline de QA se ejecutó con éxito!'
+            echo 'El pipeline de QA se ejecutó con éxito!'
             script {
                 if (env.DISCORD_WEBHOOK) {
                     discordSend webhookURL: env.DISCORD_WEBHOOK,
-                        title      : "✅ Éxito — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                        description: "Pipeline QA completado · Análisis Claude AI ✅",
+                        title      : "Éxito — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                        description: "Pipeline QA completado exitosamente",
                         result     : currentBuild.currentResult,
                         link       : env.BUILD_URL
                 }
@@ -545,8 +550,8 @@ HTML_EOF
             script {
                 if (env.DISCORD_WEBHOOK) {
                     discordSend webhookURL: env.DISCORD_WEBHOOK,
-                        title      : "❌ Fallo — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                        description: "Pipeline QA falló · Revisar logs inmediatamente",
+                        title      : "Fallo — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                        description: "Pipeline QA falló - Revisar logs inmediatamente",
                         result     : currentBuild.currentResult,
                         link       : env.BUILD_URL
                 }

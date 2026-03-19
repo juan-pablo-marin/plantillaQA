@@ -20,36 +20,36 @@ x-common-healthcheck: &common-healthcheck
   start_period: 30s
 
 networks:
-  fuc-qa-network:
-    name: fuc-qa-network
+  qa-network:
+    name: ${PROJECT_NAME}-qa-network
     driver: bridge
 
 volumes:
   mongodb_qa_data:
-    name: fuc-mongodb-qa-data
+    name: ${PROJECT_NAME}-mongodb-qa-data
   sonarqube_data:
-    name: fuc-sonarqube-data
+    name: ${PROJECT_NAME}-sonarqube-data
   sonarqube_extensions:
-    name: fuc-sonarqube-extensions
+    name: ${PROJECT_NAME}-sonarqube-extensions
   sonarqube_logs:
-    name: fuc-sonarqube-logs
+    name: ${PROJECT_NAME}-sonarqube-logs
   sonarqube_db_data:
-    name: fuc-sonarqube-db-data
+    name: ${PROJECT_NAME}-sonarqube-db-data
   sonar_scanner_cache:
-    name: fuc-sonar-scanner-cache
+    name: ${PROJECT_NAME}-sonar-scanner-cache
   influxdb_data:
-    name: fuc-influxdb-data
+    name: ${PROJECT_NAME}-influxdb-data
   grafana_data:
-    name: fuc-grafana-data
+    name: ${PROJECT_NAME}-grafana-data
   jenkins_qa_data:
-    name: fuc-jenkins-qa-data
+    name: ${PROJECT_NAME}-jenkins-qa-data
 
 services:
 
   # --- Base de datos — MongoDB (App) ---
   db:
     image: mongo:7
-    container_name: fuc-mongodb-qa
+    container_name: ${PROJECT_NAME}-mongodb-qa
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
@@ -66,14 +66,14 @@ services:
       retries: 10
       start_period: 60s
     networks:
-      - fuc-qa-network
+      - qa-network
 
-  # --- Backend — Go API ---
+  # --- Backend ---
   backend:
     build:
-      context: ./fuc-sena
+      context: ./${BACKEND_DIR:-BACKEND}
       dockerfile: Dockerfile
-    container_name: fuc-api-qa
+    container_name: ${PROJECT_NAME}-api-qa
     restart: unless-stopped
     depends_on:
       db:
@@ -90,15 +90,15 @@ services:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
       <<: *common-healthcheck
     networks:
-      - fuc-qa-network
+      - qa-network
 
-  # --- Frontend — Next.js ---
+  # --- Frontend ---
   frontend:
     build:
-      context: ./fuc-app-web
+      context: ./${FRONTEND_DIR:-FRONTEND}
       dockerfile: Dockerfile
       target: ${FRONTEND_TARGET:-runtime}
-    container_name: fuc-app-web-qa
+    container_name: ${PROJECT_NAME}-frontend-qa
     restart: unless-stopped
     depends_on:
       - backend
@@ -107,12 +107,12 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://backend:8080/api/v1
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- SonarQube — Database (Postgres) ---
   sonar-db:
     image: postgres:15-alpine
-    container_name: fuc-sonar-db
+    container_name: ${PROJECT_NAME}-sonar-db
     profiles: [ "sonar", "all" ]
     restart: unless-stopped
     environment:
@@ -127,12 +127,12 @@ services:
       test: [ "CMD-SHELL", "pg_isready -U sonar -d sonarqube" ]
       <<: *common-healthcheck
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- SonarQube — Server ---
   sonarqube:
     image: sonarqube:10.4-community
-    container_name: fuc-sonarqube
+    container_name: ${PROJECT_NAME}-sonarqube
     profiles: [ "sonar", "all" ]
     restart: unless-stopped
     depends_on:
@@ -162,14 +162,17 @@ services:
       retries: 15
       start_period: 120s
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- QA Runner (Master Orchestrator) ---
   qa-runner:
     build:
       context: .
       dockerfile: ./qa/Dockerfile.qa
-    container_name: fuc-qa-runner
+      args:
+        BACKEND_DIR: ${BACKEND_DIR:-BACKEND}
+        FRONTEND_DIR: ${FRONTEND_DIR:-FRONTEND}
+    container_name: ${PROJECT_NAME}-qa-runner
     profiles: [ "test-e2e", "all" ]
     depends_on:
       backend:
@@ -182,7 +185,7 @@ services:
       - FRONTEND_URL=http://frontend:3000
       - SONAR_HOST_URL=http://sonarqube:9000
       - SONAR_TOKEN=${SONAR_TOKEN:-}
-      - PROJECT_KEY=${PROJECT_KEY:-fuc-sena}
+      - PROJECT_KEY=${PROJECT_KEY:-qa-project}
       # ── Flags de pruebas (false = desactivado, true = activo) ──
       - RUN_NEWMAN=${RUN_NEWMAN:-false}
       - RUN_SONAR=${RUN_SONAR:-false}
@@ -191,22 +194,18 @@ services:
       # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-20m}
-    shm_size: '2gb' # Previene crasheos de Chromium en Playwright E2E
+    shm_size: '2gb'
     volumes:
       - ./qa/reports:/qa/reports
-      # Se comentan los montajes de codigo para Jenkins (DinD). 
-      # El codigo se incluira en la imagen o se montara via dev-override.
-      # - ./fuc-sena:/src/backend:ro
-      # - ./fuc-app-web:/src/frontend:ro
       - sonar_scanner_cache:/root/.sonar/cache
     command: [ "bash", "run-tests.sh" ]
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- InfluxDB (time-series store para métricas k6) ---
   influxdb:
     image: influxdb:1.8
-    container_name: fuc-influxdb
+    container_name: ${PROJECT_NAME}-influxdb
     profiles: [ "perf", "jenkins", "all" ]
     restart: unless-stopped
     environment:
@@ -232,12 +231,12 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- Grafana (dashboard de métricas k6) ---
   grafana:
     image: grafana/grafana:latest
-    container_name: fuc-grafana
+    container_name: ${PROJECT_NAME}-grafana
     profiles: [ "perf", "jenkins", "all" ]
     restart: unless-stopped
     depends_on:
@@ -261,14 +260,17 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- k6 Runner (solo performance) ---
   k6-runner:
     build:
       context: .
       dockerfile: ./qa/Dockerfile.qa
-    container_name: fuc-k6-runner
+      args:
+        BACKEND_DIR: ${BACKEND_DIR:-BACKEND}
+        FRONTEND_DIR: ${FRONTEND_DIR:-FRONTEND}
+    container_name: ${PROJECT_NAME}-k6-runner
     profiles: [ "perf" ]
     depends_on:
       backend:
@@ -282,14 +284,12 @@ services:
       - ./qa/performance:/qa/performance:ro
     command: [ "bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests.js -e BACKEND_URL=$$BACKEND_URL --out influxdb=http://influxdb:8086/k6 --summary-export /qa/reports/k6/summary.json" ]
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- Allure Reports Viewer ---
   allure:
-    # Pinned version to match allure-docker-service-ui compatibility.
-    # (UI image is old; some newer API versions can trigger "Network Error" in the UI.)
     image: frankescobar/allure-docker-service:2.13.6
-    container_name: fuc-allure
+    container_name: ${PROJECT_NAME}-allure
     profiles: [ "viewers" ]
     environment:
       CHECK_RESULTS_EVERY_SECONDS: 1
@@ -300,27 +300,25 @@ services:
       - ./qa/reports/allure-results:/app/allure-results
       - ./qa/reports/allure-reports:/app/default-reports
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- Allure UI (React SPA; sin puerto expuesto — nginx hace de proxy) ---
   allure-ui:
     image: frankescobar/allure-docker-service-ui
-    container_name: fuc-allure-ui
+    container_name: ${PROJECT_NAME}-allure-ui
     profiles: [ "viewers" ]
     depends_on:
       - allure
     environment:
-      # Nginx expone el puerto 5252 en el host; ambos servicios quedan bajo el mismo origen
-      # y el navegador no levanta error de CORS.
       - ALLURE_DOCKER_PUBLIC_API_URL=http://localhost:5252
       - ALLURE_DOCKER_PUBLIC_API_URL_PREFIX=
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- Nginx reverse-proxy: une UI y API bajo localhost:5252 (mismo origen) ---
   allure-nginx:
     image: nginx:alpine
-    container_name: fuc-allure-nginx
+    container_name: ${PROJECT_NAME}-allure-nginx
     profiles: [ "viewers" ]
     depends_on:
       - allure
@@ -330,12 +328,12 @@ services:
     volumes:
       - ./qa/allure-nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- Newman Report Viewer (Standalone — persiste entre builds) ---
   newman-viewer:
     image: nginx:alpine
-    container_name: fuc-newman-viewer
+    container_name: ${PROJECT_NAME}-newman-viewer
     profiles: [ "test-e2e", "jenkins", "all", "report" ]
     restart: unless-stopped
     ports:
@@ -344,12 +342,12 @@ services:
       - ./qa/reports/newman:/usr/share/nginx/html:ro
       - ./qa/nginx-viewer.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- Playwright Report Viewer (Standalone — persiste entre builds) ---
   playwright-viewer:
     image: nginx:alpine
-    container_name: fuc-playwright-viewer
+    container_name: ${PROJECT_NAME}-playwright-viewer
     profiles: [ "test-e2e", "jenkins", "all", "report" ]
     restart: unless-stopped
     ports:
@@ -358,14 +356,14 @@ services:
       - ./qa/reports/playwright-html:/usr/share/nginx/html:ro
       - ./qa/nginx-viewer.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
-      - fuc-qa-network
+      - qa-network
 
   # --- Jenkins (CI/CD Orchestrator) ---
   jenkins:
     build:
       context: .
       dockerfile: Dockerfile.jenkins
-    container_name: fuc-jenkins-qa
+    container_name: ${PROJECT_NAME}-jenkins-qa
     user: root
     profiles: [ "jenkins", "all" ]
     restart: unless-stopped
@@ -374,16 +372,13 @@ services:
       - "50000:50000"
     environment:
       - JAVA_OPTS=-Djenkins.install.runSetupWizard=false -Dhudson.model.DirectoryBrowserSupport.CSP=
-      # Se recomienda usar secretos para JENKINS_ADMIN_ID y JENKINS_ADMIN_PASSWORD en un entorno productivo
       - JENKINS_ADMIN_ID=admin
       - JENKINS_ADMIN_PASSWORD=admin
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
     volumes:
       - jenkins_qa_data:/var/jenkins_home
-      # Montar socket de docker para que Jenkins pueda lanzar docker run/compose internamente
       - /var/run/docker.sock:/var/run/docker.sock
-      # Montar el propio proyecto dentro de Jenkins (para que no importe como se llama el Job)
       - .:/app
     working_dir: /app
     networks:
-      - fuc-qa-network
+      - qa-network

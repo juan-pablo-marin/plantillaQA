@@ -1,6 +1,6 @@
 {
-  "id": "fuc-env-dev",
-  "name": "FUC Dev Environment",
+  "id": "env-dev",
+  "name": "Dev Environment",
   "values": [
     {
       "key": "baseUrl",

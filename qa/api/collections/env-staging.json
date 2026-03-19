@@ -1,6 +1,6 @@
 {
-  "id": "fuc-env-staging",
-  "name": "FUC Staging Environment",
+  "id": "env-staging",
+  "name": "Staging Environment",
   "values": [
     {
       "key": "baseUrl",

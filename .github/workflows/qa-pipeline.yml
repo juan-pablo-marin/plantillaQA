@@ -8,6 +8,8 @@ on:
 
 env:
   ENVIRONMENT: qa
+  BACKEND_DIR: BACKEND
+  FRONTEND_DIR: FRONTEND
 
 jobs:
 
@@ -22,13 +24,13 @@ jobs:
 
       - name: Build Backend
         run: |
-          cd fuc-sena
-          docker build -t fuc-backend:qa .
+          cd ${{ env.BACKEND_DIR }}
+          docker build -t app-backend:qa .
 
       - name: Build Frontend
         run: |
-          cd fuc-app-web
-          docker build --target dev -t fuc-frontend:qa .
+          cd ${{ env.FRONTEND_DIR }}
+          docker build --target dev -t app-frontend:qa .
 
   # ------------------------------------------
   # Job 2: Backend Unit Tests
@@ -44,7 +46,7 @@ jobs:
           go-version: '1.25'
 
       - name: Run Go Tests
-        working-directory: fuc-sena
+        working-directory: ${{ env.BACKEND_DIR }}
         run: go test ./... -v -race -coverprofile=coverage.out -covermode=atomic
 
       - name: Upload Backend Coverage
@@ -52,7 +54,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
-          path: fuc-sena/coverage.out
+          path: ${{ env.BACKEND_DIR }}/coverage.out
           retention-days: 14
 
   # ------------------------------------------
@@ -72,14 +74,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-          cache-dependency-path: fuc-app-web/pnpm-lock.yaml
+          cache-dependency-path: ${{ env.FRONTEND_DIR }}/pnpm-lock.yaml
 
       - name: Install Dependencies
-        working-directory: fuc-app-web
+        working-directory: ${{ env.FRONTEND_DIR }}
         run: pnpm install --frozen-lockfile
 
       - name: Run Vitest
-        working-directory: fuc-app-web
+        working-directory: ${{ env.FRONTEND_DIR }}
         run: pnpm test -- --coverage
 
       - name: Upload Frontend Coverage
@@ -87,7 +89,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-coverage
-          path: fuc-app-web/coverage/
+          path: ${{ env.FRONTEND_DIR }}/coverage/
           retention-days: 14
 
   # ------------------------------------------
@@ -143,13 +145,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: backend-coverage
-          path: fuc-sena/
+          path: ${{ env.BACKEND_DIR }}/
 
       - name: Download Frontend Coverage
         uses: actions/download-artifact@v4
         with:
           name: frontend-coverage
-          path: fuc-app-web/coverage/
+          path: ${{ env.FRONTEND_DIR }}/coverage/
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v3

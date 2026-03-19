@@ -9,7 +9,7 @@ services:
   # --- Base de datos — MongoDB ---
   db:
     image: mongo:7
-    container_name: fuc-mongodb
+    container_name: ${PROJECT_NAME}-mongodb
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
@@ -26,17 +26,17 @@ services:
       retries: 5
       start_period: 20s
     networks:
-      - fuc-network
+      - app-network
 
-  # --- Backend — Go API ---
+  # --- Backend ---
   backend:
     build:
-      context: ./fuc-sena
+      context: ./${BACKEND_DIR:-BACKEND}
       dockerfile: Dockerfile
       args:
         BUILD_VERSION: ${BUILD_VERSION:-dev}
         BUILD_DATE: ${BUILD_DATE:-unknown}
-    container_name: fuc-api
+    container_name: ${PROJECT_NAME}-api
     restart: unless-stopped
     depends_on:
       db:
@@ -56,15 +56,15 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - fuc-network
+      - app-network
 
-  # --- Frontend — Next.js ---
+  # --- Frontend ---
   frontend:
     build:
-      context: ./fuc-app-web
+      context: ./${FRONTEND_DIR:-FRONTEND}
       dockerfile: Dockerfile
       target: dev
-    container_name: fuc-app-web-dev
+    container_name: ${PROJECT_NAME}-frontend-dev
     restart: unless-stopped
     depends_on:
       - backend
@@ -73,13 +73,13 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://backend:8080/api/v1
     networks:
-      - fuc-network
+      - app-network
 
 volumes:
   mongodb_data:
-    name: fuc-mongodb-data
+    name: ${PROJECT_NAME}-mongodb-data
 
 networks:
-  fuc-network:
-    name: fuc-network
+  app-network:
+    name: ${PROJECT_NAME}-network
     driver: bridge

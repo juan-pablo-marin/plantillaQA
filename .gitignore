@@ -58,7 +58,8 @@ temp/
 .cache/
 
 # --- Proyectos (Excluidos de la plantilla) ---
-fuc-app-web/
-fuc-sena/
+# Actualiza estos nombres si cambias BACKEND_DIR / FRONTEND_DIR en los .env
+BACKEND/
+FRONTEND/
 .scannerwork/
 .sonar/

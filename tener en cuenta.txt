@@ -75,7 +75,8 @@ sudo usermod -aG docker $USERnewgrp docker
 Verifica:
 docker versiondocker compose version
 2) Clonar el proyecto en el servidor Linux
-git clone <TU_REPO_URL> fuc-qacd fuc-qa
+git clone <TU_REPO_URL> plantillaQA
+cd plantillaQA
 (Usa la URL de tu repo: GitHub/GitLab/etc.)
 
 3) Preparar .env.qa
@@ -86,7 +87,7 @@ MONGO_USER, MONGO_PASSWORD, MONGO_DB
 SONAR_TOKEN (si quieres análisis)
 PROJECT_KEY (opcional)
 
-4) Levantar el stack y ejecutar fuc-qa-runner
+4) Levantar el stack y ejecutar qa-runner
 
 Cargue completo + ejecución (con Sonar por defecto)
 
