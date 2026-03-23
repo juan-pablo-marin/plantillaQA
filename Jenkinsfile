@@ -29,6 +29,7 @@ pipeline {
         COMPOSE_CMD          = "docker compose --env-file ${env.ENV_FILE} -f ${env.QA_COMPOSE} -f /app/docker-compose.jenkins.yml"
         QA_REPORTS_DIR       = "${env.IS_FUC == 'true' ? '/qa/reports/fuc' : '/qa/reports/rav'}"
         JENKINS_REPORTS_DIR  = "${env.IS_FUC == 'true' ? '/app/qa/reports/fuc' : '/app/qa/reports/rav'}"
+        RELATIVE_REPORTS_DIR = "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}"
         BUILD_TIMESTAMP      = sh(script: 'date +%Y%m%d_%H%M%S', returnStdout: true).trim()
     }
 
@@ -50,9 +51,9 @@ pipeline {
                         ${COMPOSE_CMD} rm -f db backend frontend || true
                         docker rm -f ${PROJECT_NAME}-mongodb-qa ${PROJECT_NAME}-postgres-qa ${PROJECT_NAME}-api-qa ${PROJECT_NAME}-frontend-qa 2>/dev/null || true
                         docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 ${PROJECT_NAME}-allure ${PROJECT_NAME}-allure-ui ${PROJECT_NAME}-allure-nginx 2>/dev/null || true
-                        mkdir -p /app/qa/reports
-                        mkdir -p /app/qa/reports/newman/anterior
-                        rm -rf /app/qa/reports/coverage-backend.out /app/qa/reports/coverage-backend.xml /app/qa/reports/govet.txt /app/qa/reports/k6 /app/qa/reports/js-test-report.xml /app/qa/reports/go-test-report.json
+                        mkdir -p ${JENKINS_REPORTS_DIR}
+                        mkdir -p ${JENKINS_REPORTS_DIR}/newman/anterior
+                        rm -rf ${JENKINS_REPORTS_DIR}/coverage-backend.out ${JENKINS_REPORTS_DIR}/coverage-backend.xml ${JENKINS_REPORTS_DIR}/govet.txt ${JENKINS_REPORTS_DIR}/k6 ${JENKINS_REPORTS_DIR}/js-test-report.xml ${JENKINS_REPORTS_DIR}/go-test-report.json
 
                         echo "=> Levantando servicios persistentes (sin recrear si ya existen)..."
                         ${COMPOSE_CMD} --profile sonar up -d --no-recreate \
@@ -455,47 +456,47 @@ HTML_EOF
 
                 dir('/app') {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/newman/index.html")) {
-                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/newman/**/*", allowEmptyArchive: true
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/newman/index.html")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/newman/**/*", allowEmptyArchive: true
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/coverage-backend.xml")) {
-                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/coverage-backend.*", allowEmptyArchive: true
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/coverage-backend.xml")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/coverage-backend.*", allowEmptyArchive: true
                             publishCoverage adapters: [
-                                coberturaReportAdapter(path: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/coverage-backend.xml")
+                                coberturaReportAdapter(path: "${env.RELATIVE_REPORTS_DIR}/coverage-backend.xml")
                             ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/js-test-report.xml")) {
-                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/js-test-report.xml", allowEmptyArchive: true
-                            junit testResults: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/js-test-report.xml", allowEmptyResults: true
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/js-test-report.xml")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/js-test-report.xml", allowEmptyArchive: true
+                            junit testResults: "${env.RELATIVE_REPORTS_DIR}/js-test-report.xml", allowEmptyResults: true
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/k6/summary.json")) {
-                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/k6/**/*", allowEmptyArchive: true
-                            perfReport filterRegex: '', sourceDataFiles: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/k6/*.xml"
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/k6/summary.json")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/k6/**/*", allowEmptyArchive: true
+                            perfReport filterRegex: '', sourceDataFiles: "${env.RELATIVE_REPORTS_DIR}/k6/*.xml"
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/govet.txt")) {
-                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/govet.txt", allowEmptyArchive: true
-                            recordIssues enabledForFailure: true, tool: goVet(pattern: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/govet.txt")
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/govet.txt")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/govet.txt", allowEmptyArchive: true
+                            recordIssues enabledForFailure: true, tool: goVet(pattern: "${env.RELATIVE_REPORTS_DIR}/govet.txt")
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/playwright-html/index.html")) {
-                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/playwright-html/**/*", allowEmptyArchive: true
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/playwright-html/index.html")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/playwright-html/**/*", allowEmptyArchive: true
                             publishHTML(target: [
                                 reportName         : 'Playwright E2E Report',
-                                reportDir          : "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/playwright-html",
+                                reportDir          : "${env.RELATIVE_REPORTS_DIR}/playwright-html",
                                 reportFiles        : 'index.html',
                                 keepAll            : true,
                                 alwaysLinkToLastBuild: true,
@@ -505,10 +506,10 @@ HTML_EOF
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/newman/index.html")) {
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/newman/index.html")) {
                             publishHTML(target: [
                                 reportName         : 'Newman API Report',
-                                reportDir          : "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/newman",
+                                reportDir          : "${env.RELATIVE_REPORTS_DIR}/newman",
                                 reportFiles        : 'index.html',
                                 keepAll            : true,
                                 alwaysLinkToLastBuild: true,
@@ -518,19 +519,19 @@ HTML_EOF
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/allure-results")) {
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/allure-results")) {
                             allure includeProperties: false, jdk: '', commandline: 'allure',
-                                   results: [[path: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/allure-results"]],
+                                   results: [[path: "${env.RELATIVE_REPORTS_DIR}/allure-results"]],
                                    reportBuildPolicy: 'ALWAYS'
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/claude-analysis/index.html")) {
-                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/claude-analysis/**", allowEmptyArchive: true
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/claude-analysis/index.html")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/claude-analysis/**", allowEmptyArchive: true
                             publishHTML(target: [
                                 reportName         : 'Claude AI Analysis Report',
-                                reportDir          : "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/claude-analysis",
+                                reportDir          : "${env.RELATIVE_REPORTS_DIR}/claude-analysis",
                                 reportFiles        : 'index.html',
                                 keepAll            : true,
                                 alwaysLinkToLastBuild: true,
