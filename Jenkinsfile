@@ -283,7 +283,7 @@ pipeline {
             when {
                 allOf {
                     expression { return params.RUN_CLAUDE }
-                    expression { return fileExists('/app/qa/reports/claude-analysis/analysis-report.json') }
+                    expression { return fileExists("${JENKINS_REPORTS_DIR}/claude-analysis/analysis-report.json") }
                 }
             }
             steps {
@@ -448,54 +448,54 @@ HTML_EOF
         always {
             script {
                 try {
-                    sh 'ls -d /app/qa/reports 2>/dev/null && ls /app/qa/reports/ 2>/dev/null || echo "qa/reports no encontrado en /app"'
+                    sh 'ls -d ${JENKINS_REPORTS_DIR} 2>/dev/null && ls ${JENKINS_REPORTS_DIR}/ 2>/dev/null || echo "qa/reports no encontrado"'
                 } catch (e) {
                     echo "No se pudo verificar reportes: ${e.message}"
                 }
 
                 dir('/app') {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists('qa/reports/newman/index.html')) {
-                            archiveArtifacts artifacts: 'qa/reports/newman/**/*', allowEmptyArchive: true
+                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/newman/index.html")) {
+                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/newman/**/*", allowEmptyArchive: true
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists('qa/reports/coverage-backend.xml')) {
-                            archiveArtifacts artifacts: 'qa/reports/coverage-backend.*', allowEmptyArchive: true
+                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/coverage-backend.xml")) {
+                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/coverage-backend.*", allowEmptyArchive: true
                             publishCoverage adapters: [
-                                coberturaReportAdapter(path: 'qa/reports/coverage-backend.xml')
+                                coberturaReportAdapter(path: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/coverage-backend.xml")
                             ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists('qa/reports/js-test-report.xml')) {
-                            archiveArtifacts artifacts: 'qa/reports/js-test-report.xml', allowEmptyArchive: true
-                            junit testResults: 'qa/reports/js-test-report.xml', allowEmptyResults: true
+                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/js-test-report.xml")) {
+                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/js-test-report.xml", allowEmptyArchive: true
+                            junit testResults: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/js-test-report.xml", allowEmptyResults: true
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists('qa/reports/k6/summary.json')) {
-                            archiveArtifacts artifacts: 'qa/reports/k6/**/*', allowEmptyArchive: true
-                            perfReport filterRegex: '', sourceDataFiles: 'qa/reports/k6/*.xml'
+                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/k6/summary.json")) {
+                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/k6/**/*", allowEmptyArchive: true
+                            perfReport filterRegex: '', sourceDataFiles: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/k6/*.xml"
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists('qa/reports/govet.txt')) {
-                            archiveArtifacts artifacts: 'qa/reports/govet.txt', allowEmptyArchive: true
-                            recordIssues enabledForFailure: true, tool: goVet(pattern: 'qa/reports/govet.txt')
+                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/govet.txt")) {
+                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/govet.txt", allowEmptyArchive: true
+                            recordIssues enabledForFailure: true, tool: goVet(pattern: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/govet.txt")
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists('qa/reports/playwright-html/index.html')) {
-                            archiveArtifacts artifacts: 'qa/reports/playwright-html/**/*', allowEmptyArchive: true
+                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/playwright-html/index.html")) {
+                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/playwright-html/**/*", allowEmptyArchive: true
                             publishHTML(target: [
                                 reportName         : 'Playwright E2E Report',
-                                reportDir          : 'qa/reports/playwright-html',
+                                reportDir          : "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/playwright-html",
                                 reportFiles        : 'index.html',
                                 keepAll            : true,
                                 alwaysLinkToLastBuild: true,
@@ -505,10 +505,10 @@ HTML_EOF
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists('qa/reports/newman/index.html')) {
+                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/newman/index.html")) {
                             publishHTML(target: [
                                 reportName         : 'Newman API Report',
-                                reportDir          : 'qa/reports/newman',
+                                reportDir          : "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/newman",
                                 reportFiles        : 'index.html',
                                 keepAll            : true,
                                 alwaysLinkToLastBuild: true,
@@ -518,19 +518,19 @@ HTML_EOF
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists('qa/reports/allure-results')) {
+                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/allure-results")) {
                             allure includeProperties: false, jdk: '', commandline: 'allure',
-                                   results: [[path: 'qa/reports/allure-results']],
+                                   results: [[path: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/allure-results"]],
                                    reportBuildPolicy: 'ALWAYS'
                         }
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists('qa/reports/claude-analysis/index.html')) {
-                            archiveArtifacts artifacts: 'qa/reports/claude-analysis/**', allowEmptyArchive: true
+                        if (fileExists("${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/claude-analysis/index.html")) {
+                            archiveArtifacts artifacts: "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/claude-analysis/**", allowEmptyArchive: true
                             publishHTML(target: [
                                 reportName         : 'Claude AI Analysis Report',
-                                reportDir          : 'qa/reports/claude-analysis',
+                                reportDir          : "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}/claude-analysis",
                                 reportFiles        : 'index.html',
                                 keepAll            : true,
                                 alwaysLinkToLastBuild: true,
@@ -550,7 +550,7 @@ HTML_EOF
                         echo "     - SonarQube    → http://localhost:9000"
                         echo "     - Grafana      → http://localhost:3001"
                         echo "     - InfluxDB     → http://localhost:8086"
-                        echo "     - Newman HTML  → http://localhost:8181  (historial: qa/reports/newman/anteriores/ + reports-data.js)"
+                        echo "     - Newman HTML  → http://localhost:8181  (historial: ${JENKINS_REPORTS_DIR}/newman/anteriores/ + reports-data.js)"
                         echo "     - Playwright   → http://localhost:8182"
                         echo "   Reportes HTML disponibles en Jenkins → Sidebar del build"
                         ${COMPOSE_CMD} stop db backend frontend || true
