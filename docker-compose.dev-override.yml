@@ -5,6 +5,9 @@
 #
 #  Monta archivos individuales del qa-runner para reflejar cambios
 #  sin necesidad de rebuild. NO usar en Jenkins (Docker-in-Docker).
+#
+#  Grafana / visores Nginx: provisioning y default.conf ya van en
+#  docker-compose.qa.yml y docker-compose.qa_fuc.yml.
 # ═══════════════════════════════════════════════════════════════
 
 services:

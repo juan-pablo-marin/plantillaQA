@@ -24,8 +24,6 @@ pipeline {
         ENVIRONMENT          = 'qa'
         COMPOSE_PROJECT_NAME = 'qa-pipeline'
         COMPOSE_CMD          = 'docker compose --env-file /app/.env.qa -f /app/docker-compose.qa.yml -f /app/docker-compose.jenkins.yml'
-        DISCORD_WEBHOOK      = credentials('DISCORD_WEBHOOK_URL')
-        CLAUDE_API_KEY       = credentials('CLAUDE_API_KEY')
         QA_REPORTS_DIR       = '/qa/reports'
         JENKINS_REPORTS_DIR  = '/app/qa/reports'
         BUILD_TIMESTAMP      = sh(script: 'date +%Y%m%d_%H%M%S', returnStdout: true).trim()
@@ -41,26 +39,42 @@ pipeline {
                     echo "════════════════════════════════════════"
                     sh '''
                         # Leer PROJECT_NAME del .env.qa (fuente unica de verdad)
-                        PROJECT_NAME=$(grep '^PROJECT_NAME=' /app/.env.qa | cut -d'=' -f2)
+                        PROJECT_NAME=$(grep '^PROJECT_NAME=' /app/.env.qa | cut -d'=' -f2 | tr -d '\r')
                         echo "=> PROJECT_NAME: $PROJECT_NAME"
 
                         echo "=> Limpiando contenedores transientes del build anterior..."
                         ${COMPOSE_CMD} stop db backend frontend || true
                         ${COMPOSE_CMD} rm -f db backend frontend || true
+                        docker rm -f ${PROJECT_NAME}-mongodb-qa ${PROJECT_NAME}-postgres-qa ${PROJECT_NAME}-api-qa ${PROJECT_NAME}-frontend-qa 2>/dev/null || true
                         docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 ${PROJECT_NAME}-allure ${PROJECT_NAME}-allure-ui ${PROJECT_NAME}-allure-nginx 2>/dev/null || true
                         mkdir -p /app/qa/reports
+                        mkdir -p /app/qa/reports/newman/anterior
                         rm -rf /app/qa/reports/coverage-backend.out /app/qa/reports/coverage-backend.xml /app/qa/reports/govet.txt /app/qa/reports/k6 /app/qa/reports/js-test-report.xml /app/qa/reports/go-test-report.json
 
                         echo "=> Levantando servicios persistentes (sin recrear si ya existen)..."
                         ${COMPOSE_CMD} --profile sonar up -d --no-recreate \
-                            sonar-db sonarqube \
-                            influxdb grafana \
-                            newman-viewer playwright-viewer
+                            sonar-db sonarqube influxdb \
+                        || {
+                            echo "  WARN: Conflicto de contenedores (probable cambio de proyecto compose)."
+                            echo "  Removiendo contenedores huerfanos y reintentando..."
+                            docker rm -f ${PROJECT_NAME}-influxdb \
+                                ${PROJECT_NAME}-sonar-db ${PROJECT_NAME}-sonarqube 2>/dev/null || true
+                            ${COMPOSE_CMD} --profile sonar up -d \
+                                sonar-db sonarqube influxdb
+                        }
 
-                        echo "=> Sincronizando provisioning de Grafana (DinD bind-mount fix)..."
-                        docker cp /app/qa/grafana/provisioning/dashboards/provider.yml ${PROJECT_NAME}-grafana:/etc/grafana/provisioning/dashboards/provider.yml 2>/dev/null || true
-                        docker cp /app/qa/grafana/provisioning/datasources/influxdb.yml ${PROJECT_NAME}-grafana:/etc/grafana/provisioning/datasources/influxdb.yml 2>/dev/null || true
-                        docker cp /app/qa/grafana/dashboards/k6.json ${PROJECT_NAME}-grafana:/var/lib/grafana/dashboards/k6.json 2>/dev/null || true
+                        echo "=> Levantando Newman Report Viewer (http://localhost:8181)..."
+                        docker rm -f ${PROJECT_NAME}-newman-viewer 2>/dev/null || true
+                        ${COMPOSE_CMD} up -d --force-recreate newman-viewer
+
+                        echo "=> Levantando Playwright Report Viewer (http://localhost:8182)..."
+                        docker rm -f ${PROJECT_NAME}-playwright-viewer 2>/dev/null || true
+                        ${COMPOSE_CMD} up -d --force-recreate playwright-viewer
+
+                        echo "=> Levantando Grafana (provisioning + dashboards montados desde el repo)..."
+                        docker rm -f ${PROJECT_NAME}-grafana 2>/dev/null || true
+                        ${COMPOSE_CMD} up -d --force-recreate grafana
+                        sleep 5
 
                         echo "=> Levantando servicios transientes de la aplicación..."
                         ${COMPOSE_CMD} --profile sonar up -d \
@@ -106,8 +120,8 @@ pipeline {
                                 -e RUN_K6=false \\
                                 qa-runner || true
                             """
-                            sh "mkdir -p ${JENKINS_REPORTS_DIR}/"
-                            sh "docker cp qa-runner-newman:${QA_REPORTS_DIR}/newman ${JENKINS_REPORTS_DIR}/ || true"
+                            sh "mkdir -p ${JENKINS_REPORTS_DIR}/newman/anterior"
+                            echo 'Newman: sin docker cp (bind mount ./qa/reports); se conserva el historial en qa/reports/newman/anteriores/'
                             sh "docker rm -f qa-runner-newman || true"
                         }
                     }
@@ -124,8 +138,6 @@ pipeline {
                                 -e RUN_SONAR=true \\
                                 -e RUN_PLAYWRIGHT=false \\
                                 -e RUN_K6=false \\
-                                ${env.SONAR_TOKEN ? "-e SONAR_TOKEN=${env.SONAR_TOKEN}" : ""} \\
-                                -e PROJECT_KEY=${env.PROJECT_KEY ?: 'qa-project'} \\
                                 qa-runner || true
                             """
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/"
@@ -193,6 +205,7 @@ pipeline {
                         echo "════════════════════════════════════════"
                         echo "ANALIZANDO RESULTADOS CON CLAUDE API"
                         echo "════════════════════════════════════════"
+                        withCredentials([string(credentialsId: 'CLAUDE_API_KEY', variable: 'CLAUDE_API_KEY')]) {
                         sh '''
                             mkdir -p ${JENKINS_REPORTS_DIR}/claude-analysis
 
@@ -252,6 +265,7 @@ pipeline {
                             echo "Análisis guardado"
                             echo "$ANALYSIS"
                         '''
+                        }
                     }
                 }
             }
@@ -425,7 +439,11 @@ HTML_EOF
     post {
         always {
             script {
-                sh 'ls -d /app/qa/reports 2>/dev/null && ls /app/qa/reports/ 2>/dev/null || echo "qa/reports no encontrado en /app"'
+                try {
+                    sh 'ls -d /app/qa/reports 2>/dev/null && ls /app/qa/reports/ 2>/dev/null || echo "qa/reports no encontrado en /app"'
+                } catch (e) {
+                    echo "No se pudo verificar reportes: ${e.message}"
+                }
 
                 dir('/app') {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
@@ -514,33 +532,40 @@ HTML_EOF
                     }
                 }
 
-                sh '''
-                    PROJECT_NAME=$(grep '^PROJECT_NAME=' /app/.env.qa | cut -d'=' -f2)
-                    echo "=> Aguardando procesamiento CE task de SonarQube..."
-                    sleep 30
-                    echo "=> Apagando solo contenedores transientes de la aplicación..."
-                    echo "   Servicios persistentes (activos para revisión post-ejecución):"
-                    echo "     - SonarQube    → http://localhost:9000"
-                    echo "     - Grafana      → http://localhost:3001"
-                    echo "     - Newman       → http://localhost:8181"
-                    echo "     - Playwright   → http://localhost:8182"
-                    echo "     - InfluxDB     → http://localhost:8086"
-                    ${COMPOSE_CMD} stop db backend frontend || true
-                    ${COMPOSE_CMD} rm -f db backend frontend || true
-                    docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 2>/dev/null || true
-                '''
+                try {
+                    sh '''
+                        PROJECT_NAME=$(grep '^PROJECT_NAME=' /app/.env.qa | cut -d'=' -f2 | tr -d '\r')
+                        echo "=> Aguardando procesamiento CE task de SonarQube..."
+                        sleep 30
+                        echo "=> Apagando solo contenedores transientes de la aplicación..."
+                        echo "   Servicios persistentes (activos para revisión post-ejecución):"
+                        echo "     - SonarQube    → http://localhost:9000"
+                        echo "     - Grafana      → http://localhost:3001"
+                        echo "     - InfluxDB     → http://localhost:8086"
+                        echo "     - Newman HTML  → http://localhost:8181  (historial: qa/reports/newman/anteriores/ + reports-data.js)"
+                        echo "     - Playwright   → http://localhost:8182"
+                        echo "   Reportes HTML disponibles en Jenkins → Sidebar del build"
+                        ${COMPOSE_CMD} stop db backend frontend || true
+                        ${COMPOSE_CMD} rm -f db backend frontend || true
+                        docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 2>/dev/null || true
+                    '''
+                } catch (e) {
+                    echo "Limpieza post-pipeline omitida: ${e.message}"
+                }
             }
         }
 
         success {
             echo 'El pipeline de QA se ejecutó con éxito!'
             script {
-                if (env.DISCORD_WEBHOOK) {
-                    discordSend webhookURL: env.DISCORD_WEBHOOK,
+                if (env.DISCORD_WEBHOOK_URL) {
+                    discordSend webhookURL: env.DISCORD_WEBHOOK_URL,
                         title      : "Éxito — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                         description: "Pipeline QA completado exitosamente",
                         result     : currentBuild.currentResult,
                         link       : env.BUILD_URL
+                } else {
+                    echo "Notificación Discord omitida (DISCORD_WEBHOOK_URL no definida)"
                 }
             }
         }
@@ -548,12 +573,14 @@ HTML_EOF
         failure {
             echo 'El pipeline de QA falló. Revisa los logs.'
             script {
-                if (env.DISCORD_WEBHOOK) {
-                    discordSend webhookURL: env.DISCORD_WEBHOOK,
+                if (env.DISCORD_WEBHOOK_URL) {
+                    discordSend webhookURL: env.DISCORD_WEBHOOK_URL,
                         title      : "Fallo — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                         description: "Pipeline QA falló - Revisar logs inmediatamente",
                         result     : currentBuild.currentResult,
                         link       : env.BUILD_URL
+                } else {
+                    echo "Notificación Discord omitida (DISCORD_WEBHOOK_URL no definida)"
                 }
             }
         }

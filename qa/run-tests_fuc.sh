@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# RAV — puerto backend interno por defecto 8082 (Postgres + victims_backend)
-BACKEND_URL="${BACKEND_URL:-http://backend:8082}"
+# FUC — puerto backend interno 8080 (plantilla Mongo)
+BACKEND_URL="${BACKEND_URL:-http://backend:8080}"
 FRONTEND_URL="${FRONTEND_URL:-http://frontend:3000}"
 SONAR_URL="${SONAR_HOST_URL:-http://sonarqube:9000}"
 REPORTS_DIR="/qa/reports"
@@ -130,12 +130,10 @@ else
 fi
 
 # 1. Esperar Backend
-# RAV no expone GET /health; Gin responde en / con 404 cuando el servidor ya escucha.
-# FUC usa /health (200). Aquí aceptamos cualquier respuesta HTTP (curl exit 0 salvo fallo de conexión).
 echo "[1/6] Esperando Backend..."
 for i in $(seq 1 30); do
-    if curl -s -o /dev/null "$BACKEND_URL/" 2>/dev/null; then
-        echo " OK: Backend responde en $BACKEND_URL/"
+    if curl -sf "$BACKEND_URL/health" > /dev/null 2>&1; then
+        echo " OK: Backend listo."
         break
     fi
     echo "  ... backend no disponible todavia (intento $i/30)"
@@ -162,13 +160,13 @@ echo "  Token generado correctamente para el usuario: $TEST_USER_ID"
 echo "[2/6] Newman API Tests..."
 if [ "$RUN_NEWMAN" != "true" ]; then
     echo " SKIP: RUN_NEWMAN=$RUN_NEWMAN"
-elif [ -f "api/collections/api.postman_collection.json" ]; then
+elif [ -f "api/collections/api.postman_collection_fuc.json" ]; then
     # --- Paso 1: CLI + JSON (garantiza que el JSON se genere siempre) ---
     # Newman escribe el JSON en /tmp y luego lo copiamos al volumen montado.
     # Docker Desktop for Windows no siempre sincroniza writes programaticos al host;
     # cp SI funciona de forma confiable en bind mounts.
-    newman run api/collections/api.postman_collection.json \
-        --environment api/collections/env-qa.json \
+    newman run api/collections/api.postman_collection_fuc.json \
+        --environment api/collections/env-qa_fuc.json \
         --env-var "baseUrl=$BACKEND_URL" \
         --env-var "token=$TEST_TOKEN" \
         --reporters cli,json \
@@ -187,8 +185,8 @@ elif [ -f "api/collections/api.postman_collection.json" ]; then
     # --- Paso 2: Allure (independiente, puede fallar sin afectar el JSON) ---
     echo "  Generando resultados Allure..."
     rm -rf /tmp/allure-results
-    newman run api/collections/api.postman_collection.json \
-        --environment api/collections/env-qa.json \
+    newman run api/collections/api.postman_collection_fuc.json \
+        --environment api/collections/env-qa_fuc.json \
         --env-var "baseUrl=$BACKEND_URL" \
         --env-var "token=$TEST_TOKEN" \
         --reporters allure \
@@ -398,11 +396,11 @@ fi
 echo "[5/6] k6 Performance Tests..."
 if [ "$RUN_K6" != "true" ]; then
     echo " SKIP: RUN_K6=$RUN_K6"
-elif [ -f "performance/k6-tests.js" ]; then
+elif [ -f "performance/k6-tests_fuc.js" ]; then
     BUILD_TAG="${BUILD_NUMBER:-manual_$(date +%Y%m%d_%H%M%S)}"
     echo "  Etiqueta de build: $BUILD_TAG"
     echo "  Push interval InfluxDB: ${K6_INFLUXDB_PUSH_INTERVAL:-1s} (K6_INFLUXDB_PUSH_INTERVAL)"
-    k6 run performance/k6-tests.js \
+    k6 run performance/k6-tests_fuc.js \
       -e BACKEND_URL="$BACKEND_URL" \
       -e TEST_TOKEN="$TEST_TOKEN" \
       --tag build="${BUILD_TAG}" \

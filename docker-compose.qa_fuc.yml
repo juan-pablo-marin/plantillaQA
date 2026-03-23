@@ -1,23 +1,32 @@
 # ═══════════════════════════════════════════════════════════════
-#  QA STACK — RAV (victims_backend + frontend-rav / Postgres)
-#
-#  Plantilla FUC (Mongo + BACKEND/FRONTEND): docker-compose.qa_fuc.yml + .env.qa_fuc
+#  QA STACK — FUC (Mongo + BACKEND/FRONTEND plantilla original)
 #
 #  Uso:
-#    docker compose --env-file .env.qa -f docker-compose.qa.yml up -d
+#    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml up -d
 #
 #  Stack completo (Sonar, Influx, Grafana, Allure, Jenkins, visores, app):
-#    docker compose --env-file .env.qa -f docker-compose.qa.yml --profile all up -d --build
+#    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile all up -d --build
 #
-#  Requiere el código RAV en las carpetas indicadas por BACKEND_DIR / FRONTEND_DIR
-#  (p. ej. victims_backend y frontend-rav) con .docker/wait-for-db.sh y db/migrations.
+#  RAV: usar docker-compose.qa.yml + .env.qa
+# ═══════════════════════════════════════════════════════════════
+#  Uso (histórico):
+#    - Levantar todo:    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml up -d
+#    - Solo Sonar:       docker compose --env-file .env.qa -f docker-compose.qa.yml --profile sonar up -d
+#    - Solo E2E + Sonar: docker compose --env-file .env.qa -f docker-compose.qa.yml --profile sonar --profile test-e2e up
+#    - Performance:      docker compose --env-file .env.qa -f docker-compose.qa.yml --profile perf up -d
+#
+#  Flags de pruebas (en .env.qa o como variables de entorno):
+#    RUN_NEWMAN=true      → Activa tests de API con Newman
+#    RUN_SONAR=true       → Activa análisis estático con SonarQube
+#    RUN_PLAYWRIGHT=true  → Activa tests E2E con Playwright
+#    RUN_K6=true          → Activa tests de rendimiento con k6
 # ═══════════════════════════════════════════════════════════════
 
 x-common-healthcheck: &common-healthcheck
   interval: 15s
   timeout: 10s
   retries: 5
-  start_period: 45s
+  start_period: 30s
 
 networks:
   qa-network:
@@ -25,8 +34,8 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_app_qa_data:
-    name: ${PROJECT_NAME}-postgres-app-qa-data
+  mongodb_qa_data:
+    name: ${PROJECT_NAME}-mongodb-qa-data
   sonarqube_data:
     name: ${PROJECT_NAME}-sonarqube-data
   sonarqube_extensions:
@@ -46,76 +55,58 @@ volumes:
 
 services:
 
-  # --- Base de datos — PostgreSQL (app RAV) ---
+  # --- Base de datos — MongoDB (App) ---
   db:
-    image: postgres:16-alpine
-    container_name: ${PROJECT_NAME}-postgres-qa
+    image: mongo:7
+    container_name: ${PROJECT_NAME}-mongodb-qa
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-rav_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rav_changeme}
-      POSTGRES_DB: ${POSTGRES_DB:-db_ruv}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT:-27017}:27017"
     volumes:
-      - postgres_app_qa_data:/var/lib/postgresql/data
-      - ./${BACKEND_DIR:-BACKENDRAV}/db/migrations:/docker-entrypoint-initdb.d:ro
+      - mongodb_qa_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-rav_admin} -d $${POSTGRES_DB:-db_ruv}"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval \"db.adminCommand('ping')\" --quiet"]
+      interval: 15s
+      timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 60s
     networks:
       - qa-network
 
-  # --- Backend RAV (Go + Gin) ---
-  # context: raíz del repo — evita que Docker busque qa/ dentro de BACKEND_DIR (bug Windows).
+  # --- Backend ---
   backend:
     build:
-      context: .
-      dockerfile: ./qa/docker/Dockerfile.rav-backend
-      args:
-        BACKEND_DIR: ${BACKEND_DIR:-BACKENDRAV}
+      context: ./${BACKEND_DIR:-BACKEND}
+      dockerfile: Dockerfile
     container_name: ${PROJECT_NAME}-api-qa
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DB_HOST: db
-      DB_PORT: "5432"
-      DB_USER: ${POSTGRES_USER:-rav_admin}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-rav_changeme}
-      DB_NAME: ${POSTGRES_DB:-db_ruv}
-      DB_SSLMODE: disable
-      SERVER_PORT: ${BACKEND_INTERNAL_PORT:-8082}
-      SERVER_WRITE_TIMEOUT: ${SERVER_WRITE_TIMEOUT:-420}
-      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://frontend:3000}
-      JWT_SECRET: ${JWT_SECRET:-cambiar-en-env-qa-minimo-64-caracteres-recomendado-para-rav}
-      UPLOAD_PATH: ${UPLOAD_PATH:-/tmp/rav-qa-uploads}
+      PORT: ${BACKEND_PORT:-8080}
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db:27017/${MONGO_DB}?authSource=admin
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_DB: ${MONGO_DB}
     ports:
-      - "${BACKEND_PORT:-8082}:${BACKEND_INTERNAL_PORT:-8082}"
+      - "${BACKEND_PORT:-8080}:8080"
     healthcheck:
-      # Gin responde 404 en / cuando el servicio ya escucha (no hay ruta /health en RAV).
-      test:
-        [
-          "CMD-SHELL",
-          'c=$$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:$$SERVER_PORT/) && { [ "$$c" = "404" ] || [ "$$c" = "200" ]; }',
-        ]
-      interval: 15s
-      timeout: 10s
-      retries: 8
-      start_period: 60s
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      <<: *common-healthcheck
     networks:
       - qa-network
 
-  # --- Frontend RAV (Next.js standalone) ---
+  # --- Frontend ---
   frontend:
     build:
-      context: ./${FRONTEND_DIR:-FRONTENDRAV}
+      context: ./${FRONTEND_DIR:-FRONTEND}
       dockerfile: Dockerfile
-      target: ${FRONTEND_TARGET:-runner}
+      target: ${FRONTEND_TARGET:-runtime}
     container_name: ${PROJECT_NAME}-frontend-qa
     restart: unless-stopped
     depends_on:
@@ -123,7 +114,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      - NEXT_PUBLIC_API_BASE_URL=http://backend:${BACKEND_INTERNAL_PORT:-8082}/api/v1
+      - NEXT_PUBLIC_API_URL=http://backend:8080/api/v1
     networks:
       - qa-network
 
@@ -188,8 +179,8 @@ services:
       context: .
       dockerfile: ./qa/Dockerfile.qa
       args:
-        BACKEND_DIR: ${BACKEND_DIR:-BACKENDRAV}
-        FRONTEND_DIR: ${FRONTEND_DIR:-FRONTENDRAV}
+        BACKEND_DIR: ${BACKEND_DIR:-BACKEND}
+        FRONTEND_DIR: ${FRONTEND_DIR:-FRONTEND}
     container_name: ${PROJECT_NAME}-qa-runner
     profiles: [ "test-e2e", "all" ]
     depends_on:
@@ -201,12 +192,11 @@ services:
         condition: service_healthy
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-qa}
-      - BACKEND_URL=http://backend:${BACKEND_INTERNAL_PORT:-8082}
+      - BACKEND_URL=http://backend:8080
       - FRONTEND_URL=http://frontend:3000
       - SONAR_HOST_URL=http://sonarqube:9000
       - SONAR_TOKEN=${SONAR_TOKEN:-}
-      - PROJECT_KEY=${PROJECT_KEY:-rav-qa}
-      - JWT_SECRET=${JWT_SECRET:-cambiar-en-env-qa-minimo-64-caracteres-recomendado-para-rav}
+      - PROJECT_KEY=${PROJECT_KEY:-qa-project}
       # ── Flags de pruebas (false = desactivado, true = activo) ──
       - RUN_NEWMAN=${RUN_NEWMAN:-false}
       - RUN_SONAR=${RUN_SONAR:-false}
@@ -219,7 +209,7 @@ services:
     volumes:
       - ./qa/reports:/qa/reports
       - sonar_scanner_cache:/root/.sonar/cache
-    command: [ "bash", "run-tests.sh" ]
+    command: [ "bash", "run-tests_fuc.sh" ]
     networks:
       - qa-network
 
@@ -290,8 +280,8 @@ services:
       context: .
       dockerfile: ./qa/Dockerfile.qa
       args:
-        BACKEND_DIR: ${BACKEND_DIR:-BACKENDRAV}
-        FRONTEND_DIR: ${FRONTEND_DIR:-FRONTENDRAV}
+        BACKEND_DIR: ${BACKEND_DIR:-BACKEND}
+        FRONTEND_DIR: ${FRONTEND_DIR:-FRONTEND}
     container_name: ${PROJECT_NAME}-k6-runner
     profiles: [ "perf" ]
     depends_on:
@@ -300,11 +290,11 @@ services:
       influxdb:
         condition: service_healthy
     environment:
-      - BACKEND_URL=http://backend:${BACKEND_INTERNAL_PORT:-8082}
+      - BACKEND_URL=http://backend:8080
     volumes:
       - ./qa/reports:/qa/reports
       - ./qa/performance:/qa/performance:ro
-    command: [ "bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests.js -e BACKEND_URL=$$BACKEND_URL --out influxdb=http://influxdb:8086/k6 --summary-export /qa/reports/k6/summary.json" ]
+    command: [ "bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests_fuc.js -e BACKEND_URL=$$BACKEND_URL --out influxdb=http://influxdb:8086/k6 --summary-export /qa/reports/k6/summary.json" ]
     networks:
       - qa-network
 

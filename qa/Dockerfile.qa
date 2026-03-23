@@ -59,6 +59,7 @@ COPY ${BACKEND_DIR}/ /src/backend/
 COPY ${FRONTEND_DIR}/ /src/frontend/
 
 # Fix CRLF issues (Windows line endings) that break bash scripts
-RUN sed -i 's/\r$//' /qa/run-tests.sh && chmod +x /qa/run-tests.sh
+RUN sed -i 's/\r$//' /qa/run-tests.sh /qa/run-tests_fuc.sh \
+    && chmod +x /qa/run-tests.sh /qa/run-tests_fuc.sh
 
 CMD ["bash", "run-tests.sh"]

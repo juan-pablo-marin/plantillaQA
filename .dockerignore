@@ -1,3 +1,6 @@
+# Contexto Docker (raíz del repo) — usado por qa/docker/Dockerfile.rav-backend (COPY BACKEND_DIR)
+# Evitar patrones demasiado amplios: antes Dockerfile* y *.json excluían rutas del backend Go.
+
 # Node.js
 **/node_modules/
 **/npm-debug.log
@@ -13,13 +16,12 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Go
-bin/
-pkg/
+# Go — solo artefactos típicos en la raíz del repo (no carpetas pkg/ del código fuente)
+/bin/
+/pkg/
 
-# Docker
-.dockerignore
-Dockerfile*
+# Docker — solo Dockerfile en la raíz (no "Dockerfile*" → rompe exclusiones raras)
+/Dockerfile
 
 # Version Control
 .git/
@@ -30,8 +32,8 @@ qa/reports/
 qa/src_backend/
 qa/src_frontend/
 *coverage.out
-*.xml
-*.json
+qa/reports/**/*.xml
+qa/reports/**/*.json
 
 # IDE
 .vscode/
@@ -41,3 +43,7 @@ qa/src_frontend/
 .env
 .env.*
 !.env.example
+
+# Módulo Go siempre incluido (por si algún patrón anterior afecta)
+!**/go.mod
+!**/go.sum

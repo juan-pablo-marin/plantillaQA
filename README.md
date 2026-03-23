@@ -10,7 +10,7 @@ Plantilla genérica con QA integrado para orquestar pruebas automatizadas de cua
 | ------------ | --------------------------- |
 | Backend      | Configurable (Go, Node, etc)|
 | Frontend     | Configurable (Next.js, etc) |
-| Base de datos| MongoDB 7                   |
+| Base de datos| MongoDB 7 (FUC) / PostgreSQL 16 (RAV) |
 | API Testing  | Newman (Postman)            |
 | UI Testing   | Playwright                  |
 | Performance  | k6 (Grafana)                |
@@ -43,12 +43,14 @@ plantillaQA/
 │   └── run-tests.sh             # Script orquestador
 │
 ├── docker-compose.yml           # Desarrollo básico
-├── docker-compose.qa.yml        # QA completo
+├── docker-compose.qa.yml          # QA RAV (Postgres + victims_backend + frontend-rav) 
+├── docker-compose.qa_fuc.yml      # QA plantilla FUC (Mongo + BACKEND/FRONTEND)
 ├── docker-compose.jenkins.yml   # Override para Jenkins DinD
 ├── docker-compose.dev-override.yml # Override para hot-reload local
 │
 ├── .env.dev                     # Variables desarrollo
-├── .env.qa                      # Variables QA
+├── .env.qa                      # Variables QA (RAV — ver docs/RAV-FUC-QA.md)
+├── .env.qa_fuc                  # Variables QA plantilla FUC
 ├── .env.staging                 # Variables staging
 ├── .env.example                 # Plantilla de variables
 │
@@ -96,6 +98,43 @@ docker compose --env-file .env.dev up -d --build
 | Frontend  | http://localhost:3000         |
 | MongoDB   | localhost:27017              |
 
+### RAV vs FUC (dos perfiles QA)
+
+| Perfil | Compose | Variables | Código app |
+|--------|---------|-----------|------------|
+| **RAV** (por defecto) | `docker-compose.qa.yml` | `.env.qa` | `victims_backend/` + `frontend-rav/` (Postgres) |
+| **FUC** (plantilla original) | `docker-compose.qa_fuc.yml` | `.env.qa_fuc` | `BACKEND/` + `FRONTEND/` (Mongo) |
+
+Detalle y scripts duplicados (`*_fuc`): **[docs/RAV-FUC-QA.md](docs/RAV-FUC-QA.md)**. Plantillas de entorno versionadas: `docs/templates/env.qa.RAV.example` y `docs/templates/env.qa.FUC.example`.
+
+#### Stack QA completo desde cero (Sonar, Influx, Grafana, k6, Allure, Jenkins, visores)
+
+Los archivos `docker-compose.qa.yml` y `docker-compose.qa_fuc.yml` montan **Grafana** con `qa/grafana/provisioning` y `qa/grafana/dashboards` (mismo comportamiento en RAV y FUC). El perfil Compose **`all`** incluye también Allure.
+
+**RAV — limpieza opcional y arranque:**
+
+```bash
+docker compose --env-file .env.qa -f docker-compose.qa.yml down -v --remove-orphans
+docker compose --env-file .env.qa -f docker-compose.qa.yml --profile all up -d --build
+```
+
+**FUC:**
+
+```bash
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml down -v --remove-orphans
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile all up -d --build
+```
+
+**Ejecutar Newman, Playwright, Sonar y k6** (con el stack ya levantado; cambia compose/env según RAV o FUC):
+
+```bash
+docker compose --env-file .env.qa -f docker-compose.qa.yml run --rm \
+  -e RUN_NEWMAN=true -e RUN_PLAYWRIGHT=true -e RUN_SONAR=true -e RUN_K6=true \
+  qa-runner
+```
+
+Tabla de URLs y notas (incl. `docker system prune -af`): **[docs/RAV-FUC-QA.md](docs/RAV-FUC-QA.md)** → *Stack completo desde cero*.
+
 ### 3. Ejecutar Suite QA Completa
 
 ```bash
@@ -112,6 +151,16 @@ docker compose --env-file .env.qa -f docker-compose.qa.yml up --build --abort-on
 ### 4. Ver Reportes
 
 Después de ejecutar QA, los reportes están en `qa/reports/` y en Allure UI en http://localhost:5252/allure-docker-service-ui (el API de Allure queda en http://localhost:5050).
+
+#### Newman (API)
+
+| Ubicación | Contenido |
+| --------- | --------- |
+| `qa/reports/newman/` | Reporte **actual**: `newman-report.json`, `index.html`, `reports-index.json`, **`reports-data.js`** (historial para Jenkins CSP) |
+| `qa/reports/newman/anteriores/` | JSON de **ejecuciones previas** (timestamp en el nombre del archivo) |
+
+- **Docker (visores Nginx):** `http://localhost:8181` (Newman), `http://localhost:8182` (Playwright). `nginx-viewer.conf` ya se monta en `docker-compose.qa.yml` / `docker-compose.qa_fuc.yml`. El override `docker-compose.dev-override.yml` sirve sobre todo para **hot-reload** del script `run-tests.sh` y rutas de código.
+- **Jenkins HTML Publisher:** el historial en el lateral usa `reports-data.js` (mismo origen, compatible con CSP). Sin ese archivo, el informe solo vería la última ejecución por restricciones del plugin.
 
 ---
 

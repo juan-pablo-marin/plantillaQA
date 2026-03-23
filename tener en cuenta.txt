@@ -17,6 +17,7 @@ Sincronización: Finalmente, mezclé (merge) los últimos cambios de dev hacia q
 📋 Estado Actual
 Rama Activa: qa/fichasp1 (Tiene todo: código nuevo + herramientas QA).
 Rama dev: Intacta y limpia (Como si las herramientas de QA nunca hubieran pasado por ahí).
+
 💡 Recomendaciones para tu flujo de QA
 No hagas push desde QA: Como mencionaste, mantén esta rama local. Git te avisará que la rama no existe en origin, lo cual es normal.
 Para actualizar con nuevos cambios: Cuando tus compañeros suban código a main o dev, simplemente haz:
@@ -75,8 +76,7 @@ sudo usermod -aG docker $USERnewgrp docker
 Verifica:
 docker versiondocker compose version
 2) Clonar el proyecto en el servidor Linux
-git clone <TU_REPO_URL> plantillaQA
-cd plantillaQA
+git clone <TU_REPO_URL> fuc-qacd fuc-qa
 (Usa la URL de tu repo: GitHub/GitLab/etc.)
 
 3) Preparar .env.qa
@@ -87,7 +87,7 @@ MONGO_USER, MONGO_PASSWORD, MONGO_DB
 SONAR_TOKEN (si quieres análisis)
 PROJECT_KEY (opcional)
 
-4) Levantar el stack y ejecutar qa-runner
+4) Levantar el stack y ejecutar fuc-qa-runner
 
 Cargue completo + ejecución (con Sonar por defecto)
 
@@ -151,4 +151,7 @@ $ git reset --soft HEAD~1
 docker compose --env-file .env.qa -f docker-compose.qa.yml build qa-runner
 
 
+
+subir todo FUC
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile test-e2e --profile all --profile perf --profile jenkins --profile sonar up -d
 

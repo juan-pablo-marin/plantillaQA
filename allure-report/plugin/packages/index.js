@@ -48,14 +48,6 @@ allure.api.addTranslation('he', {
     }
 });
 
-allure.api.addTranslation('hu', {
-    tab: {
-        packages: {
-            name: 'Modulok'
-        }
-    }
-});
-
 allure.api.addTranslation('br', {
     tab: {
         packages: {
@@ -104,50 +96,10 @@ allure.api.addTranslation('pl', {
     }
 });
 
-allure.api.addTranslation('am', {
-    tab: {
-        packages: {
-            name: 'Փաթեթներ'
-        }
-    }
-});
-
 allure.api.addTranslation('az', {
     tab: {
         packages: {
             name: 'Paketlər'
-        }
-    }
-});
-
-allure.api.addTranslation('sv', {
-    tab: {
-        packages: {
-            name: 'Paket'
-        }
-    }
-});
-
-allure.api.addTranslation('isv', {
-    tab: {
-        packages: {
-            name: 'Pakety'
-        }
-    }
-});
-
-allure.api.addTranslation('ka', {
-    tab: {
-        packages: {
-            name: 'პაკეტები'
-        }
-    }
-});
-
-allure.api.addTranslation('it', {
-    tab: {
-        packages: {
-            name: 'Pacchetti'
         }
     }
 });

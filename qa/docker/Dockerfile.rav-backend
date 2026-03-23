@@ -1,0 +1,71 @@
+# RAV — build desde la RAÍZ del repo (context: .)
+# ARG BACKEND_DIR: carpeta con el código Go RAV (Postgres / victims_backend), p. ej. victims_backend o BACKEND
+#
+# - Un solo COPY: no exige go.sum (se regenera con go mod tidy).
+# - Verificación anti-FUC: si detecta backend Mongo (MONGO_URI / driver mongo), falla con mensaje claro.
+# - wait-for-db: usa .docker/wait-for-db.sh del repo o genera uno equivalente.
+#
+# FUC no usa este archivo (sigue usando BACKEND/Dockerfile + docker-compose.qa_fuc.yml).
+
+FROM golang:1.25-alpine
+
+ARG BACKEND_DIR=victims_backend
+
+WORKDIR /app
+
+RUN apk add --no-cache gcc musl-dev git postgresql-client curl
+
+# Copia todo el backend de una vez (evita "go.sum not found" si falta o está incompleto)
+COPY ${BACKEND_DIR}/ ./
+
+# Comprueba que exista el módulo Go
+RUN test -f go.mod || ( \
+    echo "ERROR: No hay go.mod en la carpeta indicada por BACKEND_DIR (ARG=${BACKEND_DIR})."; \
+    echo "  Copia aquí el código RAV (victimas / victims_backend) o ajusta BACKEND_DIR en .env.qa."; \
+    exit 1 \
+)
+
+# Genera/actualiza go.sum y descarga módulos
+RUN go mod tidy
+
+# Evita mezclar backend FUC (Mongo) con el stack RAV (Postgres)
+RUN if grep -q mongo-driver go.mod 2>/dev/null || grep -q go.mongodb.org/mongo-driver go.mod 2>/dev/null; then \
+    echo "ERROR: go.mod apunta a MongoDB. Este build es solo para el backend RAV (PostgreSQL)."; \
+    echo "  Para FUC usa: docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml up -d --build"; \
+    echo "  No pongas el código FUC en BACKEND_DIR cuando usas docker-compose.qa.yml."; \
+    exit 1; \
+fi
+
+RUN if find . -name '*.go' ! -path './vendor/*' -exec grep -l 'MONGO_URI' {} \; 2>/dev/null | grep -q .; then \
+    echo "ERROR: El código fuente usa MONGO_URI (backend FUC / Mongo)."; \
+    echo "  Stack RAV espera Postgres (DB_*). Coloca el repo victims_backend o usa el compose FUC."; \
+    exit 1; \
+fi
+
+RUN go build -o main ./cmd/api \
+ && chmod +x main
+
+EXPOSE 8082
+
+RUN set -e; \
+    if [ -f .docker/wait-for-db.sh ]; then \
+        cp .docker/wait-for-db.sh ./wait-for-db.sh; \
+    else \
+        printf '%s\n' \
+        '#!/bin/sh' \
+        'set -e' \
+        'host="${DB_HOST:-postgres}"' \
+        'port="${DB_PORT:-5432}"' \
+        'user="${DB_USER:-admin}"' \
+        'db="${DB_NAME:-db_ruv}"' \
+        'echo "Waiting for PostgreSQL at $host:$port..."' \
+        'until pg_isready -h "$host" -p "$port" -U "$user" -d "$db" > /dev/null 2>&1; do' \
+        '  echo "PostgreSQL not ready yet, retrying in 2s..."' \
+        '  sleep 2' \
+        'done' \
+        'echo "PostgreSQL is ready, starting application..."' \
+        'exec "$@"' > ./wait-for-db.sh; \
+    fi \
+ && chmod +x ./wait-for-db.sh
+
+CMD ["./wait-for-db.sh", "./main"]

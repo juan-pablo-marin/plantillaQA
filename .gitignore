@@ -23,6 +23,7 @@ out/
 .env.prod
 .env.qa.ci
 .env.qa
+.env.qa_fuc
 
 # --- IDE ---
 .vscode/
@@ -58,8 +59,11 @@ temp/
 .cache/
 
 # --- Proyectos (Excluidos de la plantilla) ---
-# Actualiza estos nombres si cambias BACKEND_DIR / FRONTEND_DIR en los .env
+# FUC — actualiza si cambias BACKEND_DIR / FRONTEND_DIR en .env.qa_fuc
 BACKEND/
 FRONTEND/
+# RAV — código de aplicación (docker-compose.qa.yml + .env.qa)
+BACKENDRAV/
+FRONTENDRAV/   
 .scannerwork/
 .sonar/

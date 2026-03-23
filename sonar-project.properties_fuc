@@ -1,13 +1,14 @@
 # ============================================
-# SonarQube — RAV (activo con docker-compose.qa.yml)
+# SonarQube — FUC (plantilla Mongo + BACKEND/FRONTEND)
+# Activo con: docker-compose.qa_fuc.yml + .env.qa_fuc
 # ============================================
-# Plantilla FUC: sonar-project.properties_fuc
 # NOTA: En Docker, qa/run-tests.sh sobreescribe algunos de estos
 # valores via -D (host.url, token, projectBaseDir, reportPaths).
+# Este archivo debe mantenerse alineado con esos argumentos.
 # ============================================
 
-sonar.projectKey=rav-qa
-sonar.projectName=RAV QA
+sonar.projectKey=qa-project
+sonar.projectName=QA Project
 sonar.projectVersion=1.0
 
 # --------------------------------------------

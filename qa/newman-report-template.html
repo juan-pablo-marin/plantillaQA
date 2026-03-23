@@ -812,6 +812,9 @@
 
     <button class="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
 
+    <!-- Datos del historial: archivo externo (CSP Jenkins) + orden antes de loadIndex() -->
+    <script src="reports-data.js"></script>
+
     <script>
         // ─── Helpers ───
         const $ = s => document.querySelector(s);
@@ -847,7 +850,7 @@
         let reportIndex = [];
         let activeFile = null;
 
-        // ─── Inline data cache (populated by run-tests.sh at build time) ───
+        // ─── Datos del historial: reports-data.js (run-tests.sh) antes de este script ───
         const __inlineData = window.__REPORT_DATA__ || {};
         const __inlineIndex = window.__REPORT_INDEX__ || null;
 
@@ -855,7 +858,7 @@
         async function loadIndex() {
             const list = $('#reportList');
 
-            // 1. Try inline data first (self-contained mode / Jenkins)
+            // 1. Datos precargados (reports-data.js — compatible CSP Jenkins HTML Publisher)
             if (__inlineIndex && __inlineIndex.length > 0) {
                 reportIndex = __inlineIndex;
             } else {
@@ -1154,8 +1157,6 @@
         // ─── Init ───
         loadIndex();
     </script>
-
-    <!-- __INLINE_DATA__ -->
 
 </body>
 

@@ -1,24 +1,13 @@
 # ═══════════════════════════════════════════════════════════════
-#  JENKINS OVERRIDE — Reservado para configuraciones exclusivas
-#  de Jenkins en Docker-in-Docker (DinD).
+#  JENKINS OVERRIDE — Configuraciones exclusivas de Jenkins
+#  en Docker-in-Docker (DinD).
 #
 #  Uso (solo desde Jenkins, vía Jenkinsfile):
 #    docker compose -f docker-compose.qa.yml -f docker-compose.jenkins.yml ...
-#
-#  Actualmente no necesita sobreescribir nada. Los bind mounts
-#  problemáticos ya fueron removidos del archivo base y movidos
-#  a docker-compose.dev-override.yml para desarrollo local.
-#
-#  Este archivo se mantiene como punto de entrada para futuras
-#  configuraciones exclusivas de Jenkins (e.g., timeouts, limits).
 # ═══════════════════════════════════════════════════════════════
 
 services:
   qa-runner:
-    # En Jenkins (DinD), los bind mounts de código fuente del host no funcionan
-    # porque el daemon Docker del host no tiene las rutas relativas de Jenkins.
-    # El Dockerfile.qa ya hace COPY de BACKEND/ y FRONTEND/ durante el build.
-    # Solo preservamos el montaje de reportes y caché de sonar.
     volumes:
       - ./qa/reports:/qa/reports
       - sonar_scanner_cache:/root/.sonar/cache
