@@ -5,7 +5,7 @@ set -euo pipefail
 BACKEND_URL="${BACKEND_URL:-http://backend:8082}"
 FRONTEND_URL="${FRONTEND_URL:-http://frontend:3000}"
 SONAR_URL="${SONAR_HOST_URL:-http://sonarqube:9000}"
-REPORTS_DIR="/qa/reports"
+REPORTS_DIR="${REPORTS_DIR:-/qa/reports}"
 
 # Rutas internas normalizadas (siempre fijas dentro del contenedor)
 SRC_BACKEND="/src/backend"

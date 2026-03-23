@@ -23,9 +23,12 @@ pipeline {
     environment {
         ENVIRONMENT          = 'qa'
         COMPOSE_PROJECT_NAME = 'qa-pipeline'
-        COMPOSE_CMD          = 'docker compose --env-file /app/.env.qa -f /app/docker-compose.qa.yml -f /app/docker-compose.jenkins.yml'
-        QA_REPORTS_DIR       = '/qa/reports'
-        JENKINS_REPORTS_DIR  = '/app/qa/reports'
+        IS_FUC               = "${env.JOB_NAME?.toUpperCase()?.contains('FUC') ? 'true' : 'false'}"
+        ENV_FILE             = "${env.IS_FUC == 'true' ? '/app/.env.qa_fuc' : '/app/.env.qa'}"
+        QA_COMPOSE           = "${env.IS_FUC == 'true' ? '/app/docker-compose.qa_fuc.yml' : '/app/docker-compose.qa.yml'}"
+        COMPOSE_CMD          = "docker compose --env-file ${env.ENV_FILE} -f ${env.QA_COMPOSE} -f /app/docker-compose.jenkins.yml"
+        QA_REPORTS_DIR       = "${env.IS_FUC == 'true' ? '/qa/reports/fuc' : '/qa/reports/rav'}"
+        JENKINS_REPORTS_DIR  = "${env.IS_FUC == 'true' ? '/app/qa/reports/fuc' : '/app/qa/reports/rav'}"
         BUILD_TIMESTAMP      = sh(script: 'date +%Y%m%d_%H%M%S', returnStdout: true).trim()
     }
 
@@ -38,8 +41,8 @@ pipeline {
                     echo "PREPARANDO ENTORNO Y DEPENDENCIAS"
                     echo "════════════════════════════════════════"
                     sh '''
-                        # Leer PROJECT_NAME del .env.qa (fuente unica de verdad)
-                        PROJECT_NAME=$(grep '^PROJECT_NAME=' /app/.env.qa | cut -d'=' -f2 | tr -d '\r')
+                        # Leer PROJECT_NAME del config actual (fuente unica de verdad)
+                        PROJECT_NAME=$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\r')
                         echo "=> PROJECT_NAME: $PROJECT_NAME"
 
                         echo "=> Limpiando contenedores transientes del build anterior..."
@@ -63,17 +66,18 @@ pipeline {
                                 sonar-db sonarqube influxdb
                         }
 
+
                         echo "=> Levantando Newman Report Viewer (http://localhost:8181)..."
                         docker rm -f ${PROJECT_NAME}-newman-viewer 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --force-recreate newman-viewer
+                        ${COMPOSE_CMD} up -d --force-recreate newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
 
                         echo "=> Levantando Playwright Report Viewer (http://localhost:8182)..."
                         docker rm -f ${PROJECT_NAME}-playwright-viewer 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --force-recreate playwright-viewer
+                        ${COMPOSE_CMD} up -d --force-recreate playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
 
                         echo "=> Levantando Grafana (provisioning + dashboards montados desde el repo)..."
                         docker rm -f ${PROJECT_NAME}-grafana 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --force-recreate grafana
+                        ${COMPOSE_CMD} up -d --force-recreate grafana || echo "  WARN: Grafana falló al iniciar (no detiene pruebas)"
                         sleep 5
 
                         echo "=> Levantando servicios transientes de la aplicación..."
@@ -114,6 +118,7 @@ pipeline {
                             echo "=> Ejecutando Newman Tests..."
                             sh """
                                 ${COMPOSE_CMD} run --name qa-runner-newman \\
+                                -e REPORTS_DIR=${QA_REPORTS_DIR} \\
                                 -e RUN_NEWMAN=true \\
                                 -e RUN_SONAR=false \\
                                 -e RUN_PLAYWRIGHT=false \\
@@ -134,6 +139,7 @@ pipeline {
                             echo "=> Ejecutando Análisis SonarQube..."
                             sh """
                                 ${COMPOSE_CMD} run --name qa-runner-sonar \\
+                                -e REPORTS_DIR=${QA_REPORTS_DIR} \\
                                 -e RUN_NEWMAN=false \\
                                 -e RUN_SONAR=true \\
                                 -e RUN_PLAYWRIGHT=false \\
@@ -158,6 +164,7 @@ pipeline {
                             echo "=> Ejecutando Playwright Tests..."
                             sh """
                                 ${COMPOSE_CMD} run --name qa-runner-e2e \\
+                                -e REPORTS_DIR=${QA_REPORTS_DIR} \\
                                 -e RUN_NEWMAN=false \\
                                 -e RUN_SONAR=false \\
                                 -e RUN_PLAYWRIGHT=true \\
@@ -179,6 +186,7 @@ pipeline {
                             echo "=> Ejecutando k6 Tests..."
                             sh """
                                 ${COMPOSE_CMD} run --name qa-runner-k6 \\
+                                -e REPORTS_DIR=${QA_REPORTS_DIR} \\
                                 -e RUN_NEWMAN=false \\
                                 -e RUN_SONAR=false \\
                                 -e RUN_PLAYWRIGHT=false \\
@@ -534,7 +542,7 @@ HTML_EOF
 
                 try {
                     sh '''
-                        PROJECT_NAME=$(grep '^PROJECT_NAME=' /app/.env.qa | cut -d'=' -f2 | tr -d '\r')
+                        PROJECT_NAME=$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\r')
                         echo "=> Aguardando procesamiento CE task de SonarQube..."
                         sleep 30
                         echo "=> Apagando solo contenedores transientes de la aplicación..."
