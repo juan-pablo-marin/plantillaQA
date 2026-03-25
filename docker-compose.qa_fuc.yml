@@ -309,8 +309,8 @@ services:
     ports:
       - "5050:5050"
     volumes:
-      - ./qa/reports/allure-results:/app/allure-results
-      - ./qa/reports/allure-reports:/app/default-reports
+      - ./qa/reports/fuc/allure-results:/app/allure-results
+      - ./qa/reports/fuc/allure-reports:/app/default-reports
     networks:
       - qa-network
 
@@ -344,29 +344,31 @@ services:
 
   # --- Newman Report Viewer (Standalone — persiste entre builds) ---
   newman-viewer:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: ./qa/Dockerfile.viewer
     container_name: ${PROJECT_NAME}-newman-viewer
     profiles: [ "test-e2e", "jenkins", "all", "report" ]
     restart: unless-stopped
     ports:
       - "8181:80"
     volumes:
-      - ./qa/reports/newman:/usr/share/nginx/html:ro
-      - ./qa/nginx-viewer.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./qa/reports/fuc/newman:/usr/share/nginx/html:ro
     networks:
       - qa-network
 
   # --- Playwright Report Viewer (Standalone — persiste entre builds) ---
   playwright-viewer:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: ./qa/Dockerfile.viewer
     container_name: ${PROJECT_NAME}-playwright-viewer
     profiles: [ "test-e2e", "jenkins", "all", "report" ]
     restart: unless-stopped
     ports:
       - "8182:80"
     volumes:
-      - ./qa/reports/playwright-html:/usr/share/nginx/html:ro
-      - ./qa/nginx-viewer.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./qa/reports/fuc/playwright-html:/usr/share/nginx/html:ro
     networks:
       - qa-network
 

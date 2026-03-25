@@ -403,6 +403,7 @@ elif [ -f "performance/k6-tests_fuc.js" ]; then
     k6 run performance/k6-tests_fuc.js \
       -e BACKEND_URL="$BACKEND_URL" \
       -e TEST_TOKEN="$TEST_TOKEN" \
+      -e K6_DIR="$K6_DIR" \
       --tag build="${BUILD_TAG}" \
       --tag environment="qa" \
       --out "influxdb=http://influxdb:8086/k6" \

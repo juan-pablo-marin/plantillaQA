@@ -28,8 +28,8 @@ pipeline {
         QA_COMPOSE           = "${env.IS_FUC == 'true' ? '/app/docker-compose.qa_fuc.yml' : '/app/docker-compose.qa.yml'}"
         COMPOSE_CMD          = "docker compose --env-file ${env.ENV_FILE} -f ${env.QA_COMPOSE} -f /app/docker-compose.jenkins.yml"
         QA_REPORTS_DIR       = "${env.IS_FUC == 'true' ? '/qa/reports/fuc' : '/qa/reports/rav'}"
-        JENKINS_REPORTS_DIR  = "${env.IS_FUC == 'true' ? '/app/qa/reports/fuc' : '/app/qa/reports/rav'}"
-        RELATIVE_REPORTS_DIR = "${env.IS_FUC == 'true' ? 'qa/reports/fuc' : 'qa/reports/rav'}"
+        JENKINS_REPORTS_DIR  = "qa_reports_ws"
+        RELATIVE_REPORTS_DIR = "qa_reports_ws"
         BUILD_TIMESTAMP      = sh(script: 'date +%Y%m%d_%H%M%S', returnStdout: true).trim()
     }
 
@@ -70,11 +70,11 @@ pipeline {
 
                         echo "=> Levantando Newman Report Viewer (http://localhost:8181)..."
                         docker rm -f ${PROJECT_NAME}-newman-viewer 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --force-recreate newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
+                        ${COMPOSE_CMD} up -d --build --force-recreate newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
 
                         echo "=> Levantando Playwright Report Viewer (http://localhost:8182)..."
                         docker rm -f ${PROJECT_NAME}-playwright-viewer 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --force-recreate playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
+                        ${COMPOSE_CMD} up -d --build --force-recreate playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
 
                         echo "=> Levantando Grafana (provisioning + dashboards montados desde el repo)..."
                         docker rm -f ${PROJECT_NAME}-grafana 2>/dev/null || true
@@ -102,7 +102,7 @@ pipeline {
                         done
 
                         echo "=> Construyendo QA Runner (Root Context)..."
-                        ${COMPOSE_CMD} build qa-runner
+                        ${COMPOSE_CMD} build --no-cache qa-runner
 
                         echo "Entorno listo"
                     '''
@@ -127,7 +127,8 @@ pipeline {
                                 qa-runner || true
                             """
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/newman/anterior"
-                            echo 'Newman: sin docker cp (bind mount ./qa/reports); se conserva el historial en qa/reports/newman/anteriores/'
+                            echo 'Newman: copiando reportes al workspace'
+                            sh "docker cp qa-runner-newman:${QA_REPORTS_DIR}/newman ${JENKINS_REPORTS_DIR}/ || true"
                             sh "docker rm -f qa-runner-newman || true"
                         }
                     }
@@ -172,9 +173,14 @@ pipeline {
                                 -e RUN_K6=false \\
                                 qa-runner || true
                             """
-                            sh "mkdir -p ${JENKINS_REPORTS_DIR}/"
-                            sh "docker cp qa-runner-e2e:${QA_REPORTS_DIR}/playwright-html ${JENKINS_REPORTS_DIR}/ || true"
-                            sh "docker cp qa-runner-e2e:${QA_REPORTS_DIR}/playwright-results ${JENKINS_REPORTS_DIR}/ || true"
+                            sh "mkdir -p ${JENKINS_REPORTS_DIR}/playwright-html"
+                            sh "docker cp qa-runner-e2e:/qa/reports/playwright-html/. ${JENKINS_REPORTS_DIR}/playwright-html/ || true"
+                            sh "docker cp qa-runner-e2e:/qa/playwright-report/. ${JENKINS_REPORTS_DIR}/playwright-html/ || true"
+                            sh "docker cp qa-runner-e2e:${QA_REPORTS_DIR}/playwright-html/. ${JENKINS_REPORTS_DIR}/playwright-html/ || true"
+                            
+                            sh "mkdir -p ${JENKINS_REPORTS_DIR}/playwright-results"
+                            sh "docker cp qa-runner-e2e:/qa/reports/playwright-results/. ${JENKINS_REPORTS_DIR}/playwright-results/ || true"
+                            sh "docker cp qa-runner-e2e:${QA_REPORTS_DIR}/playwright-results/. ${JENKINS_REPORTS_DIR}/playwright-results/ || true"
                             sh "docker rm -f qa-runner-e2e || true"
                         }
                     }
@@ -454,7 +460,7 @@ HTML_EOF
                     echo "No se pudo verificar reportes: ${e.message}"
                 }
 
-                dir('/app') {
+                dir("${env.WORKSPACE}") {
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                         if (fileExists("${env.RELATIVE_REPORTS_DIR}/newman/index.html")) {
                             archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/newman/**/*", allowEmptyArchive: true
@@ -551,7 +557,7 @@ HTML_EOF
                         echo "     - SonarQube    → http://localhost:9000"
                         echo "     - Grafana      → http://localhost:3001"
                         echo "     - InfluxDB     → http://localhost:8086"
-                        echo "     - Newman HTML  → http://localhost:8181  (historial: ${JENKINS_REPORTS_DIR}/newman/anteriores/ + reports-data.js)"
+                        echo "     - Newman HTML  → http://localhost:8181  (historial: /app/qa/reports/fuc/newman/anteriores/ + reports-data.js)"
                         echo "     - Playwright   → http://localhost:8182"
                         echo "   Reportes HTML disponibles en Jenkins → Sidebar del build"
                         ${COMPOSE_CMD} stop db backend frontend || true

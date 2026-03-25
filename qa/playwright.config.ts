@@ -9,11 +9,11 @@ export default defineConfig({
   timeout: 60_000,
   // Guardar artefactos (screenshots, videos, traces) en una ruta montada por Docker
   // para que el reporte HTML pueda referenciarlos y queden como evidencia en el host.
-  outputDir: './reports/playwright-results',
+  outputDir: process.env.REPORTS_DIR ? `${process.env.REPORTS_DIR}/playwright-results` : './reports/playwright-results',
 
   reporter: [
     ['list'],
-    ['html', { outputFolder: './reports/playwright-html', open: 'never' }],
+    ['html', { outputFolder: process.env.REPORTS_DIR ? `${process.env.REPORTS_DIR}/playwright-html` : './reports/playwright-html', open: 'never' }],
   ],
 
   use: {

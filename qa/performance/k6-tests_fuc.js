@@ -108,8 +108,9 @@ export default function (data) {
 }
 
 export function handleSummary(data) {
+  const k6Dir = __ENV.K6_DIR || '/qa/reports/k6';
   return {
-    '/qa/reports/k6/summary.json': JSON.stringify(data, null, 2),
-    '/qa/reports/k6/junit.xml': jUnit(data),
+    [`${k6Dir}/summary.json`]: JSON.stringify(data, null, 2),
+    [`${k6Dir}/junit.xml`]: jUnit(data),
   };
 }
