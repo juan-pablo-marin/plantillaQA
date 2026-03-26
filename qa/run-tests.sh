@@ -89,14 +89,19 @@ if [ "$RUN_SONAR" = "true" ]; then
         
         # Exportar cobertura a formato XML (Cobertura API)
         if [ -f "$REPORTS_DIR/coverage-backend.out" ] && [ -s "$REPORTS_DIR/coverage-backend.out" ]; then
+            # PRIMERO normalizar rutas del modulo Go (antes de generar XML)
+            GO_MODULE=$(head -1 "$SRC_BACKEND/go.mod" 2>/dev/null | awk '{print $2}' || echo "")
+            if [ -n "$GO_MODULE" ]; then
+                sed -i "s|${GO_MODULE}/|backendrav/|g" "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
+            else
+                sed -i 's|[^[:space:]]*/\(.*\.go\)|backendrav/\1|g' "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
+            fi
+            # DESPUES generar XML con rutas ya normalizadas
             if head -n 1 "$REPORTS_DIR/coverage-backend.out" | grep -q "mode:" && [ $(wc -l < "$REPORTS_DIR/coverage-backend.out") -gt 1 ]; then
                 gocover-cobertura < "$REPORTS_DIR/coverage-backend.out" > "$REPORTS_DIR/coverage-backend.xml" || echo "  WARN: gocover-cobertura falló."
             else
                 echo "  WARN: coverage-backend.out esta vacio o es invalido para gocover-cobertura."
             fi
-            # Normalizar rutas del modulo Go al directorio de Sonar (backend/)
-            # Ajusta el patron si tu go.mod usa un nombre de modulo diferente
-            sed -i 's|[^[:space:]]*/\(.*\.go\)|backend/\1|g' "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
         else
             echo "  WARN: No se encontro coverage-backend.out o esta vacio. Se omitira la conversion a Cobertura XML."
         fi
@@ -326,8 +331,10 @@ else
             if [ -f "$SRC_BACKEND/coverage.out" ]; then
                 echo "  Copiando y corrigiendo rutas en coverage.out (ReadOnly fix)..."
                 cp "$SRC_BACKEND/coverage.out" "$REPORTS_DIR/coverage-backend.out"
-                # Normalizar rutas del modulo Go al directorio de Sonar (backend/)
-                sed -i 's|[^[:space:]]*/\(.*\.go\)|backend/\1|g' "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
+                GO_MODULE=$(head -1 "$SRC_BACKEND/go.mod" 2>/dev/null | awk '{print $2}' || echo "")
+                if [ -n "$GO_MODULE" ]; then
+                    sed -i "s|${GO_MODULE}/|backendrav/|g" "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
+                fi
             fi
 
             # Construccion dinamica de argumentos para evitar fallos por archivos faltantes

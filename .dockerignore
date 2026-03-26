@@ -5,7 +5,7 @@
 **/node_modules/
 **/npm-debug.log
 **/yarn-error.log
-**/.pnpm-store
+**/.pnpm-store/
 **/.next/
 **/out/
 **/build/
@@ -23,9 +23,9 @@ __pycache__/
 # Docker — solo Dockerfile en la raíz (no "Dockerfile*" → rompe exclusiones raras)
 /Dockerfile
 
-# Version Control
-.git/
-.gitignore
+# Version Control (incluye subdirs como BACKEND/.git/)
+**/.git/
+**/.gitignore
 
 # QA & Build Artifacts
 qa/reports/
@@ -43,6 +43,19 @@ qa/reports/**/*.json
 .env
 .env.*
 !.env.example
+
+# SonarQube local cache (154 MB innecesarios)
+.sonar/
+.scannerwork/
+
+# Reportes anteriores de QA (ya montados via volumen)
+qa/reports/**/anterior/
+qa/reports/**/allure-results/
+qa/reports/**/allure-reports/
+
+# Artefactos de build / logs
+build.log
+*.log
 
 # Módulo Go siempre incluido (por si algún patrón anterior afecta)
 !**/go.mod

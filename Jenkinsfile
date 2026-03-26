@@ -102,7 +102,7 @@ pipeline {
                         done
 
                         echo "=> Construyendo QA Runner (Root Context)..."
-                        ${COMPOSE_CMD} build --no-cache qa-runner
+                        ${COMPOSE_CMD} build qa-runner
 
                         echo "Entorno listo"
                     '''

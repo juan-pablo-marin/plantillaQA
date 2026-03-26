@@ -7,8 +7,8 @@
 # Este archivo debe mantenerse alineado con esos argumentos.
 # ============================================
 
-sonar.projectKey=qa-project
-sonar.projectName=QA Project
+sonar.projectKey=fuc-sena
+sonar.projectName=FUC SENA
 sonar.projectVersion=1.0
 
 # --------------------------------------------
