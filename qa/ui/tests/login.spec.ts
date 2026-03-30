@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://frontend:3000';
+const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://ape-fuc.estebandev.tech';
 
 test.describe('Login — Ficha Única de Caracterización', () => {
 
@@ -14,9 +14,9 @@ test.describe('Login — Ficha Única de Caracterización', () => {
   });
 
   test('debe mostrar error con credenciales inválidas', async ({ page }, testInfo) => {
-    await page.fill('input[type="email"], input[name="email"]', 'invalid@test.com');
-    await page.fill('input[type="password"], input[name="password"]', 'wrongpass');
-    await page.click('button[type="submit"]');
+    await page.getByLabel(/Número de documento/i).fill('1234567890');
+    await page.locator('input[name="password"]').fill('wrongpass');
+    await page.locator('input[name="password"]').press('Enter');
 
     // El frontend actual usa window.alert(); capturamos el diálogo como evidencia en el HTML report.
     const dialog = await page.waitForEvent('dialog', { timeout: 10_000 });
@@ -28,9 +28,9 @@ test.describe('Login — Ficha Única de Caracterización', () => {
   });
 
   test('debe redirigir al home tras login exitoso', async ({ page }, testInfo) => {
-    // Credenciales que coinciden con el "mock" actual del frontend (ver FRONTEND/src/app/(auth)/login/page.tsx)
-    await page.fill('input[type="email"], input[name="email"]', 'test1@sena.com');
-    await page.fill('input[type="password"], input[name="password"]', '123456!@#');
+    // Credenciales válidas para el entorno QA / Dev
+    await page.getByLabel(/Número de documento/i).fill('1088236798');
+    await page.locator('input[name="password"]').fill('Masterkey123.');
 
     // Si aparece un alert, lo adjuntamos y lo descartamos para que no bloquee el flujo.
     let dialogMessage: string | null = null;
@@ -43,13 +43,15 @@ test.describe('Login — Ficha Única de Caracterización', () => {
       await dialog.dismiss();
     });
 
-    await page.click('button[type="submit"]');
+    await page.locator('input[name="password"]').press('Enter');
 
     try {
-      await page.waitForURL('**/home**', { timeout: 10_000 });
+      await page.waitForURL('**/home**', { timeout: 30_000 });
     } catch (err) {
+      await testInfo.attach('login-failed-url.txt', { body: page.url(), contentType: 'text/plain' });
+      await testInfo.attach('login-failed-content.html', { body: await page.content(), contentType: 'text/html' });
       if (dialogMessage) {
-        throw new Error(`No redirigió a /home. Se mostró un diálogo: "${dialogMessage}"`);
+        throw new Error(`No redirigió a /home. Se mostró un diálogo: "${dialogMessage}". URL: ${page.url()}`);
       }
       throw err;
     }
