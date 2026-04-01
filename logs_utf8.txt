@@ -1,0 +1,194 @@
+============================================
+ QA Runner - Iniciando
+ Backend:    http://backend:8080
+ Frontend:   https://ape-fuc.estebandev.tech
+ Sonar:      http://sonarqube:9000
+--------------------------------------------
+ Newman:     RUN_NEWMAN=false
+ SonarQube:  RUN_SONAR=false
+ Playwright: RUN_PLAYWRIGHT=true
+ k6:         RUN_K6=false
+============================================
+[0/6] Preparando carpetas de reportes...
+[0.5/6] Ejecutando Tests Unitarios (Backend & Frontend)...
+  SKIP: Pruebas unitarias ignoradas (Solo el worker de SonarQube debe generarlas para evitar Race Conditions).
+[1/6] Esperando Backend...
+ OK: Backend listo.
+[1.5/6] Generando JWT Token para pruebas backend...
+  Token generado correctamente para el usuario: qa_test_user
+[2/6] Newman API Tests...
+ SKIP: RUN_NEWMAN=false
+[3/6] Analisis SonarQube...
+  Esperando a que SonarQube este listo (esto puede tardar 1-2 minutos)...
+ SKIP: RUN_SONAR=false
+[4/6] Ejecutando Playwright...
+  Ejecutando tests desde playwright.config.ts (testDir: ./ui/tests)
+  Limpiando reportes anteriores (HTML + artefactos)...
+[1G[0K\[1G[0K
+[2mRunning [22m6[2m tests using [22m1[2m worker[22m
+
+     [2m1 [22m[2m…ar el wizard del FUC completo usando el Happy Path[22m
+Widget de accesibilidad deshabilitado vía CSS.
+[2A[2K[0G  [31m✘[39m  [2m1 [22m[31m…zard del FUC completo usando el Happy Path[39m[2m (44.0s)[22m[2E     [2m2 [22m[2m…d del FUC completo usando el Happy Path[22m[33m (retry #1)[39m
+Widget de accesibilidad deshabilitado vía CSS.
+[2A[2K[0G  [31m✘[39m  [2m2 [22m[31m…C completo usando el Happy Path[39m[33m (retry #1)[39m[2m (39.9s)[22m[2E     [2m3 [22m[2m…acterización › debe mostrar el formulario de login[22m
+[1A[2K[0G  [32m✓[39m  [2m3 [22m…ción › debe mostrar el formulario de login[2m (15.9s)[22m[1E     [2m4 [22m[2m…ón › debe mostrar error con credenciales inválidas[22m
+[1A[2K[0G  [32m✓[39m  [2m4 [22m…be mostrar error con credenciales inválidas[2m (6.1s)[22m[1E     [2m5 [22m[2m…zación › debe redirigir al home tras login exitoso[22m
+[1A[2K[0G  [31m✘[39m  [2m5 [22m[31m… debe redirigir al home tras login exitoso[39m[2m (15.3s)[22m[1E     [2m6 [22m[2m…be redirigir al home tras login exitoso[22m[33m (retry #1)[39m
+[1A[2K[0G  [31m✘[39m  [2m6 [22m[31m…igir al home tras login exitoso[39m[33m (retry #1)[39m[2m (14.6s)[22m[1E     [2m7 [22m[2m… general › la página principal carga correctamente[22m
+[1A[2K[0G  [32m✓[39m  [2m7 [22m…l › la página principal carga correctamente[2m (5.5s)[22m[1E     [2m8 [22m[2m…ción general › las imágenes institucionales cargan[22m
+[1A[2K[0G  [32m✓[39m  [2m8 [22m…neral › las imágenes institucionales cargan[2m (2.0s)[22m[1E
+
+[31m  1) [chromium] › ui/tests/fuc-happy-path.spec.ts:27:7 › FUC Wizard - Happy Path Completo › Debe diligenciar el wizard del FUC completo usando el Happy Path [39m
+
+    Error: Timeout en Login: No se alcanzó /home tras 30s. URL actual: https://ape-fuc.estebandev.tech/login.
+
+    [90m   at [39m../pages/fuc-wizard.page.ts:105
+
+    [0m [90m 103 |[39m         [36mthrow[39m [36mnew[39m [33mError[39m([32m`Error en Login detectado (UI): "${errorMessage.trim()}" con ID: ${id}`[39m)[33m;[39m
+     [90m 104 |[39m       }
+    [31m[1m>[22m[39m[90m 105 |[39m       [36mthrow[39m [36mnew[39m [33mError[39m([32m`Timeout en Login: No se alcanzó /home tras 30s. URL actual: ${currentUrl}.`[39m)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 106 |[39m     }
+     [90m 107 |[39m   }
+     [90m 108 |[39m[0m
+    [2m    at FucWizardPage.login (/qa/ui/pages/fuc-wizard.page.ts:105:13)[22m
+    [2m    at /qa/ui/tests/fuc-happy-path.spec.ts:18:5[22m
+
+[2m    attachment #1: [1mscreenshot[2m (image/png) [2m────────────────[2m[22m
+[2m    reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium/test-failed-1.png[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    attachment #2: [1mvideo[2m (video/webm) [2m────────────────────[2m[22m
+[2m    reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium/video.webm[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    Error Context: reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium/error-context.md[22m
+
+[2m    attachment #4: [1mtrace[2m (application/zip) [2m───────────────[2m[22m
+[2m    reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium/trace.zip[22m
+[2m    Usage:[22m
+
+[2m        npx playwright show-trace reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium/trace.zip[22m
+
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[90m    Retry #1 [2m─────────────────────────────────────────────[22m[39m
+
+    Error: Timeout en Login: No se alcanzó /home tras 30s. URL actual: https://ape-fuc.estebandev.tech/login.
+
+    [90m   at [39m../pages/fuc-wizard.page.ts:105
+
+    [0m [90m 103 |[39m         [36mthrow[39m [36mnew[39m [33mError[39m([32m`Error en Login detectado (UI): "${errorMessage.trim()}" con ID: ${id}`[39m)[33m;[39m
+     [90m 104 |[39m       }
+    [31m[1m>[22m[39m[90m 105 |[39m       [36mthrow[39m [36mnew[39m [33mError[39m([32m`Timeout en Login: No se alcanzó /home tras 30s. URL actual: ${currentUrl}.`[39m)[33m;[39m
+     [90m     |[39m             [31m[1m^[22m[39m
+     [90m 106 |[39m     }
+     [90m 107 |[39m   }
+     [90m 108 |[39m[0m
+    [2m    at FucWizardPage.login (/qa/ui/pages/fuc-wizard.page.ts:105:13)[22m
+    [2m    at /qa/ui/tests/fuc-happy-path.spec.ts:18:5[22m
+
+[2m    attachment #1: [1mscreenshot[2m (image/png) [2m────────────────[2m[22m
+[2m    reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium-retry1/test-failed-1.png[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    attachment #2: [1mvideo[2m (video/webm) [2m────────────────────[2m[22m
+[2m    reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium-retry1/video.webm[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    Error Context: reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium-retry1/error-context.md[22m
+
+[2m    attachment #4: [1mtrace[2m (application/zip) [2m───────────────[2m[22m
+[2m    reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium-retry1/trace.zip[22m
+[2m    Usage:[22m
+
+[2m        npx playwright show-trace reports/fuc/playwright-results/fuc-happy-path-FUC-Wizard--99c7c-mpleto-usando-el-Happy-Path-chromium-retry1/trace.zip[22m
+
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[31m  2) [chromium] › ui/tests/login.spec.ts:30:7 › Login — Ficha Única de Caracterización › debe redirigir al home tras login exitoso [39m
+
+    Error: No redirigió a /home. Se mostró un diálogo: "Credenciales inválidas"
+
+    [0m [90m 50 |[39m     } [36mcatch[39m (err) {
+     [90m 51 |[39m       [36mif[39m (dialogMessage) {
+    [31m[1m>[22m[39m[90m 52 |[39m         [36mthrow[39m [36mnew[39m [33mError[39m([32m`No redirigió a /home. Se mostró un diálogo: "${dialogMessage}"`[39m)[33m;[39m
+     [90m    |[39m               [31m[1m^[22m[39m
+     [90m 53 |[39m       }
+     [90m 54 |[39m       [36mthrow[39m err[33m;[39m
+     [90m 55 |[39m     }[0m
+    [2m    at /qa/ui/tests/login.spec.ts:52:15[22m
+
+[2m    attachment #1: [1mlogin-success-dialog.txt[2m (text/plain) [2m─[2m[22m
+[2m    alert: Credenciales inválidas[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    attachment #2: [1mscreenshot[2m (image/png) [2m────────────────[2m[22m
+[2m    reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium/test-failed-1.png[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    attachment #3: [1mvideo[2m (video/webm) [2m────────────────────[2m[22m
+[2m    reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium/video.webm[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    Error Context: reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium/error-context.md[22m
+
+[2m    attachment #5: [1mtrace[2m (application/zip) [2m───────────────[2m[22m
+[2m    reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium/trace.zip[22m
+[2m    Usage:[22m
+
+[2m        npx playwright show-trace reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium/trace.zip[22m
+
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[90m    Retry #1 [2m─────────────────────────────────────────────[22m[39m
+
+    Error: No redirigió a /home. Se mostró un diálogo: "Credenciales inválidas"
+
+    [0m [90m 50 |[39m     } [36mcatch[39m (err) {
+     [90m 51 |[39m       [36mif[39m (dialogMessage) {
+    [31m[1m>[22m[39m[90m 52 |[39m         [36mthrow[39m [36mnew[39m [33mError[39m([32m`No redirigió a /home. Se mostró un diálogo: "${dialogMessage}"`[39m)[33m;[39m
+     [90m    |[39m               [31m[1m^[22m[39m
+     [90m 53 |[39m       }
+     [90m 54 |[39m       [36mthrow[39m err[33m;[39m
+     [90m 55 |[39m     }[0m
+    [2m    at /qa/ui/tests/login.spec.ts:52:15[22m
+
+[2m    attachment #1: [1mlogin-success-dialog.txt[2m (text/plain) [2m─[2m[22m
+[2m    alert: Credenciales inválidas[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    attachment #2: [1mscreenshot[2m (image/png) [2m────────────────[2m[22m
+[2m    reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium-retry1/test-failed-1.png[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    attachment #3: [1mvideo[2m (video/webm) [2m────────────────────[2m[22m
+[2m    reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium-retry1/video.webm[22m
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[2m    Error Context: reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium-retry1/error-context.md[22m
+
+[2m    attachment #5: [1mtrace[2m (application/zip) [2m───────────────[2m[22m
+[2m    reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium-retry1/trace.zip[22m
+[2m    Usage:[22m
+
+[2m        npx playwright show-trace reports/fuc/playwright-results/login-Login-—-Ficha-Única--37c8b--al-home-tras-login-exitoso-chromium-retry1/trace.zip[22m
+
+[2m    [2m──────────────────────────────────────────────────────[2m[22m
+
+[31m  2 failed[39m
+[31m    [chromium] › ui/tests/fuc-happy-path.spec.ts:27:7 › FUC Wizard - Happy Path Completo › Debe diligenciar el wizard del FUC completo usando el Happy Path [39m
+[31m    [chromium] › ui/tests/login.spec.ts:30:7 › Login — Ficha Única de Caracterización › debe redirigir al home tras login exitoso [39m
+[32m  4 passed[39m[2m (3.6m)[22m
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report reports/fuc/playwright-html[39m
+[36m[39m
+[1G[0K\[1G[0K  WARN: Algunos tests fallaron.
+[5/6] k6 Performance Tests...
+ SKIP: RUN_K6=false
+[6/6] Finalizando...
+Reportes guardados en /qa/reports/fuc
+============================================

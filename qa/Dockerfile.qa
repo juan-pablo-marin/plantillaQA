@@ -1,9 +1,12 @@
 FROM node:20-bookworm
 
 WORKDIR /qa
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # --- System dependencies + git ---
-RUN apt-get update && apt-get install -y \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y \
     curl \
     unzip \
     wget \
@@ -24,10 +27,12 @@ RUN go install github.com/boumenot/gocover-cobertura@latest \
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # --- Newman (API testing) ---
-RUN npm install -g newman newman-reporter-allure
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g newman newman-reporter-allure
 
 # --- Playwright (UI testing) ---
-RUN npm install -g playwright
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g playwright
 RUN npx playwright install --with-deps chromium
 
 # --- k6 (Performance testing) ---
@@ -36,7 +41,8 @@ RUN curl -sSLo /tmp/k6.deb https://github.com/grafana/k6/releases/download/v0.50
     && rm /tmp/k6.deb
 
 # --- ZAP (Security testing) ---
-RUN pip3 install --break-system-packages zaproxy
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install --break-system-packages zaproxy
 
 # --- Sonar Scanner ---
 RUN curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.2.1.4610-linux-x64.zip \
@@ -47,7 +53,8 @@ RUN curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribut
 
 # --- QA project dependencies ---
 COPY qa/package.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
 
 # --- Copy QA project files ---
 COPY qa/ /qa/

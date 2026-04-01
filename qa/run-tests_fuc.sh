@@ -89,16 +89,24 @@ if [ "$RUN_SONAR" = "true" ]; then
         
         # Exportar cobertura a formato XML (Cobertura API)
         if [ -f "$REPORTS_DIR/coverage-backend.out" ] && [ -s "$REPORTS_DIR/coverage-backend.out" ]; then
-            # PRIMERO normalizar rutas del modulo Go (antes de generar XML)
-            GO_MODULE=$(head -1 "$SRC_BACKEND/go.mod" 2>/dev/null | awk '{print $2}' || echo "")
+            # PRIMERO normalizar rutas del modulo Go (antes de generar XML); trim CRLF en go.mod (checkout Windows)
+            GO_MODULE=$(head -1 "$SRC_BACKEND/go.mod" 2>/dev/null | tr -d '\r' | awk '{print $2}' || echo "")
             if [ -n "$GO_MODULE" ]; then
                 sed -i "s|${GO_MODULE}/|backend/|g" "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
             else
                 sed -i 's|[^[:space:]]*/\(.*\.go\)|backend/\1|g' "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
             fi
+            # Respaldo por si el perfil conserva prefijo del modulo sin sustituir
+            sed -i 's|fuc-sena-backend/|backend/|g' "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
             # DESPUES generar XML con rutas ya normalizadas
             if head -n 1 "$REPORTS_DIR/coverage-backend.out" | grep -q "mode:" && [ $(wc -l < "$REPORTS_DIR/coverage-backend.out") -gt 1 ]; then
                 gocover-cobertura < "$REPORTS_DIR/coverage-backend.out" > "$REPORTS_DIR/coverage-backend.xml" || echo "  WARN: gocover-cobertura falló."
+                # Jenkins (publishCoverage) resuelve fuentes en el workspace: carpeta real BACKEND/ (no /src/backend)
+                if [ -f "$REPORTS_DIR/coverage-backend.xml" ]; then
+                    sed -i 's|fuc-sena-backend/|BACKEND/|g' "$REPORTS_DIR/coverage-backend.xml" 2>/dev/null || true
+                    sed -i 's|filename="backend/|filename="BACKEND/|g' "$REPORTS_DIR/coverage-backend.xml" 2>/dev/null || true
+                    sed -i "s|filename='backend/|filename='BACKEND/|g" "$REPORTS_DIR/coverage-backend.xml" 2>/dev/null || true
+                fi
             else
                 echo "  WARN: coverage-backend.out esta vacio o es invalido para gocover-cobertura."
             fi
@@ -115,8 +123,8 @@ if [ "$RUN_SONAR" = "true" ]; then
         cd "$SRC_FRONTEND"
         if [ -f "package.json" ]; then
             if ! [ -d "node_modules" ]; then
-                echo "  Instalando dependencias del frontend..."
-                pnpm install --frozen-lockfile 2>/dev/null || pnpm install || echo "  WARN: pnpm install falló."
+                echo "  Instalando dependencias del frontend (usando pnpm cache)..."
+                pnpm install --frozen-lockfile --store-dir /pnpm-cache 2>/dev/null || pnpm install --store-dir /pnpm-cache || echo "  WARN: pnpm install falló."
             fi
             if grep -q '"test":' package.json; then
                 pnpm test run --reporter=junit --outputFile="$REPORTS_DIR/js-test-report.xml" || echo "  WARN: Algunos tests de Frontend fallaron."
@@ -329,10 +337,11 @@ else
             if [ -f "$SRC_BACKEND/coverage.out" ]; then
                 echo "  Copiando y corrigiendo rutas en coverage.out (ReadOnly fix)..."
                 cp "$SRC_BACKEND/coverage.out" "$REPORTS_DIR/coverage-backend.out"
-                GO_MODULE=$(head -1 "$SRC_BACKEND/go.mod" 2>/dev/null | awk '{print $2}' || echo "")
+                GO_MODULE=$(head -1 "$SRC_BACKEND/go.mod" 2>/dev/null | tr -d '\r' | awk '{print $2}' || echo "")
                 if [ -n "$GO_MODULE" ]; then
                     sed -i "s|${GO_MODULE}/|backend/|g" "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
                 fi
+                sed -i 's|fuc-sena-backend/|backend/|g' "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
             fi
 
             # Construccion dinamica de argumentos para evitar fallos por archivos faltantes
@@ -355,6 +364,8 @@ else
             fi
 
             echo "  Iniciando sonar-scanner (timeout: $SONAR_SCAN_TIMEOUT)..."
+            # Menos plugins descargados (~30s) y más heap para el bridge Node (evita "bridge server is unresponsive")
+            export SONAR_SCANNER_OPTS="${SONAR_SCANNER_OPTS:--Dsonar.plugins.downloadOnlyRequired=true -Xmx2048m}"
             timeout "$SONAR_SCAN_TIMEOUT" sonar-scanner \
                 -Dsonar.projectBaseDir=/src \
                 -Dsonar.projectKey="${PROJECT_KEY:-qa-project}" \
@@ -365,8 +376,9 @@ else
                 -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
                 -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
                 -Dsonar.scm.disabled=true \
-                -Dsonar.javascript.node.maxspace=4096 \
-                -Dsonar.javascript.node.bridge.timeout=2400 \
+                -Dsonar.plugins.downloadOnlyRequired=true \
+                -Dsonar.javascript.node.maxspace=8192 \
+                -Dsonar.javascript.node.bridge.timeout=3600 \
                 $SONAR_ARGS \
                 || echo "  WARN: Fallo o timeout el escaneo de Sonar."
     else

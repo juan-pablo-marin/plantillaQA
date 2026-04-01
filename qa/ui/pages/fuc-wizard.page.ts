@@ -1,7 +1,7 @@
 import { Page, expect } from '@playwright/test';
 
 export class FucWizardPage {
-  constructor(private readonly page: Page) {}
+  constructor(private readonly page: Page) { }
 
   async gotoHome() {
     console.log('Navegando a home...');
@@ -17,7 +17,7 @@ export class FucWizardPage {
   async disableAccessibilityWidget() {
     try {
       // 1. Inyectar CSS agresivo para ocultar y desactivar el widget
-      await this.page.addStyleTag({ 
+      await this.page.addStyleTag({
         content: `
           #ape-accessibility-root,
           [data-a11y-icon],
@@ -32,9 +32,9 @@ export class FucWizardPage {
             visibility: hidden !important;
             z-index: -9999 !important;
           }
-        ` 
+        `
       });
-      
+
       // 2. Intentar remover directamente el elemento del DOM si existe
       await this.page.evaluate(() => {
         const a11yRoot = document.getElementById('ape-accessibility-root');
@@ -44,7 +44,7 @@ export class FucWizardPage {
         const a11yElements = document.querySelectorAll('[data-a11y-icon]');
         a11yElements.forEach(el => el.remove());
       });
-      
+
       console.log('Widget de accesibilidad deshabilitado vía CSS y DOM removal.');
     } catch (e) {
       console.log('Error al deshabilitar widget de accesibilidad:', e.message);
@@ -73,7 +73,7 @@ export class FucWizardPage {
    */
   async login(id: string, pass: string) {
     await this.page.goto('/login');
-    
+
     // Inyectamos el CSS de deshabilitación lo antes posible
     await this.disableAccessibilityWidget();
 
@@ -101,7 +101,7 @@ export class FucWizardPage {
       const possibleUrls = ['**/home**', '**/ficha**', '**/dashboard**', '**/wizard**'];
       const navigationPromises = possibleUrls.map(url => this.page.waitForURL(url, { timeout: 30_000 }));
       const navigationPromise = Promise.race(navigationPromises);
-      
+
       // Presionar Enter en el campo de contraseña suele ser más confiable que un click forzado
       await this.page.locator('input[name="password"]').press('Enter');
 
@@ -113,9 +113,9 @@ export class FucWizardPage {
       }
 
       await navigationPromise;
-      
+
       console.log('Login exitoso. Redireccionado a:', this.page.url());
-      
+
       // Volvemos a deshabilitar por si la redirección limpió los estilos inyectados
       await this.disableAccessibilityWidget();
     } catch (error) {
@@ -141,16 +141,16 @@ export class FucWizardPage {
   // Helper para componentes "Select" customizados que requieren click y luego selección de opción
   async selectDropdownOptionByLabel(label: string, optionText: string) {
     console.log(`Seleccionando dropdown [${label}] -> ${optionText}`);
-    
+
     // Desabilitar widget de accesibilidad antes de interactuar
     await this.disableAccessibilityWidget();
-    await this.page.waitForTimeout(200);
-    
+    await this.page.waitForTimeout(300);
+
     let dropdown = null;
-    
-    // Estrategia 1: Buscar por label directo
+
+    // Estrategia 1: Buscar por label directo (primeros 25 caracteres para ser más flexible)
     try {
-      const labelLoc = this.page.locator('label').filter({ hasText: new RegExp(label.substring(0, 20), 'i') }).first();
+      const labelLoc = this.page.locator('label').filter({ hasText: new RegExp(label.substring(0, 25), 'i') }).first();
       const cont = labelLoc.locator('..');
       dropdown = cont.locator('[role="combobox"]').first();
       if (await dropdown.isVisible({ timeout: 1500 })) {
@@ -161,11 +161,11 @@ export class FucWizardPage {
     } catch (e) {
       console.log(`Estrategia label falló`);
     }
-    
-    // Estrategia 2: Buscar por combobox role
+
+    // Estrategia 2: Buscar por combobox role con parte del label
     if (!dropdown) {
       try {
-        dropdown = this.page.getByRole('combobox', { name: new RegExp(label.substring(0, 20), 'i') }).first();
+        dropdown = this.page.getByRole('combobox', { name: new RegExp(label.substring(0, 25), 'i') }).first();
         if (await dropdown.isVisible({ timeout: 1500 })) {
           console.log(`Dropdown encontrado por role`);
         } else {
@@ -175,8 +175,8 @@ export class FucWizardPage {
         console.log(`Estrategia role falló`);
       }
     }
-    
-    // Estrategia 3: Buscar cualquier combobox visible
+
+    // Estrategia 3: Buscar cualquier combobox visible cercano
     if (!dropdown) {
       try {
         const allCb = this.page.locator('[role="combobox"]');
@@ -189,15 +189,50 @@ export class FucWizardPage {
         console.log(`Estrategia combobox falló`);
       }
     }
-    
+
     if (!dropdown) {
       throw new Error(`No se encontró dropdown: ${label}`);
     }
-    
+
+    // Encontrar el contenedor para buscar <select> subyacente
+    let container = null;
+    try {
+      const labelLoc = this.page.locator('label').filter({ hasText: new RegExp(label.substring(0, 25), 'i') }).first();
+      container = labelLoc.locator('..');
+    } catch {
+      container = dropdown.locator('..');
+    }
+
+    // ESTRATEGIA 0: Intentar primero seleccionar por el select HTML subyacente (más robusto)
+    if (container) {
+      try {
+        const hiddenSelect = container.locator('select').first();
+        const selectCount = await hiddenSelect.count();
+        if (selectCount > 0) {
+          const options = await hiddenSelect.locator('option').all();
+          console.log(`Select encontrado con ${options.length} opciones`);
+          
+          for (const opt of options) {
+            const text = await opt.textContent();
+            if (text && text.toLowerCase().includes(optionText.toLowerCase())) {
+              const value = await opt.getAttribute('value');
+              if (value) {
+                await hiddenSelect.selectOption(value);
+                console.log(`✓ Opción seleccionada por SELECT HTML: ${optionText}`);
+                return;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`Select HTML strategy falló: ${e.message}`);
+      }
+    }
+
     // Hacer scroll y clic
     await dropdown.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(300);
-    
+    await this.page.waitForTimeout(400);
+
     try {
       await dropdown.click({ force: true, timeout: 10000 });
     } catch (e) {
@@ -205,129 +240,226 @@ export class FucWizardPage {
       await this.page.waitForTimeout(500);
       await dropdown.click({ force: true });
     }
-    
-    await this.page.waitForTimeout(300);
-    
+
+    // Esperar a que el listbox aparezca
+    try {
+      await this.page.locator('[role="listbox"]').waitFor({ state: 'visible', timeout: 2000 });
+    } catch (e) {
+      console.log(`Listbox no apareció en 2s, continuando...`);
+    }
+
+    await this.page.waitForTimeout(500);
+
     // Buscar opción sin anclas estrictas para evitar problemas de espaciado DOM
     const option = this.page.getByRole('option', { name: new RegExp(optionText, 'i') }).first();
     try {
-      await option.waitFor({ state: 'visible', timeout: 8000 });
+      await option.waitFor({ state: 'visible', timeout: 10000 });
       await option.click({ force: true });
       console.log(`Opción "${optionText}" seleccionada`);
     } catch (e) {
-      // Fallback: búsqueda parcial
-      const optPart = this.page.getByRole('option', { name: new RegExp(optionText.split(' ')[0], 'i') }).first();
-      await optPart.waitFor({ state: 'visible', timeout: 5000 });
-      await optPart.click({ force: true });
-      console.log(`Opción (parcial) "${optionText}" seleccionada`);
+      // Fallback: búsqueda parcial con primera palabra
+      try {
+        const firstWord = optionText.split(' ')[0];
+        const optPart = this.page.getByRole('option', { name: new RegExp(`^${firstWord}`, 'i') }).first();
+        await optPart.waitFor({ state: 'visible', timeout: 8000 });
+        await optPart.click({ force: true });
+        console.log(`Opción (parcial) "${firstWord}" seleccionada`);
+      } catch (fallbackError) {
+        // Último fallback: primera opción disponible
+        try {
+          const firstOption = this.page.getByRole('option').first();
+          await firstOption.waitFor({ state: 'visible', timeout: 5000 });
+          const firstText = await firstOption.textContent();
+          await firstOption.click({ force: true });
+          console.log(`Primera opción seleccionada como fallback: "${firstText}"`);
+        } catch (finalError) {
+          throw new Error(`No se encontró opción "${optionText}" en dropdown "${label}"`);
+        }
+      }
     }
   }
 
   // Helper para selectores "Searchable" como municipios
   async searchAndSelectDropdownOption(label: string, searchText: string, optionTextToClick: string) {
     console.log(`Buscando en ${label}: ${searchText}`);
-    
+
     // Desabilitar widget de accesibilidad antes de interactuar
     await this.disableAccessibilityWidget();
-    await this.page.waitForTimeout(200);
-    
-    const container = this.page.locator('label').filter({ hasText: label }).locator('..');
-    const combobox = container.locator('[role="combobox"]');
-    
-    // Hacer scroll y esperar visibilidad
+    await this.page.waitForTimeout(800);
+
+    // Encontrar el contenedor
+    let container;
+    try {
+      container = this.page.locator('label').filter({ hasText: label }).locator('..');
+      if (await container.count() === 0) {
+        throw new Error("No es un label estricto");
+      }
+    } catch {
+      const labelTextElement = this.page.getByText(label, { exact: false }).first();
+      container = labelTextElement.locator('..');
+    }
+
+    const combobox = container.locator('[role="combobox"]').first();
+    const hiddenSelect = container.locator('select').first();
+
+    // ESTRATEGIA 0: Intentar primero seleccionar por el select HTML subyacente (más robusto)
+    try {
+      const selectCount = await hiddenSelect.count();
+      if (selectCount > 0) {
+        const options = await hiddenSelect.locator('option').all();
+        console.log(`Select encontrado con ${options.length} opciones`);
+        
+        for (const opt of options) {
+          const text = await opt.textContent();
+          if (text && text.toLowerCase().includes(optionTextToClick.toLowerCase())) {
+            const value = await opt.getAttribute('value');
+            if (value) {
+              await hiddenSelect.selectOption(value);
+              console.log(`✓ Opción seleccionada por SELECT HTML: ${optionTextToClick}`);
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.log(`Select HTML strategy falló: ${e.message}`);
+    }
+
+    // ESTRATEGIA 1: Búsqueda visual con rol="option"
+    // Hacer scroll
     await combobox.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(300);
-    
+    await this.page.waitForTimeout(400);
+
     // Hacer clic para abrir
     try {
       await combobox.click({ force: true, timeout: 8000 });
+      console.log(`Combobox clickeado`);
     } catch (e) {
-      console.log(`Clic inicial falló`);  
+      console.log(`Clic falló: ${e.message}`);
       await this.page.waitForTimeout(500);
       await combobox.click({ force: true });
     }
+
+    await this.page.waitForTimeout(1000); // Esperar más tiempo para que se abra el dropdown
+
+    // Buscar el input dentro del combobox O en el popup que se abre
+    let inputLoc = null;
     
-    await this.page.waitForTimeout(400);
-    
-    // Intente escribir en el search input (que puede estar en un portal)
+    // Buscar en el combobox primero
+    try {
+      inputLoc = combobox.locator('input').first();
+      const isVisible = await inputLoc.isVisible({ timeout: 500 });
+      if (isVisible) {
+        console.log(`Input encontrado en combobox`);
+      } else {
+        inputLoc = null;
+      }
+    } catch (e) {
+      console.log(`Input no en combobox`);
+    }
+
+    // Si no está en combobox, buscar en la página
+    if (!inputLoc) {
+      try {
+        const pageInputs = this.page.locator('input[type="text"], input:not([type])');
+        const count = await pageInputs.count();
+        for (let i = 0; i < count; i++) {
+          const inp = pageInputs.nth(i);
+          const isVis = await inp.isVisible({ timeout: 300 }).catch(() => false);
+          if (isVis) {
+            inputLoc = inp;
+            console.log(`Input encontrado en página (index ${i})`);
+            break;
+          }
+        }
+      } catch (e) {
+        console.log(`Búsqueda de inputs en página falló`);
+      }
+    }
+
+    // Escribir en el input
     const query = searchText.includes(',') ? searchText.split(',')[0].trim() : searchText;
     
-    try {
-      let inputLoc = combobox.locator('input').first();
+    if (inputLoc) {
       try {
-        await inputLoc.waitFor({ state: 'visible', timeout: 1000 });
+        await inputLoc.focus();
+        await inputLoc.fill('', { force: true });
+        await inputLoc.fill(query, { delay: 50 });
+        console.log(`Input rellenado con "fillText: ${query}"`);
       } catch (e) {
-        // En lugar de .last(), le pedimos a Playwright que espere a que cualquier input portalled sea visible
-        inputLoc = this.page.locator('[cmdk-input], [role="dialog"] input, .popover input, [role="listbox"] input');
-        // Buscamos cuál de todos es el que realmente está visible actualmente en el DOM tras la apertura
-        let visibleFound = false;
-        for (let i = 0; i < 5; i++) {
-          const count = await inputLoc.count();
-          for (let j = 0; j < count; j++) {
-            if (await inputLoc.nth(j).isVisible()) {
-              inputLoc = inputLoc.nth(j);
-              visibleFound = true;
-              break;
-            }
-          }
-          if (visibleFound) break;
-          await this.page.waitForTimeout(500); // 5 retries of 500ms = 2.5s anidado
+        console.log(`Fill falló: ${e.message}, usando type...`);
+        try {
+          await inputLoc.focus();
+          await this.page.keyboard.type(query, { delay: 100 });
+          console.log(`Input rellenado con keyboard.type: ${query}`);
+        } catch (keyboardError) {
+          console.log(`Keyboard.type también falló: ${keyboardError.message}`);
         }
       }
+    } else {
+      console.log(`Input no encontrado, escribiendo keyboard directo...`);
+      await this.page.keyboard.type(query, { delay: 100 });
+    }
+
+    // Esperar a que el listbox y opciones aparezcan
+    console.log(`Esperando listbox...`);
+    try {
+      await this.page.locator('[role="listbox"]').waitFor({ state: 'visible', timeout: 5000 });
+      console.log(`Listbox visible`);
+    } catch (e) {
+      console.log(`Listbox no apareció tras 5s`);
+    }
+
+    await this.page.waitForTimeout(2000); // Tiempo extra para que las opciones se rendericen
+
+    // Buscar role="option"
+    try {
+      const options = this.page.getByRole('option');
+      const count = await options.count();
+      console.log(`Opciones encontradas: ${count}`);
       
-      try {
-        await inputLoc.waitFor({ state: 'visible', timeout: 1500 });
-        await inputLoc.fill('', { force: true });
-        await inputLoc.fill(query);
-        console.log(`Input portal rellenado: ${query}`);
-      } catch (e) {
-        // Si no se encuentra input visualmente, emitir teclas nativas asumiendo que tiene autofocus
-        console.log(`No se halló input visible tras esperar. Emitiendo teclas al aire...`);
-        await this.page.keyboard.type(query, { delay: 50 });
+      for (let i = 0; i < count; i++) {
+        const opt = options.nth(i);
+        const text = await opt.textContent();
+        if (text && text.toLowerCase().includes(optionTextToClick.toLowerCase())) {
+          await opt.click({ force: true });
+          console.log(`✓ Opción seleccionada por role="option": ${optionTextToClick}`);
+          return;
+        }
       }
+    } catch (e) {
+      console.log(`Búsqueda por role="option" falló: ${e.message}`);
+    }
+
+    // Fallback: Clic en primer elemento visible en listbox
+    try {
+      const listbox = this.page.locator('[role="listbox"]').first();
+      const allChildren = listbox.locator('> div, > li, > [role="option"]');
+      const childCount = await allChildren.count();
+      console.log(`Elementos en listbox: ${childCount}`);
       
-      // Aumentamos a 1500ms para permitir debounce de la API de lista de ciudades
-      await this.page.waitForTimeout(1500);
+      if (childCount > 0) {
+        await allChildren.first().click({ force: true });
+        console.log(`✓ Primer elemento del listbox clickeado`);
+        return;
+      }
     } catch (e) {
-      console.log(`Excepción al escribir. Fallback de teclado nativo...`);
-      await this.page.keyboard.type(query, { delay: 50 });
-      await this.page.waitForTimeout(1500);
+      console.log(`Fallback listbox falló: ${e.message}`);
     }
-    
-    // Buscar y seleccionar la opción exacta
-    try {
-      // Remover anclas '^' para evitar fallos por espacios en blanco o DOM nodes extra
-      const option = this.page.getByRole('option', { name: new RegExp(optionTextToClick, 'i') }).first();
-      await option.waitFor({ state: 'visible', timeout: 6000 });
-      await option.click({ force: true });
-      console.log(`Opción seleccionada: ${optionTextToClick}`);
-      return;
-    } catch (e) {
-      console.log(`No encontrada opción exacta, buscando por primer match`);
-    }
-    
-    // Fallback: clic en la primera opción disponible
-    try {
-      const firstOption = this.page.getByRole('option').first();
-      await firstOption.waitFor({ state: 'visible', timeout: 6000 });
-      await firstOption.click({ force: true });
-      console.log(`Primera opción seleccionada como fallback`);
-    } catch (err) {
-      console.log(`Ninguna opción disponible`);
-      throw new Error(`No se pudo seleccionar opción para: ${label}`);
-    }
+
+    throw new Error(`No se pudo seleccionar opción para: "${label}" buscando "${optionTextToClick}"`);
   }
 
   // Helper para componentes "ToggleGroup" (SÍ/NO)
   async selectToggleOption(label: string, optionText: string) {
     console.log(`Seleccionando toggle [${label}] -> ${optionText}`);
-    
+
     await this.disableAccessibilityWidget();
     await this.page.waitForTimeout(200);
-    
+
     const optionSearch = new RegExp(`^${optionText}$`, 'i');
     let element = null;
-    
+
     // Estrategia 1: Buscar por radiogroup
     try {
       const group = this.page.getByRole('radiogroup', { name: label, exact: false });
@@ -342,7 +474,7 @@ export class FucWizardPage {
     } catch (e) {
       console.log(`Radiogroup no encontrado`);
     }
-    
+
     // Estrategia 2: Buscar por rol 'radio'
     if (!element) {
       try {
@@ -360,7 +492,7 @@ export class FucWizardPage {
         console.log(`Radio search falló`);
       }
     }
-    
+
     // Estrategia 3: Buscar en contenedor cercano
     if (!element) {
       try {
@@ -375,7 +507,7 @@ export class FucWizardPage {
         console.log(`Container search falló`);
       }
     }
-    
+
     // Estrategia 4: Buscar cualquier elemento con el texto de opción
     if (!element) {
       try {
@@ -389,15 +521,15 @@ export class FucWizardPage {
         console.log(`Text search falló`);
       }
     }
-    
+
     if (!element) {
       throw new Error(`No se encontró toggle para: ${label} -> ${optionText}`);
     }
-    
+
     // Hacer clic
     await element.scrollIntoViewIfNeeded();
     await this.page.waitForTimeout(200);
-    
+
     try {
       await element.click({ force: true, timeout: 10000 });
       console.log(`Toggle \"${optionText}\" seleccionado`);
@@ -411,7 +543,7 @@ export class FucWizardPage {
   async clickNext() {
     await this.page.getByRole('button', { name: 'Siguiente' }).click();
     // Pequeño timeout para permitir transición de React Motion o renderizado
-    await this.page.waitForTimeout(500); 
+    await this.page.waitForTimeout(500);
   }
 
   // --- Step 1: Identificación ---
@@ -419,9 +551,9 @@ export class FucWizardPage {
     console.log('Llenando Paso 1: Identificación...');
     await this.fillInputByLabel('Primer nombre', data.nombre1);
     await this.fillInputByLabel('Primer apellido', data.apellido1);
-    
+
     await this.fillInputByLabel('Fecha de nacimiento', data.fechanacimiento);
-    
+
     console.log(`Buscando lugar de nacimiento: ${data.munnacimiento}`);
     await this.searchAndSelectDropdownOption('Lugar de nacimiento', data.munnacimiento, data.munnacimiento);
 
@@ -437,7 +569,7 @@ export class FucWizardPage {
     await this.selectDropdownOptionByLabel('¿Cuál es su género?', data.generoText);
 
     const toggleLabel = data.isLgbtiqPlus ? 'SÍ' : 'NO';
-    await this.selectToggleOption('¿Usted se reconoce como parte de la población LGBTIQ+?', toggleLabel); 
+    await this.selectToggleOption('¿Usted se reconoce como parte de la población LGBTIQ+?', toggleLabel);
 
     console.log('Paso 1 completo. Click en Siguiente...');
     await this.clickNext();
@@ -447,7 +579,7 @@ export class FucWizardPage {
   async fillLocationStep(data: any) {
     console.log('Llenando Paso 2: Ubicación...');
     await this.searchAndSelectDropdownOption('Ciudad de residencia', data.location, data.location);
-    
+
     // Zona de residencia (urbana/rural) - asume Select
     if (data.areaResidence === 'urbana') {
       await this.selectDropdownOptionByLabel('Zona de residencia', 'Urbana');
@@ -470,7 +602,7 @@ export class FucWizardPage {
 
     // Etnia
     await this.selectDropdownOptionByLabel('De acuerdo con su cultura, pueblo o rasgos físicos, usted es o se reconoce como...', data.ethnicGroup);
-    
+
     // Discapacidad
     await this.selectToggleOption('¿Presenta alguna discapacidad?', data.hasDisability ? 'SÍ' : 'NO');
 
@@ -496,8 +628,8 @@ export class FucWizardPage {
     const rlcpdLabel = data.hasRlcpd === 'SÍ' ? 'SÍ' : 'NO';
     await this.selectToggleOption('¿Está inscrito en el Registro de la localización y caracterización de personas con discapacidad del Ministerio de Salud?', rlcpdLabel);
 
-    // Usar una parte única de la pregunta para evitar fallos por prefijos largos
-    await this.selectDropdownOptionByLabel('regímenes de seguridad social en salud está afiliado/a', data.socialSecurity);
+    // Usar el label EXACTO del componente frontend StepHealth.tsx
+    await this.selectDropdownOptionByLabel('¿A cúal de los siguientes regímenes de seguridad social en salud está afiliado/a?', data.socialSecurity);
 
     console.log('Paso 4 completo. Click en Siguiente...');
     await this.clickNext();
@@ -506,7 +638,7 @@ export class FucWizardPage {
   // --- Step 5: Educación ---
   async fillEducationStep(data: any) {
     console.log('Llenando Paso 5: Educación...');
-    await this.selectDropdownOptionByLabel('máximo nivel educativo alcanzado por usted', data.maxEducationLevel);
+    await this.selectDropdownOptionByLabel('¿Cúal es el máximo nivel educativo alcanzado por usted hasta el momento?', data.maxEducationLevel);
     console.log('Paso 5 completo. Click en Siguiente...');
     await this.clickNext();
   }

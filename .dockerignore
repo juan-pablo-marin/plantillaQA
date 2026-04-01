@@ -1,15 +1,20 @@
 # Contexto Docker (raíz del repo) — usado por qa/docker/Dockerfile.rav-backend (COPY BACKEND_DIR)
 # Evitar patrones demasiado amplios: antes Dockerfile* y *.json excluían rutas del backend Go.
 
-# Node.js
+# Node.js / frontend (cachés que a veces existen en el workspace Jenkins)
 **/node_modules/
 **/npm-debug.log
 **/yarn-error.log
 **/.pnpm-store/
+**/.pnpm/
 **/.next/
 **/out/
 **/build/
 **/dist/
+**/.turbo/
+**/.cache/
+**/coverage/
+**/.eslintcache
 
 # Python
 __pycache__/
@@ -27,24 +32,62 @@ __pycache__/
 **/.git/
 **/.gitignore
 
-# QA & Build Artifacts
-qa/reports/
+# QA & Build Artifacts (explícito: miles de JSON/HTML de Allure ralentizan el contexto)
+qa/reports
+qa/reports/**
 qa/src_backend/
 qa/src_frontend/
 *coverage.out
 qa/reports/**/*.xml
 qa/reports/**/*.json
 
+# Workspace Jenkins / artefactos locales (muchos archivos pequeños → contexto lento)
+qa_reports_ws/
+**/qa_reports_ws/
+
+# Playwright / E2E (pesados, innecesarios para la imagen qa-runner)
+**/playwright-report/
+**/test-results/
+**/blob-report/
+**/.playwright/
+**/playwright/.cache/
+
+# Allure / multimedia
+**/allure-results/
+**/allure-report/
+**/allure-reports/
+**/*.mp4
+**/*.webm
+
+# Herramientas / IDE (no deben entrar al contexto)
+.cursor/
+**/.cursor/
+**/*.tsbuildinfo
+Thumbs.db
+desktop.ini
+
+# Git (además de **/.git/: metadatos sueltos)
+**/.gitattributes
+**/.gitmodules
+
 # IDE
 .vscode/
 .idea/
+.project
+.settings/
+.classpath
+
+# OS junk
+Thumbs.db
+desktop.ini
+.DS_Store
 
 # Environment Variables
 .env
 .env.*
 !.env.example
 
-# SonarQube local cache (154 MB innecesarios)
+# SonarQube local cache
 .sonar/
 .scannerwork/
 
@@ -57,6 +100,28 @@ qa/reports/**/allure-reports/
 build.log
 *.log
 
-# Módulo Go siempre incluido (por si algún patrón anterior afecta)
-!**/go.mod
-!**/go.sum
+# Archivos de CI/documentación en la raíz
+docker-compose*.yml
+Dockerfile.jenkins
+Jenkinsfile
+updatejob.groovy
+update-jenkins.js
+*.groovy
+tener en cuenta.txt
+README.md
+README*.md
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# Node / pnpm / Playwright
+node_modules/
+**/node_modules/
+.pnpm-store/
+.playwright/
+ms-playwright/
+playwright-report/
+test-results/

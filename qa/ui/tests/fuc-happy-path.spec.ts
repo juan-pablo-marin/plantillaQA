@@ -67,7 +67,7 @@ test.describe('FUC Wizard - Happy Path Completo', () => {
     await wizardPage.fillHealthStep({
       hasRlcpd: 'NO',
       socialSecurity: 'Contributivo',
-    });
+    }); // ✅ "Contributivo" es la opción correcta (label debe coincidir exactamente con REGIMEN_HEALTH_OPTIONS)
 
     // --- STEP 5: EDUCACIÓN ---
     await wizardPage.fillEducationStep({

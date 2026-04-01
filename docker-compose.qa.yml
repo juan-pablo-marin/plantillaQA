@@ -215,6 +215,7 @@ services:
       # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-20m}
+      - SONAR_SCANNER_OPTS=-Dsonar.plugins.downloadOnlyRequired=true -Xmx2048m
     shm_size: '2gb'
     volumes:
       - ./qa/reports:/qa/reports

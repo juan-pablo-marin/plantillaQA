@@ -331,7 +331,7 @@ else
             if [ -f "$SRC_BACKEND/coverage.out" ]; then
                 echo "  Copiando y corrigiendo rutas en coverage.out (ReadOnly fix)..."
                 cp "$SRC_BACKEND/coverage.out" "$REPORTS_DIR/coverage-backend.out"
-                GO_MODULE=$(head -1 "$SRC_BACKEND/go.mod" 2>/dev/null | awk '{print $2}' || echo "")
+                GO_MODULE=$(head -1 "$SRC_BACKEND/go.mod" 2>/dev/null | tr -d '\r' | awk '{print $2}' || echo "")
                 if [ -n "$GO_MODULE" ]; then
                     sed -i "s|${GO_MODULE}/|backendrav/|g" "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
                 fi
@@ -357,6 +357,7 @@ else
             fi
 
             echo "  Iniciando sonar-scanner (timeout: $SONAR_SCAN_TIMEOUT)..."
+            export SONAR_SCANNER_OPTS="${SONAR_SCANNER_OPTS:--Dsonar.plugins.downloadOnlyRequired=true -Xmx2048m}"
             timeout "$SONAR_SCAN_TIMEOUT" sonar-scanner \
                 -Dsonar.projectBaseDir=/src \
                 -Dsonar.projectKey="${PROJECT_KEY:-qa-project}" \
@@ -367,8 +368,9 @@ else
                 -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
                 -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
                 -Dsonar.scm.disabled=true \
-                -Dsonar.javascript.node.maxspace=4096 \
-                -Dsonar.javascript.node.bridge.timeout=2400 \
+                -Dsonar.plugins.downloadOnlyRequired=true \
+                -Dsonar.javascript.node.maxspace=8192 \
+                -Dsonar.javascript.node.bridge.timeout=3600 \
                 $SONAR_ARGS \
                 || echo "  WARN: Fallo o timeout el escaneo de Sonar."
     else

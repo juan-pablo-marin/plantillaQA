@@ -47,3 +47,7 @@ sonar.javascript.lcov.reportPaths=frontend/coverage/lcov.info
 sonar.sourceEncoding=UTF-8
 sonar.qualitygate.wait=true
 sonar.scm.disabled=true
+# Menos descargas en el scanner; más memoria para el bridge Node (TS/JS)
+sonar.plugins.downloadOnlyRequired=true
+sonar.javascript.node.maxspace=8192
+sonar.javascript.node.bridge.timeout=3600

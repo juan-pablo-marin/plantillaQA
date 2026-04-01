@@ -42,6 +42,9 @@ pipeline {
                     echo "PREPARANDO ENTORNO Y DEPENDENCIAS"
                     echo "════════════════════════════════════════"
                     sh '''
+                        export DOCKER_BUILDKIT=1
+                        export COMPOSE_DOCKER_CLI_BUILD=1
+
                         # Leer PROJECT_NAME del config actual (fuente unica de verdad)
                         PROJECT_NAME=$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\r')
                         echo "=> PROJECT_NAME: $PROJECT_NAME"
@@ -70,15 +73,16 @@ pipeline {
 
                         echo "=> Levantando Newman Report Viewer (http://localhost:8181)..."
                         docker rm -f ${PROJECT_NAME}-newman-viewer 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --build --force-recreate newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
+                        # Sin --force-recreate: el contenedor ya se eliminó; evita recreaciones innecesarias
+                        ${COMPOSE_CMD} up -d --build newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
 
                         echo "=> Levantando Playwright Report Viewer (http://localhost:8182)..."
                         docker rm -f ${PROJECT_NAME}-playwright-viewer 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --build --force-recreate playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
+                        ${COMPOSE_CMD} up -d --build playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
 
                         echo "=> Levantando Grafana (provisioning + dashboards montados desde el repo)..."
                         docker rm -f ${PROJECT_NAME}-grafana 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --force-recreate grafana || echo "  WARN: Grafana falló al iniciar (no detiene pruebas)"
+                        ${COMPOSE_CMD} up -d grafana || echo "  WARN: Grafana falló al iniciar (no detiene pruebas)"
                         sleep 5
 
                         echo "=> Levantando servicios transientes de la aplicación..."
@@ -88,10 +92,11 @@ pipeline {
                         echo "=> Configurando Grafana home dashboard..."
                         for i in $(seq 1 20); do
                             if docker exec ${PROJECT_NAME}-influxdb curl -sf http://grafana:3000/api/health 2>/dev/null | grep -q 'database.*ok'; then
+                                sleep 5 # Dar tiempo a que Grafana cargue los dashboards del provisioning
                                 docker exec ${PROJECT_NAME}-influxdb curl -sf -X PUT \
                                     -u admin:admin \
-                                    -H 'Content-Type: application/json' \
-                                    -d '{"homeDashboardUID":"k6-perf"}' \
+                                    -H "Content-Type: application/json" \
+                                    -d "{\\"homeDashboardUID\\":\\"k6-perf\\"}" \
                                     http://grafana:3000/api/org/preferences > /dev/null 2>&1 && \
                                     echo "  Home dashboard configurado: k6-perf" || \
                                     echo "  WARN: No se pudo configurar el home dashboard"
@@ -198,8 +203,8 @@ pipeline {
                                 -e RUN_SONAR=false \\
                                 -e RUN_PLAYWRIGHT=false \\
                                 -e RUN_K6=true \\
-                                -e K6_INFLUXDB_PUSH_INTERVAL=5s \\
-                                -e K6_INFLUXDB_CONCURRENT_WRITES=4 \\
+                                -e K6_INFLUXDB_PUSH_INTERVAL=10s \\
+                                -e K6_INFLUXDB_CONCURRENT_WRITES=2 \\
                                 -e BUILD_NUMBER=${env.BUILD_NUMBER} \\
                                 qa-runner || true
                             """
@@ -472,7 +477,9 @@ HTML_EOF
                             archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/coverage-backend.*", allowEmptyArchive: true
                             publishCoverage adapters: [
                                 coberturaReportAdapter(path: "${env.RELATIVE_REPORTS_DIR}/coverage-backend.xml")
-                            ], sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
+                            ],
+                            sourceDirectories: [[path: "${env.IS_FUC == 'true' ? 'BACKEND' : 'BACKENDRAV'}"]],
+                            sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
                         }
                     }
 

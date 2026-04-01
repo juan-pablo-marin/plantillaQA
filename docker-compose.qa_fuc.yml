@@ -52,6 +52,10 @@ volumes:
     name: ${PROJECT_NAME}-grafana-data
   jenkins_qa_data:
     name: ${PROJECT_NAME}-jenkins-qa-data
+  playwright_cache:
+    name: ${PROJECT_NAME}-playwright-cache
+  pnpm_cache:
+    name: ${PROJECT_NAME}-pnpm-cache
 
 services:
 
@@ -192,8 +196,8 @@ services:
         condition: service_healthy
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-qa}
-      - BACKEND_URL=http://backend:8080
-      - FRONTEND_URL=http://frontend:3000
+      - BACKEND_URL=${BACKEND_URL:-http://backend:8080}
+      - FRONTEND_URL=${FRONTEND_URL:-http://frontend:3000}
       - SONAR_HOST_URL=http://sonarqube:9000
       - SONAR_TOKEN=${SONAR_TOKEN:-}
       - PROJECT_KEY=${PROJECT_KEY:-qa-project}
@@ -205,10 +209,14 @@ services:
       # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-20m}
+      # JVM del scanner: solo plugins necesarios + heap (sobrescribible en .env.qa_fuc)
+      - SONAR_SCANNER_OPTS=-Dsonar.plugins.downloadOnlyRequired=true -Xmx2048m
     shm_size: '2gb'
     volumes:
       - ./qa/reports:/qa/reports
       - sonar_scanner_cache:/root/.sonar/cache
+      - playwright_cache:/ms-playwright
+      - pnpm_cache:/pnpm-cache
     command: [ "bash", "run-tests_fuc.sh" ]
     networks:
       - qa-network
@@ -264,7 +272,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./qa/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./qa/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./qa/grafana/dashboards:/etc/grafana/dashboards:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health 2>/dev/null | grep -q 'database.*ok'"]
       interval: 20s
@@ -294,6 +302,8 @@ services:
     volumes:
       - ./qa/reports:/qa/reports
       - ./qa/performance:/qa/performance:ro
+      - playwright_cache:/ms-playwright
+      - pnpm_cache:/pnpm-cache
     command: [ "bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests_fuc.js -e BACKEND_URL=$$BACKEND_URL --out influxdb=http://influxdb:8086/k6 --summary-export /qa/reports/k6/summary.json" ]
     networks:
       - qa-network

@@ -155,3 +155,32 @@ docker compose --env-file .env.qa -f docker-compose.qa.yml build qa-runner
 subir todo FUC
 docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile test-e2e --profile all --profile perf --profile jenkins --profile sonar up -d
 
+
+
+1. Bajar todos los servicios FUC y limpiar basura (Contenedores y Redes)
+Este comando bajará absolutamente todo lo relacionado con FUC y limpiará redes huérfanas:
+
+
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml -f docker-compose.jenkins.yml --profile all down --remove-orphans
+
+2. (Opcional pero Recomendado) Limpiar volúmenes transitorios
+A veces la base de datos de MongoDB de QA o los reportes anteriores quedan con data vieja. Si no te importa borrar el historial local de métricas de la DB de SonarQube y las pruebas, puedes forzar el borrado de volúmenes agregando -v al comando anterior:
+
+bash
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml -f docker-compose.jenkins.yml --profile all down -v --remove-orphans
+3. Crear limpiar/recontruir caché de las imágenes Docker (Importante para tu fix de 6 minutos)
+Como acabamos de cambiar el .dockerignore para ahorrar 462MB, forzaremos a Docker a construir el contenedor QA runner desde cero con el nuevo contexto optimizado:
+
+bash
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml -f docker-compose.jenkins.yml build --no-cache qa-runner
+4. Volver a levantar el entorno base para la Pipeline de FUC
+Esto dejará listos a SonarQube, InfluxDB, Grafana, Jenkins, y las DBs (lo mínimo que necesita el Jenkinsfile antes de lanzar las pruebas):
+
+bash
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml -f docker-compose.jenkins.yml --profile sonar up -d
+
+--- Qué ignorar (Docker / Sonar / Jenkins) — referencia rápida para el equipo ---
+
+El archivo .dockerignore (raíz del repo) define qué NO entra al contexto de build de imágenes (qa-runner, viewers, etc.): así se acorta el tiempo de “transferring context” en Jenkins y en Docker Desktop. Incluye entre otras cosas qa_reports_ws/, qa/reports/, **/node_modules/, **/.next/, dist/build/coverage, reportes de Playwright (playwright-report, test-results, blob-report, .playwright), Allure, .git, .sonar, .scannerwork, .cursor, *.tsbuildinfo y medios pesados (*.mp4, *.webm). No copies al workspace de Jenkins carpetas de artefactos locales que ya estén listadas ahí.
+
+En Git sigue mandando el .gitignore del repo (node_modules, .env reales, reportes bajo qa/reports, etc.); SonarQube ya excluye en propiedades/scripts vendor, node_modules, .next, coverage generada, tests como fuentes duplicadas, etc. Jenkins publica cobertura Go usando rutas bajo BACKEND/ (FUC) o BACKENDRAV/ (RAV) según el job; el XML Cobertura se normaliza en run-tests_fuc.sh para que coincida con esas carpetas en el workspace.
