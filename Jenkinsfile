@@ -71,18 +71,17 @@ pipeline {
                         }
 
 
-                        echo "=> Levantando Newman Report Viewer (http://localhost:8181)..."
-                        docker rm -f ${PROJECT_NAME}-newman-viewer 2>/dev/null || true
-                        # Sin --force-recreate: el contenedor ya se eliminó; evita recreaciones innecesarias
-                        ${COMPOSE_CMD} up -d --build newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
+                        echo "=> Levantando Report Viewers (preserva reportes entre builds)..."
+                        # Docker Compose solo recrea si la configuración cambió.
+                        # El contenido inyectado por docker cp persiste en la capa
+                        # de escritura del contenedor mientras no se recree.
+                        ${COMPOSE_CMD} up -d newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
+                        ${COMPOSE_CMD} up -d playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
 
-                        echo "=> Levantando Playwright Report Viewer (http://localhost:8182)..."
-                        docker rm -f ${PROJECT_NAME}-playwright-viewer 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --build playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
-
-                        echo "=> Levantando Grafana (provisioning + dashboards montados desde el repo)..."
-                        docker rm -f ${PROJECT_NAME}-grafana 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d grafana || echo "  WARN: Grafana falló al iniciar (no detiene pruebas)"
+                        echo "=> Levantando Grafana (provisioning embebido en imagen)..."
+                        # No destruir: preserva preferencias y permite consultar datos históricos.
+                        # --build reconstruye la imagen si Dockerfile.grafana o provisioning cambiaron.
+                        ${COMPOSE_CMD} up -d --build grafana || echo "  WARN: Grafana falló al iniciar (no detiene pruebas)"
                         sleep 5
 
                         echo "=> Levantando servicios transientes de la aplicación..."
@@ -135,6 +134,19 @@ pipeline {
                             echo 'Newman: copiando reportes al workspace'
                             sh "docker cp qa-runner-newman:${QA_REPORTS_DIR}/newman ${JENKINS_REPORTS_DIR}/ || true"
                             sh "docker rm -f qa-runner-newman || true"
+
+                            // ── Sincronizar reportes al viewer (DinD: bind mounts no funcionan) ──
+                            def newmanViewer = sh(script: "grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r'", returnStdout: true).trim() + '-newman-viewer'
+                            echo "Newman: sincronizando reportes al viewer (${newmanViewer})..."
+                            sh """
+                                if docker ps -q -f name=${newmanViewer} | grep -q .; then
+                                    docker exec ${newmanViewer} sh -c 'rm -rf /usr/share/nginx/html/*' || true
+                                    docker cp ${JENKINS_REPORTS_DIR}/newman/. ${newmanViewer}:/usr/share/nginx/html/ || true
+                                    echo '  Newman viewer actualizado'
+                                else
+                                    echo '  WARN: Newman viewer no esta corriendo'
+                                fi
+                            """
                         }
                     }
                 }
@@ -187,6 +199,19 @@ pipeline {
                             sh "docker cp qa-runner-e2e:/qa/reports/playwright-results/. ${JENKINS_REPORTS_DIR}/playwright-results/ || true"
                             sh "docker cp qa-runner-e2e:${QA_REPORTS_DIR}/playwright-results/. ${JENKINS_REPORTS_DIR}/playwright-results/ || true"
                             sh "docker rm -f qa-runner-e2e || true"
+
+                            // ── Sincronizar reportes al viewer (DinD: bind mounts no funcionan) ──
+                            def playwrightViewer = sh(script: "grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r'", returnStdout: true).trim() + '-playwright-viewer'
+                            echo "Playwright: sincronizando reportes al viewer (${playwrightViewer})..."
+                            sh """
+                                if docker ps -q -f name=${playwrightViewer} | grep -q .; then
+                                    docker exec ${playwrightViewer} sh -c 'rm -rf /usr/share/nginx/html/*' || true
+                                    docker cp ${JENKINS_REPORTS_DIR}/playwright-html/. ${playwrightViewer}:/usr/share/nginx/html/ || true
+                                    echo '  Playwright viewer actualizado'
+                                else
+                                    echo '  WARN: Playwright viewer no esta corriendo'
+                                fi
+                            """
                         }
                     }
                 }

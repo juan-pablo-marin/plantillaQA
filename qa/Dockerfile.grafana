@@ -1,0 +1,19 @@
+# ═══════════════════════════════════════════════════════════════
+#  Grafana con provisioning embebido (fix DinD bind mounts)
+#
+#  En Docker-in-Docker (Jenkins), los bind mounts con rutas
+#  relativas (./qa/grafana/...) se resuelven a /app/... que no
+#  existe en el host. Al empaquetar provisioning y dashboards
+#  directamente en la imagen, Grafana siempre arranca con la
+#  configuración correcta sin depender de bind mounts.
+# ═══════════════════════════════════════════════════════════════
+FROM grafana/grafana:latest
+
+# Datasource: InfluxDB apuntando a la DB k6
+COPY ./qa/grafana/provisioning/datasources/ /etc/grafana/provisioning/datasources/
+
+# Dashboard provider: carga automática desde /etc/grafana/dashboards
+COPY ./qa/grafana/provisioning/dashboards/ /etc/grafana/provisioning/dashboards/
+
+# Dashboard JSON: k6 Load Testing
+COPY ./qa/grafana/dashboards/ /etc/grafana/dashboards/

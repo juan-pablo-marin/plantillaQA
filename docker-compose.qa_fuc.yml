@@ -253,8 +253,11 @@ services:
       - qa-network
 
   # --- Grafana (dashboard de métricas k6) ---
+  # Provisioning embebido vía Dockerfile (fix DinD bind mounts)
   grafana:
-    image: grafana/grafana:latest
+    build:
+      context: .
+      dockerfile: ./qa/Dockerfile.grafana
     container_name: ${PROJECT_NAME}-grafana
     profiles: [ "perf", "jenkins", "all", "test-e2e" ]
     restart: unless-stopped
@@ -271,8 +274,6 @@ services:
       - "3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./qa/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./qa/grafana/dashboards:/etc/grafana/dashboards:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health 2>/dev/null | grep -q 'database.*ok'"]
       interval: 20s
@@ -353,6 +354,8 @@ services:
       - qa-network
 
   # --- Newman Report Viewer (Standalone — persiste entre builds) ---
+  # NOTA: Sin bind mount — en DinD las rutas relativas se resuelven a /app/...
+  # que no existe en el host. Jenkins inyecta reportes vía 'docker cp'.
   newman-viewer:
     build:
       context: .
@@ -362,12 +365,12 @@ services:
     restart: unless-stopped
     ports:
       - "8181:80"
-    volumes:
-      - ./qa/reports/fuc/newman:/usr/share/nginx/html:ro
     networks:
       - qa-network
 
   # --- Playwright Report Viewer (Standalone — persiste entre builds) ---
+  # NOTA: Sin bind mount — en DinD las rutas relativas se resuelven a /app/...
+  # que no existe en el host. Jenkins inyecta reportes vía 'docker cp'.
   playwright-viewer:
     build:
       context: .
@@ -377,8 +380,6 @@ services:
     restart: unless-stopped
     ports:
       - "8182:80"
-    volumes:
-      - ./qa/reports/fuc/playwright-html:/usr/share/nginx/html:ro
     networks:
       - qa-network
 
