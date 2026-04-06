@@ -1,40 +1,434 @@
 {
   "info": {
-    "name": "RAV API — Smoke QA",
-    "_postman_id": "rav-api-smoke-v1",
-    "description": "Smoke mínimo para RAV (victims_backend). Amplía con rutas reales bajo /api/v1.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "name": "Victims Backend API",
+    "description": "Exportado desde Insomnia (YAML). Variables de entorno Newman: baseUrl (p. ej. http://backend:8082), token (JWT). Rutas bajo /api/v1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "rav-victims-backend-insomnia"
   },
   "item": [
     {
-      "name": "01 — Servidor HTTP (Gin)",
+      "name": "00 — Smoke",
       "item": [
         {
-          "name": "GET / — raíz (esperado 404 sin ruta /)",
+          "name": "GET / — servidor activo",
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/",
-              "host": ["{{baseUrl}}"],
-              "path": [""]
-            }
+            "url": "{{baseUrl}}/"
           },
           "event": [
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "pm.test('Servidor responde (404 esperado en raíz)', function () {",
+                  "pm.test('Servidor responde (404 o 200 en raíz)', function () {",
                   "    pm.expect(pm.response.code).to.be.oneOf([404, 200]);",
                   "});"
-                ],
-                "type": "text/javascript"
+                ]
               }
             }
           ]
         }
       ]
+    },
+    {
+      "name": "Victims",
+      "item": [
+        {
+          "name": "Search Victim by Document",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/victims/39178315?document_type=CC",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Victim",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/victims",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"person_id\": \"123456\",\n  \"document\": \"1234567890\",\n  \"origin\": \"RUV\",\n  \"source\": \"SIPOD\",\n  \"program\": \"Atencion\",\n  \"household_id\": \"HH-001\",\n  \"document_type\": \"CC\",\n  \"first_name\": \"Juan\",\n  \"middle_name\": \"Carlos\",\n  \"first_surname\": \"Perez\",\n  \"second_surname\": \"Garcia\",\n  \"birth_date\": \"15/01/1990\",\n  \"document_issuance\": \"Bogota\",\n  \"document_issuance_date\": \"20/03/2010\",\n  \"ethnic_group\": \"NINGUNO\",\n  \"gender\": \"MASCULINO\",\n  \"incident_type\": \"Desplazamiento\",\n  \"incident\": \"Desplazamiento forzado\",\n  \"occurrence_date\": \"10/06/2015\",\n  \"occurrence_municipality_code\": \"05001\",\n  \"occurrence_zone\": \"URBANA\",\n  \"occurrence_location\": \"Centro\",\n  \"presumed_actor\": \"Desconocido\",\n  \"presumed_victimizer\": \"Grupo armado\",\n  \"report_date\": \"01/07/2015\",\n  \"population_type\": \"DESPLAZADO\",\n  \"victim_type\": \"INDIVIDUAL\",\n  \"country\": \"COLOMBIA\",\n  \"city\": \"MEDELLIN\",\n  \"residence_municipality_code\": \"05001\",\n  \"residence_zone\": \"URBANA\",\n  \"residence_location\": \"Barrio Centro\",\n  \"address\": \"Calle 10 # 20-30\",\n  \"landline_phone\": \"6041234567\",\n  \"mobile_phone\": \"3001234567\",\n  \"email\": \"juan.perez@ejemplo.com\",\n  \"assessment_date\": \"01/08/2015\",\n  \"victim_status\": \"INCLUIDO\",\n  \"full_name\": \"JUAN CARLOS PEREZ GARCIA\",\n  \"claim_id\": \"CLM-001\",\n  \"supervisor_id\": \"SUP-001\",\n  \"displacement_type\": \"INDIVIDUAL\",\n  \"registry\": \"RUV-2015-001\",\n  \"document_validity\": \"VIGENTE\",\n  \"person_ref\": \"REF-001\",\n  \"relationship\": \"TITULAR\",\n  \"declaration_code\": \"DEC-2015-001\",\n  \"arrival_code\": \"ARR-2015-001\",\n  \"incident_code\": \"INC-2015-001\",\n  \"disability\": \"NINGUNA\",\n  \"disability_description\": null,\n  \"fud_sheet\": \"FUD-001\",\n  \"afflictions\": \"Desplazamiento forzado\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Dashboard - Cities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/dashboard/cities?department=&page=1&pageSize=10",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Dashboard - Age Group",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/dashboard/age-group?department=&gender=",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Dashboard - Ethnic Group",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/dashboard/ethnic-group?department=&page=1&pageSize=10",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Departments",
+      "item": [
+        {
+          "name": "Get Victim Count by Department",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/department/ANTIOQUIA",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Departments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/departments",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tickets",
+      "item": [
+        {
+          "name": "Get Attended Tickets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ticket/attended?page=1&pageSize=10",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Tickets (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ticket/all?page=1&pageSize=10",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Tickets by Document",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/ticket/1234567890?page=1&pageSize=10",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/ticket",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket_id\": 1,\n  \"title\": \"Atencion inicial\",\n  \"content\": \"Se realizo atencion inicial al usuario con orientacion sobre rutas de atencion\",\n  \"keywords\": \"atencion,inicial,orientacion,victima\",\n  \"document_number\": \"1234567890\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Care Lines",
+      "item": [
+        {
+          "name": "Get SENA Care Lines",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/lines/sena/ANTIOQUIA?page=1&pageSize=10",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get APE Care Lines",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/lines/ape/ANTIOQUIA?page=1&pageSize=10",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Goals",
+      "item": [
+        {
+          "name": "Create Goal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/goal",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"goal_title\": \"Meta mensual de atencion\",\n  \"limit\": 100,\n  \"start_date\": \"2026-03-01\",\n  \"end_date\": \"2026-03-31\",\n  \"user_id\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Goal by User ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/goal/1",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "File Upload",
+      "item": [
+        {
+          "name": "Upload File Chunk",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/upload",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "disabled": true,
+                  "description": "Deshabilitado en CI/Newman; subir archivo manualmente en Postman/Insomnia."
+                },
+                {
+                  "key": "sizeMainFile",
+                  "type": "text",
+                  "value": "5341866043"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete File",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/delete/example_file.txt",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://backend:8082"
+    },
+    {
+      "key": "token",
+      "value": ""
     }
   ]
 }

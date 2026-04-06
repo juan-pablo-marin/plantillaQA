@@ -4,17 +4,19 @@
   "private": true,
   "description": "Suite QA - Template",
   "scripts": {
-    "test:api": "newman run api/collections/api.postman_collection.json --environment api/collections/env-qa.json",
+    "gen:jwt": "python3 scripts/generate-qa-jwt.py",
+    "test:api": "newman run api/collections/api.postman_collection.json --environment api/collections/env-qa.json --env-var baseUrl=http://127.0.0.1:8082",
     "test:ui": "npx playwright test",
     "test:ui:headed": "npx playwright test --headed",
-    "test:perf": "k6 run performance/k6-tests.js",
-    "report:newman": "npx --yes serve reports/newman -l 8181"
+    "test:perf": "k6 run performance/k6-tests.js -e BACKEND_URL=http://127.0.0.1:8082 -e K6_DIR=reports/rav/k6",
+    "report:newman": "npx --yes serve reports/rav/newman -l 8181"
   },
   "dependencies": {
     "@playwright/test": "^1.48.0",
     "allure-playwright": "^3.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "js-yaml": "^4.1.1"
   }
 }

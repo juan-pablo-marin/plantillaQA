@@ -42,7 +42,7 @@ plantillaQA/
 │   ├── Dockerfile.qa            # Imagen Docker del QA Runner
 │   └── run-tests.sh             # Script orquestador
 │
-├── docker-compose.yml           # Desarrollo básico
+├── docker-compose.yml           # Desarrollo FUC (Mongo) — perfil fuc-dev obligatorio
 ├── docker-compose.qa.yml          # QA RAV (Postgres + victims_backend + frontend-rav) 
 ├── docker-compose.qa_fuc.yml      # QA plantilla FUC (Mongo + BACKEND/FRONTEND)
 ├── docker-compose.jenkins.yml   # Override para Jenkins DinD
@@ -89,7 +89,7 @@ Edita los archivos `.env.*` y configura:
 ### 2. Levantar en Desarrollo
 
 ```bash
-docker compose --env-file .env.dev up -d --build
+docker compose --profile fuc-dev --env-file .env.dev up -d --build
 ```
 
 | Servicio  | URL                          |
@@ -176,7 +176,7 @@ Después de ejecutar QA, los reportes están en `qa/reports/` y en Allure UI en 
 
 ```bash
 # Desarrollo
-docker compose --env-file .env.dev up -d --build
+docker compose --profile fuc-dev --env-file .env.dev up -d --build
 
 # QA
 docker compose --env-file .env.qa -f docker-compose.qa.yml up --build --abort-on-container-exit
@@ -314,7 +314,7 @@ Los reportes se guardan como artifacts de GitHub Actions por 30 días.
 
 ```bash
 # Levantar desarrollo
-docker compose --env-file .env.dev up -d --build
+docker compose --profile fuc-dev --env-file .env.dev up -d --build
 
 # Ejecutar QA completo
 docker compose --env-file .env.qa -f docker-compose.qa.yml up --build --abort-on-container-exit

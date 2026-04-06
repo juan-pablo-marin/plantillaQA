@@ -1,5 +1,8 @@
 # Contexto Docker (raíz del repo) — usado por qa/docker/Dockerfile.rav-backend (COPY BACKEND_DIR)
-# Evitar patrones demasiado amplios: antes Dockerfile* y *.json excluían rutas del backend Go.
+# y por Dockerfile.qa / bake del qa-runner.
+#
+# IMPORTANTE: no usar **/out/ — elimina BACKENDRAV/internal/usecases/ports/out/ (Go) y rompe go build.
+# Tras cambiar este archivo en Jenkins: docker compose build --no-cache backend (proyecto qa-pipeline).
 
 # Node.js / frontend (cachés que a veces existen en el workspace Jenkins)
 **/node_modules/
@@ -8,7 +11,9 @@
 **/.pnpm-store/
 **/.pnpm/
 **/.next/
-**/out/
+# NO usar **/out/: excluiría BACKENDRAV/.../ports/out/ (Go) y rompe go build en Dockerfile.rav-backend
+FRONTENDRAV/out/
+BACKENDRAV/out/
 **/build/
 **/dist/
 **/.turbo/

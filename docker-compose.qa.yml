@@ -78,6 +78,8 @@ services:
       args:
         BACKEND_DIR: ${BACKEND_DIR:-BACKENDRAV}
     container_name: ${PROJECT_NAME}-api-qa
+    labels:
+      com.victimasrav.stack: rav-postgres
     restart: unless-stopped
     depends_on:
       db:
@@ -105,8 +107,8 @@ services:
         ]
       interval: 15s
       timeout: 10s
-      retries: 8
-      start_period: 60s
+      retries: 12
+      start_period: 90s
     networks:
       - qa-network
 
@@ -201,12 +203,22 @@ services:
         condition: service_healthy
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-qa}
+      # Misma raíz que Jenkins (QA_REPORTS_DIR) para Newman, k6, Allure y artefactos
+      - REPORTS_DIR=${REPORTS_DIR:-/qa/reports/rav}
       - BACKEND_URL=http://backend:${BACKEND_INTERNAL_PORT:-8082}
       - FRONTEND_URL=http://frontend:3000
       - SONAR_HOST_URL=http://sonarqube:9000
       - SONAR_TOKEN=${SONAR_TOKEN:-}
       - PROJECT_KEY=${PROJECT_KEY:-rav-qa}
       - JWT_SECRET=${JWT_SECRET:-cambiar-en-env-qa-minimo-64-caracteres-recomendado-para-rav}
+      # Claims del JWT de Newman (deben coincidir con JWTMiddleware: user_id numérico)
+      - TEST_USER_ID=${TEST_USER_ID:-1}
+      - TEST_JWT_EMAIL=${TEST_JWT_EMAIL:-qa@victimasrav.local}
+      - TEST_JWT_ROLE=${TEST_JWT_ROLE:-funcionario}
+      - TEST_JWT_TTL_SECONDS=${TEST_JWT_TTL_SECONDS:-86400}
+      # RAV — Newman (colección explícita; sobrescribible con NEWMAN_COLLECTION / NEWMAN_ENV en .env.qa)
+      - NEWMAN_COLLECTION=${NEWMAN_COLLECTION:-api/collections/api.postman_collection.json}
+      - NEWMAN_ENV=${NEWMAN_ENV:-api/collections/env-qa.json}
       # ── Flags de pruebas (false = desactivado, true = activo) ──
       - RUN_NEWMAN=${RUN_NEWMAN:-false}
       - RUN_SONAR=${RUN_SONAR:-false}
@@ -228,7 +240,8 @@ services:
   influxdb:
     image: influxdb:1.8
     container_name: ${PROJECT_NAME}-influxdb
-    profiles: [ "perf", "jenkins", "all", "test-e2e" ]
+    # "sonar" incluido: Jenkins levanta stack con --profile sonar (sonar-db, sonarqube, influxdb)
+    profiles: [ "sonar", "perf", "jenkins", "all", "test-e2e" ]
     restart: unless-stopped
     environment:
       INFLUXDB_DB: k6
@@ -247,11 +260,12 @@ services:
         limits:
           memory: 1g
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8086/ping"]
+      # Influx 1.8: probar wget o curl según la variante de imagen
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:8086/ping >/dev/null 2>&1 || curl -sf http://127.0.0.1:8086/ping >/dev/null || exit 1"]
       interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      timeout: 10s
+      retries: 8
+      start_period: 40s
     networks:
       - qa-network
 
@@ -303,10 +317,11 @@ services:
         condition: service_healthy
     environment:
       - BACKEND_URL=http://backend:${BACKEND_INTERNAL_PORT:-8082}
+      - REPORTS_DIR=${REPORTS_DIR:-/qa/reports/rav}
     volumes:
       - ./qa/reports:/qa/reports
       - ./qa/performance:/qa/performance:ro
-    command: [ "bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests.js -e BACKEND_URL=$$BACKEND_URL --out influxdb=http://influxdb:8086/k6 --summary-export /qa/reports/k6/summary.json" ]
+    command: [ "bash", "-lc", "mkdir -p \"$$REPORTS_DIR/k6\" && k6 run /qa/performance/k6-tests.js -e BACKEND_URL=$$BACKEND_URL -e K6_DIR=$$REPORTS_DIR/k6 --out influxdb=http://influxdb:8086/k6 --summary-export $$REPORTS_DIR/k6/summary.json" ]
     networks:
       - qa-network
 
@@ -321,6 +336,7 @@ services:
     ports:
       - "5050:5050"
     volumes:
+      # Con REPORTS_DIR=/qa/reports/rav (defecto compose + Jenkins), Newman escribe en .../rav/allure-results
       - ./qa/reports/rav/allure-results:/app/allure-results
       - ./qa/reports/rav/allure-reports:/app/default-reports
     networks:
@@ -355,8 +371,8 @@ services:
       - qa-network
 
   # --- Newman Report Viewer (Standalone — persiste entre builds) ---
-  # NOTA: Sin bind mount — en DinD las rutas relativas se resuelven a /app/...
-  # que no existe en el host. Jenkins inyecta reportes vía 'docker cp'.
+  # RAV: bind mount al mismo árbol que escribe qa-runner (REPORTS_DIR=/qa/reports/rav).
+  # En host se ve en http://localhost:8181 sin depender de docker cp (DinD puede seguir usando cp en Jenkinsfile).
   newman-viewer:
     build:
       context: .
@@ -366,12 +382,12 @@ services:
     restart: unless-stopped
     ports:
       - "8181:80"
+    volumes:
+      - ./qa/reports/rav/newman:/usr/share/nginx/html
     networks:
       - qa-network
 
   # --- Playwright Report Viewer (Standalone — persiste entre builds) ---
-  # NOTA: Sin bind mount — en DinD las rutas relativas se resuelven a /app/...
-  # que no existe en el host. Jenkins inyecta reportes vía 'docker cp'.
   playwright-viewer:
     build:
       context: .
@@ -381,6 +397,8 @@ services:
     restart: unless-stopped
     ports:
       - "8182:80"
+    volumes:
+      - ./qa/reports/rav/playwright-html:/usr/share/nginx/html
     networks:
       - qa-network
 

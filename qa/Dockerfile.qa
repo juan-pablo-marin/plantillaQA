@@ -26,9 +26,9 @@ RUN go install github.com/boumenot/gocover-cobertura@latest \
 # --- pnpm (for running frontend unit tests) ---
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# --- Newman (API testing) ---
+# --- Newman (API testing) --- (pin; si re-exportas desde Insomnia, ejecuta qa/scripts/fix-newman-urls.cjs)
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g newman newman-reporter-allure
+    npm install -g newman@6.2.2 newman-reporter-allure
 
 # --- Playwright (UI testing) ---
 RUN --mount=type=cache,target=/root/.npm \

@@ -29,6 +29,11 @@ ALLURE_RESULTS_DIR="$REPORTS_DIR/allure-results"
 NEWMAN_DIR="$REPORTS_DIR/newman"
 K6_DIR="$REPORTS_DIR/k6"
 
+# Rutas sobreescribibles por proyecto (plantilla multi-repo)
+NEWMAN_COLLECTION="${NEWMAN_COLLECTION:-api/collections/api.postman_collection.json}"
+NEWMAN_ENV="${NEWMAN_ENV:-api/collections/env-qa.json}"
+K6_SCRIPT="${K6_SCRIPT:-performance/k6-tests.js}"
+
 echo "============================================"
 echo " QA Runner - Iniciando"
 echo " Backend:    $BACKEND_URL"
@@ -36,6 +41,10 @@ echo " Frontend:   $FRONTEND_URL"
 echo " Sonar:      $SONAR_URL"
 echo "--------------------------------------------"
 echo " Newman:     RUN_NEWMAN=$RUN_NEWMAN"
+if [ "$RUN_NEWMAN" = "true" ]; then
+    echo " Newman:     coleccion=$NEWMAN_COLLECTION"
+    echo " Newman:     entorno=$NEWMAN_ENV"
+fi
 echo " SonarQube:  RUN_SONAR=$RUN_SONAR"
 echo " Playwright: RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT"
 echo " k6:         RUN_K6=$RUN_K6"
@@ -147,33 +156,43 @@ for i in $(seq 1 30); do
     sleep 3
 done
 
-# 1.5. Generar Token JWT de Prueba
+# 1.5. Generar Token JWT de prueba (RAV / victims_backend)
+# El middleware JWTMiddleware exige claim user_id como número JSON (float64 en Go).
+# Mismo JWT_SECRET que el servicio backend (compose pasa JWT_SECRET al qa-runner).
 echo "[1.5/6] Generando JWT Token para pruebas backend..."
-export TEST_USER_ID="${TEST_USER_ID:-qa_test_user}"
+export TEST_USER_ID="${TEST_USER_ID:-1}"
+export TEST_JWT_EMAIL="${TEST_JWT_EMAIL:-qa@victimasrav.local}"
+export TEST_JWT_ROLE="${TEST_JWT_ROLE:-funcionario}"
 export JWT_SECRET="${JWT_SECRET:-secret-key-for-development}"
 
 export TEST_TOKEN=$(python3 -c "import time, hmac, hashlib, base64, json, os;\
 secret=os.environ.get('JWT_SECRET').encode();\
 header={'alg': 'HS256', 'typ': 'JWT'};\
-payload={'user_id': os.environ.get('TEST_USER_ID'), 'exp': int(time.time()) + 86400};\
-b64_header=base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip('=');\
-b64_payload=base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip('=');\
+uid=int(os.environ.get('TEST_USER_ID', '1'));\
+payload={\
+  'user_id': uid,\
+  'email': os.environ.get('TEST_JWT_EMAIL', 'qa@victimasrav.local'),\
+  'role': os.environ.get('TEST_JWT_ROLE', 'funcionario'),\
+  'exp': int(time.time()) + int(os.environ.get('TEST_JWT_TTL_SECONDS', '86400'))\
+};\
+b64_header=base64.urlsafe_b64encode(json.dumps(header,separators=(',',':')).encode()).decode().rstrip('=');\
+b64_payload=base64.urlsafe_b64encode(json.dumps(payload,separators=(',',':')).encode()).decode().rstrip('=');\
 sig=base64.urlsafe_b64encode(hmac.new(secret, (b64_header + '.' + b64_payload).encode(), hashlib.sha256).digest()).decode().rstrip('=');\
 print(f'{b64_header}.{b64_payload}.{sig}')")
 
-echo "  Token generado correctamente para el usuario: $TEST_USER_ID"
+echo "  Token generado (user_id=$TEST_USER_ID, role=$TEST_JWT_ROLE); expira según TEST_JWT_TTL_SECONDS (default 24h)"
 
 # 2. Newman API Tests
 echo "[2/6] Newman API Tests..."
 if [ "$RUN_NEWMAN" != "true" ]; then
     echo " SKIP: RUN_NEWMAN=$RUN_NEWMAN"
-elif [ -f "api/collections/api.postman_collection.json" ]; then
+elif [ -f "$NEWMAN_COLLECTION" ]; then
     # --- Paso 1: CLI + JSON (garantiza que el JSON se genere siempre) ---
     # Newman escribe el JSON en /tmp y luego lo copiamos al volumen montado.
     # Docker Desktop for Windows no siempre sincroniza writes programaticos al host;
     # cp SI funciona de forma confiable en bind mounts.
-    newman run api/collections/api.postman_collection.json \
-        --environment api/collections/env-qa.json \
+    newman run "$NEWMAN_COLLECTION" \
+        --environment "$NEWMAN_ENV" \
         --env-var "baseUrl=$BACKEND_URL" \
         --env-var "token=$TEST_TOKEN" \
         --reporters cli,json \
@@ -192,8 +211,9 @@ elif [ -f "api/collections/api.postman_collection.json" ]; then
     # --- Paso 2: Allure (independiente, puede fallar sin afectar el JSON) ---
     echo "  Generando resultados Allure..."
     rm -rf /tmp/allure-results
-    newman run api/collections/api.postman_collection.json \
-        --environment api/collections/env-qa.json \
+    mkdir -p /tmp/allure-results
+    newman run "$NEWMAN_COLLECTION" \
+        --environment "$NEWMAN_ENV" \
         --env-var "baseUrl=$BACKEND_URL" \
         --env-var "token=$TEST_TOKEN" \
         --reporters allure \
@@ -407,20 +427,21 @@ fi
 echo "[5/6] k6 Performance Tests..."
 if [ "$RUN_K6" != "true" ]; then
     echo " SKIP: RUN_K6=$RUN_K6"
-elif [ -f "performance/k6-tests.js" ]; then
+elif [ -f "$K6_SCRIPT" ]; then
     BUILD_TAG="${BUILD_NUMBER:-manual_$(date +%Y%m%d_%H%M%S)}"
     echo "  Etiqueta de build: $BUILD_TAG"
     echo "  Push interval InfluxDB: ${K6_INFLUXDB_PUSH_INTERVAL:-1s} (K6_INFLUXDB_PUSH_INTERVAL)"
-    k6 run performance/k6-tests.js \
+    k6 run "$K6_SCRIPT" \
       -e BACKEND_URL="$BACKEND_URL" \
       -e TEST_TOKEN="$TEST_TOKEN" \
+      -e K6_DIR="$K6_DIR" \
       --tag build="${BUILD_TAG}" \
       --tag environment="qa" \
       --out "influxdb=http://influxdb:8086/k6" \
       --summary-export "$K6_DIR/summary.json" \
       || echo "  WARN: k6 fallo o no cumplio thresholds."
 else
-    echo " SKIP: No se encontro performance/k6-tests.js"
+    echo " SKIP: No se encontro $K6_SCRIPT"
 fi
 
 # 6. Reportes Finales

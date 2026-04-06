@@ -1,13 +1,24 @@
 # ============================================
-# docker-compose.yml — Desarrollo básico
-# Uso:
-#   docker compose --env-file .env.dev up -d --build
+# docker-compose.yml — Desarrollo FUC (Mongo + API que exige MONGO_URI)
+#
+# NO es el stack RAV (Postgres). Si ves en logs "MONGO_URI is required":
+#   - Estás usando ESTE archivo sin .env.dev (con MONGO_*), o
+#   - Tienes un contenedor "backend" viejo de FUC mezclado con db Postgres de RAV.
+#
+# Stack QA RAV (víctimas / Postgres):
+#   docker compose --env-file .env.qa -f docker-compose.qa.yml -f docker-compose.jenkins.yml up -d ...
+#
+# Uso de ESTE archivo (perfil obligatorio; evita choque con RAV/QA):
+#   docker compose --profile fuc-dev --env-file .env.dev up -d --build
 # ============================================
+
+name: fuc-dev
 
 services:
 
   # --- Base de datos — MongoDB ---
   db:
+    profiles: [fuc-dev]
     image: mongo:7
     container_name: ${PROJECT_NAME}-mongodb
     restart: unless-stopped
@@ -30,6 +41,7 @@ services:
 
   # --- Backend ---
   backend:
+    profiles: [fuc-dev]
     build:
       context: ./${BACKEND_DIR:-BACKEND}
       dockerfile: Dockerfile
@@ -60,6 +72,7 @@ services:
 
   # --- Frontend ---
   frontend:
+    profiles: [fuc-dev]
     build:
       context: ./${FRONTEND_DIR:-FRONTEND}
       dockerfile: Dockerfile

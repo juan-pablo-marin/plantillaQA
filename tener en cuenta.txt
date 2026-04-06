@@ -184,3 +184,12 @@ docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml -f docker-com
 El archivo .dockerignore (raíz del repo) define qué NO entra al contexto de build de imágenes (qa-runner, viewers, etc.): así se acorta el tiempo de “transferring context” en Jenkins y en Docker Desktop. Incluye entre otras cosas qa_reports_ws/, qa/reports/, **/node_modules/, **/.next/, dist/build/coverage, reportes de Playwright (playwright-report, test-results, blob-report, .playwright), Allure, .git, .sonar, .scannerwork, .cursor, *.tsbuildinfo y medios pesados (*.mp4, *.webm). No copies al workspace de Jenkins carpetas de artefactos locales que ya estén listadas ahí.
 
 En Git sigue mandando el .gitignore del repo (node_modules, .env reales, reportes bajo qa/reports, etc.); SonarQube ya excluye en propiedades/scripts vendor, node_modules, .next, coverage generada, tests como fuentes duplicadas, etc. Jenkins publica cobertura Go usando rutas bajo BACKEND/ (FUC) o BACKENDRAV/ (RAV) según el job; el XML Cobertura se normaliza en run-tests_fuc.sh para que coincida con esas carpetas en el workspace.
+
+
+////rav  
+
+docker compose --env-file .env.qa -f docker-compose.qa.yml up -d --build frontend
+
+//crear el token 
+
+docker run --rm -e JWT_SECRET="cambiar-en-env-qa-minimo-64-caracteres-recomendado-para-rav-seguridad-qa" -e TEST_USER_ID="1" -v "c:\Users\Windows\Documents\PROYECTOS\victimasrav\qa\scripts:/scripts" python:3.11-alpine python /scripts/generate-qa-jwt.py > $env:TEMP\token.txt 2>&1; $TOKEN = (Get-Content $env:TEMP\token.txt -Raw).Trim(); Write-Host "Authorization: Bearer $TOKEN`n" -ForegroundColor Yellow; &curl.exe -i -X GET "http://localhost:8082/api/v1/departments" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"

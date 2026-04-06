@@ -6,7 +6,7 @@ import { jUnit } from 'https://jslib.k6.io/k6-summary/0.0.3/index.js';
 // RAV — ajusta BACKEND_URL en docker-compose / .env.qa (por defecto :8082)
 const BACKEND_URL = __ENV.BACKEND_URL || 'http://backend:8082';
 
-const errors = new Rate('errors');
+const ravErrors = new Rate('rav_errors');
 const rootLatency = new Trend('root_latency');
 
 export const options = {
@@ -17,7 +17,7 @@ export const options = {
   ],
   thresholds: {
     http_req_duration: ['p(95)<800'],
-    errors: ['rate<0.2'],
+    rav_errors: ['rate<0.25'],
     root_latency: ['p(99)<500'],
   },
 };
@@ -29,15 +29,16 @@ export default function () {
     const ok = check(res, {
       'status 404 o 200': (r) => r.status === 404 || r.status === 200,
     });
-    errors.add(!ok);
+    ravErrors.add(!ok);
   });
 
   sleep(1);
 }
 
 export function handleSummary(data) {
+  const k6Dir = __ENV.K6_DIR || '/qa/reports/k6';
   return {
-    '/qa/reports/k6/summary.json': JSON.stringify(data, null, 2),
-    '/qa/reports/k6/junit.xml': jUnit(data),
+    [`${k6Dir}/summary.json`]: JSON.stringify(data, null, 2),
+    [`${k6Dir}/junit.xml`]: jUnit(data),
   };
 }

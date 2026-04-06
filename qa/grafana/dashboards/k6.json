@@ -80,7 +80,7 @@
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
       "title": "Tasa de Errores",
       "type": "stat",
-      "targets": [{ "datasource": { "type": "influxdb", "uid": "influxdb-k6" }, "query": "SELECT mean(\"value\") FROM \"errors\" WHERE $timeFilter GROUP BY time($__interval) fill(0)", "rawQuery": true, "refId": "A", "resultFormat": "time_series" }]
+      "targets": [{ "datasource": { "type": "influxdb", "uid": "influxdb-k6" }, "query": "SELECT mean(\"value\") FROM \"rav_errors\" WHERE $timeFilter GROUP BY time($__interval) fill(0)", "rawQuery": true, "refId": "A", "resultFormat": "time_series" }]
     },
     {
       "datasource": { "type": "influxdb", "uid": "influxdb-k6" },
@@ -168,7 +168,7 @@
       "options": { "legend": { "calcs": ["mean", "min"], "displayMode": "table", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
       "title": "Tasa de Errores en el Tiempo",
       "type": "timeseries",
-      "targets": [{ "datasource": { "type": "influxdb", "uid": "influxdb-k6" }, "alias": "error rate", "query": "SELECT mean(\"value\") FROM \"errors\" WHERE $timeFilter GROUP BY time($__interval) fill(0)", "rawQuery": true, "refId": "A", "resultFormat": "time_series" }]
+      "targets": [{ "datasource": { "type": "influxdb", "uid": "influxdb-k6" }, "alias": "error rate", "query": "SELECT mean(\"value\") FROM \"rav_errors\" WHERE $timeFilter GROUP BY time($__interval) fill(0)", "rawQuery": true, "refId": "A", "resultFormat": "time_series" }]
     },
     {
       "datasource": { "type": "influxdb", "uid": "influxdb-k6" },

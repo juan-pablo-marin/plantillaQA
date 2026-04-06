@@ -66,6 +66,8 @@ RUN set -e; \
         'echo "PostgreSQL is ready, starting application..."' \
         'exec "$@"' > ./wait-for-db.sh; \
     fi \
+ && sed -i 's/\r$//' ./wait-for-db.sh \
  && chmod +x ./wait-for-db.sh
 
+# CRLF en wait-for-db.sh (Windows/Jenkins) provoca: exec ./wait-for-db.sh: no such file or directory
 CMD ["./wait-for-db.sh", "./main"]
