@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     parameters {
-        // booleanParam(name: 'RESET_DOCKER_STACK', defaultValue: true,  description: 'Antes de preparar: compose down + huérfanos RAV (victimasrav + qa-pipeline)')
+     
         booleanParam(name: 'RUN_NEWMAN',     defaultValue: true,  description: 'Ejecutar pruebas de API con Newman')
         booleanParam(name: 'RUN_SONAR',      defaultValue: true,  description: 'Ejecutar análisis estático con SonarQube')
         booleanParam(name: 'RUN_PLAYWRIGHT', defaultValue: true,  description: 'Ejecutar pruebas End-to-End con Playwright')
@@ -638,8 +638,7 @@ HTML_EOF
                         echo "     - Newman HTML  → http://localhost:8181  (RAV: qa/reports/rav/newman; historial en anterior/)"
                         echo "     - Playwright   → http://localhost:8182"
                         echo "   Reportes HTML disponibles en Jenkins → Sidebar del build"
-                        ${COMPOSE_CMD} stop db backend frontend || true
-                        ${COMPOSE_CMD} rm -f db backend frontend || true
+                      
                         docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 2>/dev/null || true
                     '''
                 } catch (e) {
