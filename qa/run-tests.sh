@@ -21,6 +21,8 @@ RUN_K6="${RUN_K6:-false}"                  # Tests de rendimiento con k6
 
 SONAR_WAIT_SECONDS="${SONAR_WAIT_SECONDS:-300}"
 SONAR_SCAN_TIMEOUT="${SONAR_SCAN_TIMEOUT:-20m}"
+# Heap del bridge JS/TS de Sonar: debe caber en la RAM del contenedor (ver WARN en scanner si maxspace > OS)
+SONAR_JS_MAXSPACE="${SONAR_JS_MAXSPACE:-4096}"
 
 mkdir -p "$REPORTS_DIR"
 cd /qa
@@ -383,13 +385,14 @@ else
                 -Dsonar.projectKey="${PROJECT_KEY:-qa-project}" \
                 -Dsonar.host.url="$SONAR_URL" \
                 -Dsonar.token="$SONAR_TOKEN" \
+                -Dsonar.sourceEncoding=UTF-8 \
                 -Dsonar.sources=frontend/src,backend \
                 -Dsonar.tests=frontend/src,backend \
                 -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
-                -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
+                -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**,backend/main,**/*.exe" \
                 -Dsonar.scm.disabled=true \
                 -Dsonar.plugins.downloadOnlyRequired=true \
-                -Dsonar.javascript.node.maxspace=8192 \
+                -Dsonar.javascript.node.maxspace="${SONAR_JS_MAXSPACE}" \
                 -Dsonar.javascript.node.bridge.timeout=3600 \
                 $SONAR_ARGS \
                 || echo "  WARN: Fallo o timeout el escaneo de Sonar."

@@ -17,9 +17,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Go 1.25 (for running backend unit tests) ---
-RUN curl -sSL https://go.dev/dl/go1.25.0.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+# --- Go: misma línea que BACKENDRAV/go.mod (evita GOTOOLCHAIN=auto descargando toolchain en runtime) ---
+RUN curl -sSL https://go.dev/dl/go1.25.5.linux-amd64.tar.gz | tar -C /usr/local -xzf -
 ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOTOOLCHAIN=local
 RUN go install github.com/boumenot/gocover-cobertura@latest \
     && mv /root/go/bin/gocover-cobertura /usr/local/bin/
 
@@ -64,6 +65,12 @@ ARG BACKEND_DIR=BACKEND
 ARG FRONTEND_DIR=FRONTEND
 COPY ${BACKEND_DIR}/ /src/backend/
 COPY ${FRONTEND_DIR}/ /src/frontend/
+
+# Frontend: dependencias en build (el worker Sonar ya tiene node_modules → se omite pnpm install de ~6m en runtime)
+WORKDIR /src/frontend
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile 2>/dev/null || pnpm install
+WORKDIR /qa
 
 # Fix CRLF issues (Windows line endings) that break bash scripts
 RUN sed -i 's/\r$//' /qa/run-tests.sh /qa/run-tests_fuc.sh \
