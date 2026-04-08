@@ -13,6 +13,9 @@
 #  (p. ej. victims_backend y frontend-rav) con .docker/wait-for-db.sh y db/migrations.
 # ═══════════════════════════════════════════════════════════════
 
+# Proyecto Compose fijo (alineado con Jenkins COMPOSE_PROJECT_NAME=qa-pipeline y RAV).
+name: qa-pipeline
+
 x-common-healthcheck: &common-healthcheck
   interval: 15s
   timeout: 10s
@@ -62,10 +65,10 @@ services:
       - ./${BACKEND_DIR:-BACKENDRAV}/db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-rav_admin} -d $${POSTGRES_DB:-db_ruv}"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 12
+      start_period: 25s
     networks:
       - qa-network
 
@@ -105,8 +108,8 @@ services:
         ]
       interval: 15s
       timeout: 10s
-      retries: 8
-      start_period: 60s
+      retries: 12
+      start_period: 90s
     networks:
       - qa-network
 

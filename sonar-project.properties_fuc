@@ -31,7 +31,8 @@ sonar.test.inclusions=**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*
 # Los archivos de test se clasifican via sonar.test.inclusions,
 # NO es necesario listarlos aqui.
 # --------------------------------------------
-sonar.exclusions=**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**,**/qa/**
+# backend/main = binario Go local (go build -o main); no es fuente.
+sonar.exclusions=**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**,**/qa/**,**/backend/main
 
 # --------------------------------------------
 # COVERAGE

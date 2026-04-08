@@ -110,7 +110,7 @@ jobs:
 
       - name: Run Docker QA
         run: |
-          docker compose \
+          docker compose -p qa-pipeline \
             --env-file .env.qa.ci \
             -f docker-compose.qa.yml \
             up --build --abort-on-container-exit --exit-code-from qa-runner
@@ -126,7 +126,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker compose -f docker-compose.qa.yml down -v --remove-orphans
+          docker compose -p qa-pipeline -f docker-compose.qa.yml down --remove-orphans
 
   # ------------------------------------------
   # Job 5: Sonar (analisis separado)

@@ -22,6 +22,10 @@
 #    RUN_K6=true          → Activa tests de rendimiento con k6
 # ═══════════════════════════════════════════════════════════════
 
+# Mismo criterio que Jenkins (COMPOSE_PROJECT_NAME=qa-pipeline): todo el stack bajo un único
+# proyecto Compose, no el nombre de la carpeta del repo (p. ej. fichacaracterizacionv1).
+name: qa-pipeline
+
 x-common-healthcheck: &common-healthcheck
   interval: 15s
   timeout: 10s
@@ -73,11 +77,12 @@ services:
     volumes:
       - mongodb_qa_data:/data/db
     healthcheck:
+      # Intervalo corto: pasar a healthy en cuanto mongod acepta auth (no esperar 15s entre intentos).
       test: ["CMD-SHELL", "mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval \"db.adminCommand('ping')\" --quiet"]
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
     networks:
       - qa-network
 
@@ -100,8 +105,12 @@ services:
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     healthcheck:
+      # El bucle Jenkins espera BE_ST=healthy; Node/conn Mongo suele tardar más que 30s en cold start.
       test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
-      <<: *common-healthcheck
+      interval: 10s
+      timeout: 8s
+      retries: 10
+      start_period: 90s
     networks:
       - qa-network
 
@@ -110,7 +119,8 @@ services:
     build:
       context: ./${FRONTEND_DIR:-FRONTEND}
       dockerfile: Dockerfile
-      target: ${FRONTEND_TARGET:-runtime}
+      # Mismo criterio que RAV / Dockerfile Next.js oficial: stage final suele llamarse "runner", no "runtime".
+      target: ${FRONTEND_TARGET:-runner}
     container_name: ${PROJECT_NAME}-frontend-qa
     restart: unless-stopped
     depends_on:

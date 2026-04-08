@@ -15,7 +15,7 @@ pipeline {
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '15'))
-        timeout(time: 45, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         disableConcurrentBuilds()
         ansiColor('xterm')
     }
@@ -26,14 +26,42 @@ pipeline {
         IS_FUC               = "${env.JOB_NAME?.toUpperCase()?.contains('FUC') ? 'true' : 'false'}"
         ENV_FILE             = "${env.IS_FUC == 'true' ? '/app/.env.qa_fuc' : '/app/.env.qa'}"
         QA_COMPOSE           = "${env.IS_FUC == 'true' ? '/app/docker-compose.qa_fuc.yml' : '/app/docker-compose.qa.yml'}"
-        COMPOSE_CMD          = "docker compose --env-file ${env.ENV_FILE} -f ${env.QA_COMPOSE} -f /app/docker-compose.jenkins.yml"
+        COMPOSE_CMD          = "docker compose -p qa-pipeline --env-file ${env.ENV_FILE} -f ${env.QA_COMPOSE} -f /app/docker-compose.jenkins.yml"
         QA_REPORTS_DIR       = "${env.IS_FUC == 'true' ? '/qa/reports/fuc' : '/qa/reports/rav'}"
         JENKINS_REPORTS_DIR  = "qa_reports_ws"
         RELATIVE_REPORTS_DIR = "qa_reports_ws"
         BUILD_TIMESTAMP      = sh(script: 'date +%Y%m%d_%H%M%S', returnStdout: true).trim()
+        // Activa qa-runner, influx/grafana y servicios con perfil test-e2e/sonar (sin down -v: volumenes nombrados persisten)
+        COMPOSE_PROFILES     = 'test-e2e,sonar'
     }
 
     stages {
+
+        stage('Sync Latest Code from qa-team') {
+            steps {
+                script {
+                    echo "════════════════════════════════════════"
+                    echo "SINCRONIZANDO CÓDIGO DESDE qa-team"
+                    echo "════════════════════════════════════════"
+                    sh '''
+                        cd ${WORKSPACE}
+                        
+                        echo "=> Obtener información de rama actual..."
+                        git branch -a | grep qa-team || echo "Rama qa-team no existe localmente"
+                        
+                        echo "=> Intentando checkout a qa-team..."
+                        git checkout qa-team 2>/dev/null || git checkout -b qa-team origin/qa-team
+                        
+                        echo "=> Haciendo pull de los últimos cambios..."
+                        git pull origin qa-team --ff-only
+                        
+                        echo "✅ Código sincronizado exitosamente"
+                        echo "=> Commit actual:"
+                        git log -1 --oneline
+                    '''
+                }
+            }
+        }
 
         stage('Preparar Entorno y Dependencias Docker') {
             steps {
@@ -44,10 +72,12 @@ pipeline {
                     sh '''
                         export DOCKER_BUILDKIT=1
                         export COMPOSE_DOCKER_CLI_BUILD=1
+                        export COMPOSE_PROJECT_NAME=qa-pipeline
 
                         # Leer PROJECT_NAME del config actual (fuente unica de verdad)
                         PROJECT_NAME=$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\r')
                         echo "=> PROJECT_NAME: $PROJECT_NAME"
+                        echo "=> Compose project: ${COMPOSE_PROJECT_NAME} (mismo que RAV; no usar nombre de carpeta del repo)"
 
                         echo "=> Limpiando contenedores transientes del build anterior..."
                         ${COMPOSE_CMD} stop db backend frontend || true
@@ -79,14 +109,46 @@ pipeline {
                         ${COMPOSE_CMD} up -d playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
 
                         echo "=> Levantando Grafana (provisioning embebido en imagen)..."
-                        # No destruir: preserva preferencias y permite consultar datos históricos.
+                        # Solo contenedor: los datos siguen en el volumen nombrado grafana_data.
                         # --build reconstruye la imagen si Dockerfile.grafana o provisioning cambiaron.
+                        docker rm -f ${PROJECT_NAME}-grafana 2>/dev/null || true
                         ${COMPOSE_CMD} up -d --build grafana || echo "  WARN: Grafana falló al iniciar (no detiene pruebas)"
                         sleep 5
 
                         echo "=> Levantando servicios transientes de la aplicación..."
                         ${COMPOSE_CMD} --profile sonar up -d \
                             db backend frontend
+
+                        echo "=> Esperando healthchecks (db + backend + influx; hasta ~9 min por migraciones / arranque)..."
+                        if [ "${IS_FUC}" = "true" ]; then
+                          DB_CTN="${PROJECT_NAME}-mongodb-qa"
+                        else
+                          DB_CTN="${PROJECT_NAME}-postgres-qa"
+                        fi
+                        for i in $(seq 1 180); do
+                          DB_ST=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${DB_CTN} 2>/dev/null || echo missing)
+                          BE_ST=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${PROJECT_NAME}-api-qa 2>/dev/null || echo missing)
+                          IN_ST=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${PROJECT_NAME}-influxdb 2>/dev/null || echo missing)
+                          IN_PING=bad
+                          if docker exec ${PROJECT_NAME}-influxdb sh -c 'wget -q -O- http://127.0.0.1:8086/ping >/dev/null 2>&1 || curl -sf http://127.0.0.1:8086/ping >/dev/null' 2>/dev/null; then IN_PING=ok; fi
+                          IN_OK=0
+                          if [ "$IN_ST" = "healthy" ] || [ "$IN_PING" = "ok" ]; then IN_OK=1; fi
+                          if [ "$DB_ST" = "healthy" ] && [ "$BE_ST" = "healthy" ] && [ "$IN_OK" = "1" ]; then
+                            echo " OK: db=$DB_ST backend=$BE_ST influxdb(health=$IN_ST ping=$IN_PING)"
+                            break
+                          fi
+                          echo "  ... espera $i/180: db=$DB_ST backend=$BE_ST influxdb=$IN_ST ping=$IN_PING"
+                          sleep 3
+                        done
+                        BE_ST=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${PROJECT_NAME}-api-qa 2>/dev/null || echo missing)
+                        DB_ST=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${DB_CTN} 2>/dev/null || echo missing)
+                        if [ "$DB_ST" != "healthy" ] || [ "$BE_ST" != "healthy" ]; then
+                          echo " ERROR: db=$DB_ST backend=$BE_ST; logs API:"
+                          docker logs ${PROJECT_NAME}-api-qa --tail 120 2>&1 || true
+                          echo " Logs db:"
+                          docker logs ${DB_CTN} --tail 80 2>&1 || true
+                          exit 1
+                        fi
 
                         echo "=> Configurando Grafana home dashboard..."
                         for i in $(seq 1 20); do
@@ -122,7 +184,7 @@ pipeline {
                         script {
                             echo "=> Ejecutando Newman Tests..."
                             sh """
-                                ${COMPOSE_CMD} run --name qa-runner-newman \\
+                                ${COMPOSE_CMD} run --no-deps --name qa-runner-newman \\
                                 -e REPORTS_DIR=${QA_REPORTS_DIR} \\
                                 -e RUN_NEWMAN=true \\
                                 -e RUN_SONAR=false \\
@@ -140,9 +202,13 @@ pipeline {
                             echo "Newman: sincronizando reportes al viewer (${newmanViewer})..."
                             sh """
                                 if docker ps -q -f name=${newmanViewer} | grep -q .; then
-                                    docker exec ${newmanViewer} sh -c 'rm -rf /usr/share/nginx/html/*' || true
-                                    docker cp ${JENKINS_REPORTS_DIR}/newman/. ${newmanViewer}:/usr/share/nginx/html/ || true
-                                    echo '  Newman viewer actualizado'
+                                    if [ -f ${JENKINS_REPORTS_DIR}/newman/newman-report.json ] || [ -f ${JENKINS_REPORTS_DIR}/newman/index.html ]; then
+                                        docker exec ${newmanViewer} sh -c 'rm -rf /usr/share/nginx/html/*' || true
+                                        docker cp ${JENKINS_REPORTS_DIR}/newman/. ${newmanViewer}:/usr/share/nginx/html/ || true
+                                        echo '  Newman viewer actualizado'
+                                    else
+                                        echo '  WARN: No hay newman-report.json ni index.html en workspace; no se vacia el visor (compose bind mount puede seguir mostrando historial local)'
+                                    fi
                                 else
                                     echo '  WARN: Newman viewer no esta corriendo'
                                 fi
@@ -157,7 +223,7 @@ pipeline {
                         script {
                             echo "=> Ejecutando Análisis SonarQube..."
                             sh """
-                                ${COMPOSE_CMD} run --name qa-runner-sonar \\
+                                ${COMPOSE_CMD} run --no-deps --name qa-runner-sonar \\
                                 -e REPORTS_DIR=${QA_REPORTS_DIR} \\
                                 -e RUN_NEWMAN=false \\
                                 -e RUN_SONAR=true \\
@@ -182,7 +248,7 @@ pipeline {
                         script {
                             echo "=> Ejecutando Playwright Tests..."
                             sh """
-                                ${COMPOSE_CMD} run --name qa-runner-e2e \\
+                                ${COMPOSE_CMD} run --no-deps --name qa-runner-e2e \\
                                 -e REPORTS_DIR=${QA_REPORTS_DIR} \\
                                 -e RUN_NEWMAN=false \\
                                 -e RUN_SONAR=false \\
@@ -222,7 +288,7 @@ pipeline {
                         script {
                             echo "=> Ejecutando k6 Tests..."
                             sh """
-                                ${COMPOSE_CMD} run --name qa-runner-k6 \\
+                                ${COMPOSE_CMD} run --no-deps --name qa-runner-k6 \\
                                 -e REPORTS_DIR=${QA_REPORTS_DIR} \\
                                 -e RUN_NEWMAN=false \\
                                 -e RUN_SONAR=false \\
@@ -584,16 +650,14 @@ HTML_EOF
                         PROJECT_NAME=$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\r')
                         echo "=> Aguardando procesamiento CE task de SonarQube..."
                         sleep 30
-                        echo "=> Apagando solo contenedores transientes de la aplicación..."
-                        echo "   Servicios persistentes (activos para revisión post-ejecución):"
+                        echo "   Servicios activos para revisión (db/backend/frontend siguen arriba; volumenes Docker no se eliminan):"
                         echo "     - SonarQube    → http://localhost:9000"
                         echo "     - Grafana      → http://localhost:3001"
                         echo "     - InfluxDB     → http://localhost:8086"
-                        echo "     - Newman HTML  → http://localhost:8181  (historial: /app/qa/reports/fuc/newman/anteriores/ + reports-data.js)"
+                        echo "     - Newman HTML  → http://localhost:8181  (FUC: qa/reports/fuc/newman; RAV: qa/reports/rav/newman; historial en anterior/)"
                         echo "     - Playwright   → http://localhost:8182"
+                        echo "     - App (db, backend, frontend) → puertos según .env.qa / .env.qa_fuc"
                         echo "   Reportes HTML disponibles en Jenkins → Sidebar del build"
-                        ${COMPOSE_CMD} stop db backend frontend || true
-                        ${COMPOSE_CMD} rm -f db backend frontend || true
                         docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 2>/dev/null || true
                     '''
                 } catch (e) {

@@ -1,0 +1,1408 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: Victims Backend API
+meta:
+  id: wrk_755423da03a14421a920ca6e2e23727c
+  created: 1773030981204
+  modified: 1773324708163
+  description: ""
+collection:
+  - name: Victims
+    meta:
+      id: fld_0a285626be29486a8f319c1f8ab0e105
+      created: 1740873600000
+      modified: 1773324708102
+      sortKey: -1740873600000
+      description: Endpoints para creacion y busqueda de victimas. La busqueda retorna
+        el registro completo de la victima por numero de documento.
+    children:
+      - url: "{{ _.base_url }}/victims/39178315"
+        name: Search Victim by Document
+        meta:
+          id: req_12ee6f83b1184630a26f7f81a80699ef
+          created: 1740873600000
+          modified: 1773330749715
+          isPrivate: false
+          description: |+
+            ## Path Parameter                                                                                                                                                                                                          
+            | Parametro | Tipo | Descripcion |                                                                                                                                                                                         
+            |-----------|------|-------------|                                                                                                                                                                                         
+            | `:document_number` | string | Numero de documento de la victima |
+
+              ## Query Parameter
+              | Parametro | Tipo | Requerido | Descripcion |
+              |-----------|------|-----------|-------------|
+              | `document_type` | string | Si | Tipo de documento. Ver tabla de valores permitidos |
+
+              ## Valores permitidos para `document_type`
+              | Valor | Descripcion |
+              |-------|-------------|
+              | `CC` | Cedula de ciudadania |
+              | `CE` | Cedula de extranjeria |
+              | `NIT` | Numero de identificacion tributaria |
+              | `PA` | Pasaporte |
+              | `OTRO` | Agrupa: TI, RC, NI, IND, NUIP, SR, RCD, NIP, PB, LM |
+
+              ## Ejemplos de uso
+              GET /api/v1/victims/39178315?document_type=CC
+            	
+              GET /api/v1/victims/1715133367?document_type=CE
+            	
+              GET /api/v1/victims/22010951?document_type=NIT
+            	
+              GET /api/v1/victims/497807436?document_type=PA
+            	
+              GET /api/v1/victims/1017928854?document_type=OTRO
+
+              ## Respuesta exitosa (200)
+              ```json
+              {
+                "success": true,
+                "data": {
+                  "document_type": "CC",
+                  "document": "39178315",
+                  "first_name": "Juan",
+                  "middle_name": "Carlos",
+                  "first_surname": "Perez",
+                  "second_surname": "Garcia",
+                  "ethnic_group": "NINGUNO",
+                  "household_id": "2799160",
+                  "residence_location": "Barrio Centro",
+                  "mobile_phone": "3001234567",
+                  "origin": "UNIDAD VICTIMAS",
+                  "source": "RUV LEY 1448"
+                },
+                "message": "Victima encontrada exitosamente"
+              }
+
+              Errores posibles
+
+              ┌────────┬─────────────────────────────────────┬─────────────────────────────────────────────────────────┐
+              │ Codigo │               Mensaje               │                          Causa                          │
+              ├────────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────┤
+              │ 400    │ El numero de documento es requerido │ No se envio :document_number en la URL                  │
+              ├────────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────┤
+              │ 400    │ El tipo de documento es requerido   │ No se envio el query param document_type                │
+              ├────────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────┤
+              │ 400    │ tipo de documento invalido: XYZ...  │ El valor de document_type no esta en la lista permitida │
+              ├────────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────┤
+              │ 404    │ Victima no encontrada               │ No existe un registro con ese documento y tipo en la BD │
+              ├────────┼─────────────────────────────────────┼─────────────────────────────────────────────────────────┤
+              │ 500    │ Error al buscar la victima          │ Error interno del servidor                              │
+              └────────┴─────────────────────────────────────┴─────────────────────────────────────────────────────────┘
+
+              Nota para el frontend
+
+              El desplegable debe enviar exactamente estos valores en document_type:
+              - Cedula de ciudadania → CC
+              - Cedula de extranjeria → CE
+              - Numero de identificacion tributaria → NIT
+              - Registro unico de contribuyentes → no existe en BD, deshabilitar esta opcion O mantenerla aunque la elijan siempre retornara no encontrado
+              - Pasaporte → PA
+              - Otro → OTRO
+
+
+          sortKey: -1740873600000
+        method: GET
+        parameters:
+          - name: document_type
+            value: CC
+            description: ""
+            disabled: false
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/victims"
+        name: Create Victim
+        meta:
+          id: req_2644e5d11db845ac9257466f7982190f
+          created: 1740873600000
+          modified: 1773330809551
+          isPrivate: false
+          description: >-
+            Crea un nuevo registro de victima.
+
+
+            ## Campos requeridos
+
+            - `person_id` (string) — ID de persona
+
+            - `document` (string) — Numero de documento
+
+
+            ## Campos opcionales
+
+            Todos los demas campos son opcionales (nullable strings). Ver body
+            de ejemplo.
+
+
+            ## Respuesta exitosa (201)
+
+            ```json
+
+            {
+              "success": true,
+              "message": "Victima creada exitosamente"
+            }
+
+            ```
+
+
+            ## Errores posibles
+
+            - `400` — Datos de entrada invalidos: {detalle}
+
+            - `500` — Error al crear la victima
+          sortKey: -1740873600001
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "person_id": "123456",
+              "document": "1234567890",
+              "origin": "RUV",
+              "source": "SIPOD",
+              "program": "Atencion",
+              "household_id": "HH-001",
+              "document_type": "CC",
+              "first_name": "Juan",
+              "middle_name": "Carlos",
+              "first_surname": "Perez",
+              "second_surname": "Garcia",
+              "birth_date": "15/01/1990",
+              "document_issuance": "Bogota",
+              "document_issuance_date": "20/03/2010",
+              "ethnic_group": "NINGUNO",
+              "gender": "MASCULINO",
+              "incident_type": "Desplazamiento",
+              "incident": "Desplazamiento forzado",
+              "occurrence_date": "10/06/2015",
+              "occurrence_municipality_code": "05001",
+              "occurrence_zone": "URBANA",
+              "occurrence_location": "Centro",
+              "presumed_actor": "Desconocido",
+              "presumed_victimizer": "Grupo armado",
+              "report_date": "01/07/2015",
+              "population_type": "DESPLAZADO",
+              "victim_type": "INDIVIDUAL",
+              "country": "COLOMBIA",
+              "city": "MEDELLIN",
+              "residence_municipality_code": "05001",
+              "residence_zone": "URBANA",
+              "residence_location": "Barrio Centro",
+              "address": "Calle 10 # 20-30",
+              "landline_phone": "6041234567",
+              "mobile_phone": "3001234567",
+              "email": "juan.perez@ejemplo.com",
+              "assessment_date": "01/08/2015",
+              "victim_status": "INCLUIDO",
+              "full_name": "JUAN CARLOS PEREZ GARCIA",
+              "claim_id": "CLM-001",
+              "supervisor_id": "SUP-001",
+              "displacement_type": "INDIVIDUAL",
+              "registry": "RUV-2015-001",
+              "document_validity": "VIGENTE",
+              "person_ref": "REF-001",
+              "relationship": "TITULAR",
+              "declaration_code": "DEC-2015-001",
+              "arrival_code": "ARR-2015-001",
+              "incident_code": "INC-2015-001",
+              "disability": "NINGUNA",
+              "disability_description": null,
+              "fud_sheet": "FUD-001",
+              "afflictions": "Desplazamiento forzado"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Dashboard
+    meta:
+      id: fld_1183f15d1cec44c6b5f0140c333edfc9
+      created: 1740873600000
+      modified: 1773324708104
+      sortKey: -1740873599998
+      description: Endpoints de estadisticas y graficas. Retornan datos agregados
+        listos para consumir desde componentes de graficas en el frontend
+        (Chart.js, Recharts, etc.).
+    children:
+      - url: "{{ _.base_url }}/dashboard/cities"
+        name: Dashboard - Cities
+        meta:
+          id: req_4478d09d9ef9474e9056e141814b50c9
+          created: 1740873600000
+          modified: 1773324708139
+          isPrivate: false
+          description: >-
+            Obtiene el conteo de victimas agrupado por ciudad con paginacion.
+
+
+            ## Query Parameters
+
+            | Parametro | Tipo | Requerido | Descripcion |
+
+            |-----------|------|-----------|-------------|
+
+            | `department` | string | No | Filtrar por departamento (vacio =
+            todos) |
+
+            | `page` | int | No | Numero de pagina (default: 1) |
+
+            | `pageSize` | int | No | Registros por pagina (default: 10) |
+
+
+            ## Respuesta exitosa (200)
+
+            ```json
+
+            {
+              "success": true,
+              "data": [
+                {
+                  "city": "MEDELLIN",
+                  "total_victims": 350000
+                },
+                {
+                  "city": "BOGOTA",
+                  "total_victims": 280000
+                },
+                {
+                  "city": "SIN_DATO",
+                  "total_victims": 50000
+                }
+              ],
+              "message": "Datos de ciudades obtenidos exitosamente"
+            }
+
+            ```
+
+
+            > Nota: los valores nulos o vacios se agrupan como `SIN_DATO`.
+
+
+            ## Errores posibles
+
+            - `400` — Parametro de pagina invalido
+
+            - `400` — Parametro de tamaño de pagina invalido
+
+            - `500` — Error al consultar ciudades
+          sortKey: -1740873600001
+        method: GET
+        parameters:
+          - name: department
+            value: ""
+            description: Departamento (vacio = todos)
+          - name: page
+            value: "1"
+            description: "Numero de pagina (default: 1)"
+          - name: pageSize
+            value: "10"
+            description: "Registros por pagina (default: 10)"
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/dashboard/age-group"
+        name: Dashboard - Age Group
+        meta:
+          id: req_52a20f8d10b94f9f83add083068baad6
+          created: 1740873600000
+          modified: 1773324708144
+          isPrivate: false
+          description: >-
+            Obtiene la distribucion de victimas por grupo etario.
+
+
+            ## Query Parameters
+
+            | Parametro | Tipo | Requerido | Descripcion |
+
+            |-----------|------|-----------|-------------|
+
+            | `department` | string | No | Filtrar por departamento (vacio =
+            nivel nacional) |
+
+            | `gender` | string | No | Filtrar por genero (vacio = todos) |
+
+
+            ## Respuesta CON filtro de departamento (200)
+
+            ```json
+
+            {
+              "success": true,
+              "data": [
+                {
+                  "department_name": "ANTIOQUIA",
+                  "age_group": "Primera infancia (0-5 anos)",
+                  "total_victims": 15234
+                },
+                {
+                  "department_name": "ANTIOQUIA",
+                  "age_group": "Infancia (6-11 anos)",
+                  "total_victims": 12890
+                }
+              ],
+              "message": "Datos de grupo etario obtenidos exitosamente"
+            }
+
+            ```
+
+
+            ## Respuesta SIN filtro (nivel nacional) (200)
+
+            ```json
+
+            {
+              "success": true,
+              "data": [
+                {
+                  "age_group": "Adultez (27-59 anos)",
+                  "total_victims": 2500000
+                },
+                {
+                  "age_group": "Juventud (19-26 anos)",
+                  "total_victims": 980000
+                }
+              ],
+              "message": "Datos de grupo etario obtenidos exitosamente"
+            }
+
+            ```
+
+
+            ## Grupos etarios
+
+            - Primera infancia (0-5 anos)
+
+            - Infancia (6-11 anos)
+
+            - Adolescencia temprana (12-13 anos)
+
+            - Adolescencia (14-18 anos)
+
+            - Juventud (19-26 anos)
+
+            - Adultez (27-59 anos)
+
+            - Persona mayor (60 anos o mas)
+
+            - Sin fecha / Otro grupo etario
+
+
+            ## Errores posibles
+
+            - `500` — Error al consultar grupo etario
+          sortKey: -1740873600003
+        method: GET
+        parameters:
+          - name: department
+            value: ""
+            description: Departamento (vacio = nivel nacional)
+          - name: gender
+            value: ""
+            description: Genero (vacio = todos)
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/dashboard/ethnic-group"
+        name: Dashboard - Ethnic Group
+        meta:
+          id: req_c166e8ec1a6e40b49e5fb424e96b6dbe
+          created: 1740873600000
+          modified: 1773324708159
+          isPrivate: false
+          description: >-
+            Obtiene la distribucion de victimas por pertenencia etnica con
+            paginacion.
+
+
+            ## Query Parameters
+
+            | Parametro | Tipo | Requerido | Descripcion |
+
+            |-----------|------|-----------|-------------|
+
+            | `department` | string | No | Filtrar por departamento (vacio =
+            todos) |
+
+            | `page` | int | No | Numero de pagina (default: 1) |
+
+            | `pageSize` | int | No | Registros por pagina (default: 10) |
+
+
+            ## Respuesta exitosa (200)
+
+            ```json
+
+            {
+              "success": true,
+              "data": [
+                {
+                  "ethnic_group": "NINGUNO",
+                  "total_victims": 5000000
+                },
+                {
+                  "ethnic_group": "NEGRO(A) O AFROCOLOMBIANO(A)",
+                  "total_victims": 800000
+                },
+                {
+                  "ethnic_group": "INDIGENA",
+                  "total_victims": 450000
+                },
+                {
+                  "ethnic_group": "SIN_DATO",
+                  "total_victims": 120000
+                }
+              ],
+              "message": "Datos de pertenencia etnica obtenidos exitosamente"
+            }
+
+            ```
+
+
+            > Nota: los valores nulos o vacios se agrupan como `SIN_DATO`.
+
+
+            ## Errores posibles
+
+            - `400` — Parametro de pagina invalido
+
+            - `400` — Parametro de tamaño de pagina invalido
+
+            - `500` — Error al consultar pertenencia etnica
+          sortKey: -1740873600002
+        method: GET
+        parameters:
+          - name: department
+            value: ""
+            description: Departamento (vacio = todos)
+          - name: page
+            value: "1"
+            description: "Numero de pagina (default: 1)"
+          - name: pageSize
+            value: "10"
+            description: "Registros por pagina (default: 10)"
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Departments
+    meta:
+      id: fld_128f17cb7441447f9990421c6c829759
+      created: 1740873600000
+      modified: 1773324708108
+      sortKey: -1740873599995
+      description: Endpoints para consulta de departamentos y conteo de victimas por
+        departamento.
+    children:
+      - url: "{{ _.base_url }}/department/ANTIOQUIA"
+        name: Get Victim Count by Department
+        meta:
+          id: req_595c2b28f76a4e6fbfd399f1590c73fd
+          created: 1740873600000
+          modified: 1773324708145
+          isPrivate: false
+          description: |-
+            Obtiene el conteo total de victimas para un departamento especifico.
+
+            ## Path Parameter
+            | Parametro | Tipo | Descripcion |
+            |-----------|------|-------------|
+            | `:department_name` | string | Nombre del departamento |
+
+            ## Respuesta exitosa (200)
+            ```json
+            {
+              "success": true,
+              "data": {
+                "department_name": "ANTIOQUIA",
+                "total_victims": 1250000
+              },
+              "message": "Conteo de victimas obtenido exitosamente"
+            }
+            ```
+
+            ## Errores posibles
+            - `400` — El nombre del departamento es requerido
+            - `404` — Departamento no encontrado
+            - `500` — Error al obtener el conteo de victimas por departamento
+          sortKey: -1740873600001
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/departments"
+        name: Get All Departments
+        meta:
+          id: req_afc6aca5e9fd448cac5244ffe214af65
+          created: 1740873600000
+          modified: 1773932356027
+          isPrivate: false
+          description: |-
+            Obtiene la lista de todos los departamentos disponibles.
+
+            ## Respuesta exitosa (200)
+            ```json
+            {
+              "success": true,
+              "data": {
+                "departments": [
+                  "AMAZONAS",
+                  "ANTIOQUIA",
+                  "ARAUCA",
+                  "ATLANTICO",
+                  "BOGOTA D.C.",
+                  "BOLIVAR",
+                  "BOYACA",
+                  "..."
+                ]
+              },
+              "message": "Departamentos obtenidos exitosamente"
+            }
+            ```
+
+            ## Errores posibles
+            - `500` — Error al obtener los departamentos
+          sortKey: -1740873600002
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Tickets
+    meta:
+      id: fld_4d89e69caf1a4eec8d9ee014e679dbc7
+      created: 1740873600000
+      modified: 1773324708110
+      sortKey: -1740873599999
+      description: Endpoints para gestion de tickets de atencion. El user_id se extrae
+        automaticamente del JWT al crear un ticket.
+    children:
+      - url: "{{ _.base_url }}/ticket/attended"
+        name: Get Attended Tickets
+        meta:
+          id: req_1f87e8ca279d42ffb5fd5251e100b58e
+          created: 1740873600000
+          modified: 1773324708128
+          isPrivate: false
+          description: |-
+            Obtiene los tickets atendidos recientemente con paginacion.
+
+            ## Query Parameters
+            | Parametro | Tipo | Default | Descripcion |
+            |-----------|------|---------|-------------|
+            | `page` | int | 1 | Numero de pagina (>= 1) |
+            | `pageSize` | int | 10 | Registros por pagina (>= 1) |
+
+            ## Respuesta exitosa (200)
+            ```json
+            {
+              "success": true,
+              "data": [
+                {
+                  "department_name": "ANTIOQUIA",
+                  "documentos": "1234567890",
+                  "full_name": "JUAN CARLOS PEREZ GARCIA",
+                  "date_time": "2026-03-02T10:30:00Z"
+                }
+              ],
+              "message": "Tickets atendidos obtenidos exitosamente"
+            }
+            ```
+
+            ## Errores posibles
+            - `400` — Parametro de pagina invalido
+            - `400` — Parametro de tamaño de pagina invalido
+            - `500` — Error al obtener los tickets atendidos
+          sortKey: -1740873600002
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            description: "Numero de pagina (default: 1)"
+          - name: pageSize
+            value: "10"
+            description: "Registros por pagina (default: 10)"
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/ticket/all"
+        name: Get All Tickets (Paginated)
+        meta:
+          id: req_3101f743ac5945d5b5febda70da8be8e
+          created: 1740873600000
+          modified: 1773324708132
+          isPrivate: false
+          description: |-
+            Obtiene todos los tickets con paginacion.
+
+            ## Query Parameters
+            | Parametro | Tipo | Default | Descripcion |
+            |-----------|------|---------|-------------|
+            | `page` | int | 1 | Numero de pagina (>= 1) |
+            | `pageSize` | int | 10 | Registros por pagina (>= 1) |
+
+            ## Respuesta exitosa (200)
+            ```json
+            {
+              "success": true,
+              "data": [
+                {
+                  "ticket_id": 1,
+                  "title": "Atencion inicial",
+                  "content": "Descripcion...",
+                  "keywords": "atencion,inicial",
+                  "document_number": "1234567890",
+                  "user_id": 1,
+                  "date_time": "2026-03-02T10:30:00Z"
+                }
+              ],
+              "message": "Tickets obtenidos exitosamente"
+            }
+            ```
+
+            ## Errores posibles
+            - `400` — Parametro de pagina invalido
+            - `400` — Parametro de tamano de pagina invalido
+            - `500` — Error al obtener los tickets
+          sortKey: -1740873600003
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            description: "Numero de pagina (default: 1)"
+          - name: pageSize
+            value: "10"
+            description: "Registros por pagina (default: 10)"
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/ticket/1234567890"
+        name: Get Tickets by Document
+        meta:
+          id: req_7a6538ee3ab740debbae19bf1bc04de8
+          created: 1740873600000
+          modified: 1773324708150
+          isPrivate: false
+          description: >-
+            Obtiene los tickets asociados a un numero de documento de victima
+            con paginacion.
+
+
+            ## Path Parameter
+
+            | Parametro | Tipo | Descripcion |
+
+            |-----------|------|-------------|
+
+            | `:document_number` | string | Numero de documento |
+
+
+            ## Query Parameters
+
+            | Parametro | Tipo | Default | Descripcion |
+
+            |-----------|------|---------|-------------|
+
+            | `page` | int | 1 | Numero de pagina (>= 1) |
+
+            | `pageSize` | int | 10 | Registros por pagina (>= 1) |
+
+
+            ## Respuesta exitosa (200)
+
+            ```json
+
+            {
+              "success": true,
+              "data": [
+                {
+                  "date_time": "2026-03-02T10:30:00Z",
+                  "ticket_id": 1,
+                  "title": "Atencion inicial",
+                  "content": "Descripcion de la atencion..."
+                }
+              ],
+              "message": "Tickets obtenidos exitosamente"
+            }
+
+            ```
+
+
+            ## Errores posibles
+
+            - `400` — El numero de documento es requerido
+
+            - `400` — Parametro de pagina invalido
+
+            - `400` — Parametro de tamaño de pagina invalido
+
+            - `500` — Error al obtener tickets por documento
+          sortKey: -1740873600001
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            description: "Numero de pagina (default: 1)"
+          - name: pageSize
+            value: "10"
+            description: "Registros por pagina (default: 10)"
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/ticket"
+        name: Create Ticket
+        meta:
+          id: req_9a2833ee4a0d4389a5ecdf1bf6458113
+          created: 1740873600000
+          modified: 1773932356027
+          isPrivate: false
+          description: >-
+            Crea un nuevo ticket de atencion. El `user_id` se obtiene
+            automaticamente del JWT.
+
+
+            ## Campos (todos requeridos)
+
+            | Campo | Tipo | Descripcion |
+
+            |-------|------|-------------|
+
+            | `ticket_id` | int | ID del ticket |
+
+            | `title` | string | Titulo del ticket |
+
+            | `content` | string | Contenido/descripcion |
+
+            | `keywords` | string | Palabras clave separadas por coma |
+
+            | `document_number` | string | Documento de la victima atendida |
+
+
+            ## Respuesta exitosa (201)
+
+            ```json
+
+            {
+              "success": true,
+              "message": "Ticket creado exitosamente"
+            }
+
+            ```
+
+
+            ## Errores posibles
+
+            - `400` — Datos de entrada invalidos: {detalle}
+
+            - `401` — ID de usuario no encontrado en el contexto
+
+            - `500` — Error al crear el ticket
+          sortKey: -1740873600004
+        method: POST
+        body:
+          mimeType: application/json
+          text: >-
+            {
+              "ticket_id": 1,
+              "title": "Atencion inicial",
+              "content": "Se realizo atencion inicial al usuario con orientacion sobre rutas de atencion",
+              "keywords": "atencion,inicial,orientacion,victima",
+              "document_number": "1234567890"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Care Lines
+    meta:
+      id: fld_d084e6cf930f4feb982b2cc288e5341b
+      created: 1740873600000
+      modified: 1773324708112
+      sortKey: -1740873599996
+      description: Endpoints para consulta de lineas de atencion (APE y SENA) por
+        departamento. Retornan informacion de contacto, direccion y horarios de
+        atencion.
+    children:
+      - url: "{{ _.base_url }}/lines/sena/ANTIOQUIA"
+        name: Get SENA Care Lines
+        meta:
+          id: req_7542300ef7c24f4abf34f57e15e8b305
+          created: 1740873600000
+          modified: 1773324708146
+          isPrivate: false
+          description: >-
+            Obtiene las lineas de atencion SENA para un departamento con
+            paginacion.
+
+
+            ## Path Parameter
+
+            | Parametro | Tipo | Descripcion |
+
+            |-----------|------|-------------|
+
+            | `:department` | string | Nombre del departamento (ej: ANTIOQUIA,
+            CUNDINAMARCA) |
+
+
+            ## Query Parameters
+
+            | Parametro | Tipo | Default | Descripcion |
+
+            |-----------|------|---------|-------------|
+
+            | `page` | int | 1 | Numero de pagina (>= 1) |
+
+            | `pageSize` | int | 10 | Registros por pagina (>= 1) |
+
+
+            ## Respuesta exitosa (200)
+
+            ```json
+
+            {
+              "success": true,
+              "data": [
+                {
+                  "department": "ANTIOQUIA",
+                  "city": "MEDELLIN",
+                  "contact": "Centro SENA",
+                  "address": "Carrera 70 # 30-15",
+                  "service_hours": "Lunes a Viernes 7:00 - 16:00",
+                  "phone": "6044445678"
+                }
+              ],
+              "message": "Lineas de atencion SENA obtenidas exitosamente"
+            }
+
+            ```
+
+
+            ## Errores posibles
+
+            - `400` — El department es requerido
+
+            - `400` — Parametro de pagina invalido
+
+            - `400` — Parametro de tamaño de pagina invalido
+
+            - `500` — Error al obtener lineas de atencion SENA
+          sortKey: -1740873600001
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            description: "Numero de pagina (default: 1)"
+          - name: pageSize
+            value: "10"
+            description: "Registros por pagina (default: 10)"
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/lines/ape/ANTIOQUIA"
+        name: Get APE Care Lines
+        meta:
+          id: req_79a06354325c43678ba06591bca1c98c
+          created: 1740873600000
+          modified: 1773324708148
+          isPrivate: false
+          description: >-
+            Obtiene las lineas de atencion APE para un departamento con
+            paginacion.
+
+
+            ## Path Parameter
+
+            | Parametro | Tipo | Descripcion |
+
+            |-----------|------|-------------|
+
+            | `:department` | string | Nombre del departamento (ej: ANTIOQUIA,
+            CUNDINAMARCA) |
+
+
+            ## Query Parameters
+
+            | Parametro | Tipo | Default | Descripcion |
+
+            |-----------|------|---------|-------------|
+
+            | `page` | int | 1 | Numero de pagina (>= 1) |
+
+            | `pageSize` | int | 10 | Registros por pagina (>= 1) |
+
+
+            ## Respuesta exitosa (200)
+
+            ```json
+
+            {
+              "success": true,
+              "data": [
+                {
+                  "department": "ANTIOQUIA",
+                  "city": "MEDELLIN",
+                  "contact": "Centro de Atencion",
+                  "address": "Calle 50 # 45-20",
+                  "service_hours": "Lunes a Viernes 8:00 - 17:00",
+                  "phone": "6044441234"
+                }
+              ],
+              "message": "Lineas de atencion APE obtenidas exitosamente"
+            }
+
+            ```
+
+
+            ## Errores posibles
+
+            - `400` — El department es requerido
+
+            - `400` — Parametro de pagina invalido
+
+            - `400` — Parametro de tamaño de pagina invalido
+
+            - `500` — Error al obtener lineas de atencion APE
+          sortKey: -1740873600002
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            description: "Numero de pagina (default: 1)"
+          - name: pageSize
+            value: "10"
+            description: "Registros por pagina (default: 10)"
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Goals
+    meta:
+      id: fld_f236eb72f918435b955358065ba2644c
+      created: 1740873600000
+      modified: 1773324708114
+      sortKey: -1740873599997
+      description: Endpoints para gestion de metas de atencion. Cada meta esta
+        asociada a un usuario y tiene un rango de fechas.
+    children:
+      - url: "{{ _.base_url }}/goal"
+        name: Create Goal
+        meta:
+          id: req_3e04f7d6ab224e2c8759676134796378
+          created: 1740873600000
+          modified: 1773932356027
+          isPrivate: false
+          description: |-
+            Crea una nueva meta de atencion.
+
+            ## Campos (todos requeridos)
+            | Campo | Tipo | Descripcion |
+            |-------|------|-------------|
+            | `goal_title` | string | Titulo de la meta |
+            | `limit` | int | Numero objetivo de tickets |
+            | `start_date` | string | Fecha de inicio (YYYY-MM-DD) |
+            | `end_date` | string | Fecha de fin (YYYY-MM-DD) |
+            | `user_id` | int | ID del usuario asignado |
+
+            ## Respuesta exitosa (201)
+            ```json
+            {
+              "success": true,
+              "message": "Meta creada exitosamente"
+            }
+            ```
+
+            ## Errores posibles
+            - `400` — Datos de entrada invalidos: {detalle}
+            - `500` — Error al crear la meta
+          sortKey: -1740873600001
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "goal_title": "Meta mensual de atencion",
+              "limit": 100,
+              "start_date": "2026-03-01",
+              "end_date": "2026-03-31",
+              "user_id": 1
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/goal/1"
+        name: Get Goal by User ID
+        meta:
+          id: req_fd6714b67fd54e43adb136c31d79c64d
+          created: 1740873600000
+          modified: 1773347377678
+          isPrivate: false
+          description: |-
+            Obtiene la meta de un usuario especifico.
+
+            ## Path Parameter
+            | Parametro | Tipo | Descripcion |
+            |-----------|------|-------------|
+            | `:id` | string | ID del usuario |
+
+            ## Respuesta exitosa (200)
+            ```json
+            {
+              "success": true,
+              "data": {
+                "goal_id": 1,
+                "goal_title": "Meta mensual de atencion",
+                "user_id": 1,
+                "total_tickets": 45
+              },
+              "message": "Meta obtenida exitosamente"
+            }
+            ```
+
+            ## Errores posibles
+            - `400` — El id del usuario es requerido
+            - `404` — Meta no encontrada
+            - `500` — Error al obtener la meta
+          sortKey: -1740873600002
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: File Upload
+    meta:
+      id: fld_fcbf2bfe517e4f5f8799f8c8bb55fa2b
+      created: 1740873600000
+      modified: 1773324708116
+      sortKey: -1740873600001
+      description: Endpoints para subida y eliminacion de archivos. Soporta carga por
+        chunks (partes) para archivos grandes (.txt, .xlsx, .xls).
+    children:
+      - url: "{{ _.base_url }}/upload"
+        name: Upload File Chunk
+        meta:
+          id: req_32f3984f900b4527add6053660ea7c78
+          created: 1740873600000
+          modified: 1773324708134
+          isPrivate: false
+          description: >2-
+              Sube un chunk (parte) de archivo al servidor.
+
+              ## Autenticación
+              Requiere header:
+              Authorization: Bearer {token}
+
+              ## Campos (multipart/form-data)
+
+              | Campo          | Tipo     | Requerido | Descripción                                                                       |
+              |----------------|----------|-----------|-----------------------------------------------------------------------------------|
+              | `file`         | file     | Sí        | El chunk a subir. El nombre **debe** contener `parteN` (ej: `archivo_parte1.txt`) |
+              | `sizeMainFile` | integer  | Sí        | Tamaño total del archivo completo en bytes                                        |
+
+              ## Regla de nombrado de chunks — obligatoria
+
+              El frontend debe dividir el archivo en fragmentos de **10MB** y renombrar cada uno antes de enviarlo:
+
+              archivo.txt (35MB)
+                → archivo_parte1.txt  (primer envío)
+                → archivo_parte2.txt  (segundo envío)
+                → archivo_parte3.txt  (tercer envío)
+                → archivo_parte4.txt  (último envío)
+
+              Si el nombre del chunk no contiene `parteN`, el backend rechaza con `500 — chunk arrived out of sequential order`.
+
+              ## Flujo de carga por chunks
+
+              1. Dividir el archivo en partes de 10MB nombradas con `_parteN` antes de la extensión.
+              2. Enviar cada parte en orden secuencial (parte1, parte2, parte3...).
+              3. Incluir siempre `sizeMainFile` con el tamaño del archivo **original completo**.
+              4. El servidor responde `is_complete: false` por cada chunk intermedio.
+              5. Al recibir todos los bytes, responde `is_complete: true` y procesa el archivo automáticamente en base de datos.
+
+              ## Respuesta exitosa — archivo completo (200)
+              ```json
+
+            	{
+            		"success": true,
+            		"data": {
+            			"is_complete": true,
+            			"message": "file uploaded and processed successfully",
+            			"file_path": "/app/cmd/uploads/_UNIVERSO_VICTIMAS_LB_parte.txt"
+            		},
+            		"message": "Archivo cargado y procesado exitosamente"
+            	}
+
+              Errores posibles
+
+              - 400 — El archivo es requerido
+              - 400 — sizeMainFile debe ser un entero valido
+              - 401 — token no proporcionado / token inválido / token expirado
+              - 500 — Error al abrir el archivo cargado
+              - 500 — file type is not supported, allowed: .txt, .xlsx, .xls
+              - 500 — chunk arrived out of sequential order
+          sortKey: -1740873600001
+        method: POST
+        body:
+          mimeType: multipart/form-data
+          params:
+            - name: file
+              value: ""
+              description: Archivo o chunk a subir (.txt, .xlsx, .xls)
+              fileName: C:\Users\rogstrix\Videos\0002_UNIVERSO_VICTIMAS_LB_parte1.txt
+              type: file
+            - name: sizeMainFile
+              value: "5341866043"
+              description: Tamano total del archivo completo en bytes
+              type: text
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ _.base_url }}/delete/example_file.txt"
+        name: Delete File
+        meta:
+          id: req_48fc55e389dc4818b135ae3b1be9e585
+          created: 1740873600000
+          modified: 1773324708141
+          isPrivate: false
+          description: >2-
+              ## Para `DELETE /api/v1/delete/:fileName`
+
+              Elimina un archivo parcialmente ensamblado del servidor cuando falla la conexión durante el upload.
+
+              > ⚠️ **Este endpoint no es para el botón de eliminar de la UI.**
+              > Es un mecanismo automático de recuperación: se llama desde el código cuando se detecta
+              > pérdida de conexión (`navigator.onLine === false`) durante el envío de un chunk.
+              > Debe ejecutarse cuando el internet vuelve (evento `online`), no inmediatamente al caer.
+
+              ## Aclaración — botón eliminar de la UI
+            	
+            	El botón de eliminar (ícono papelera) que aparece en la interfaz al seleccionar un archivo
+              **no tiene relación con este endpoint**. Ese botón únicamente resetea el estado local
+              del frontend (deselecciona el archivo) permitiendo al usuario elegir otro archivo diferente.
+              Es equivalente a "cancelar selección".
+
+              | Acción | Llama al backend | Efecto |
+              |--------|-----------------|--------|
+              | Botón papelera en UI | ❌ No | Deselecciona el archivo, permite elegir otro |
+              | Este endpoint DELETE | ✅ Sí (automático por código) | Elimina archivo parcial del servidor si cae el WiFi |
+            	
+
+              ## Cuándo llamarlo
+
+              **Condición:** el fetch de un chunk falla con `TypeError` y `navigator.onLine === false`.
+
+              En ese momento **no se puede llamar el endpoint** porque no hay conexión.
+              Lo correcto es registrar un listener y ejecutarlo automáticamente cuando el internet vuelva:
+
+              1. WiFi cae durante el envío de un chunk → fetch lanza `TypeError`
+              2. Frontend detecta `!navigator.onLine` → registra listener del evento `online`
+              3. Frontend muestra error al usuario en la UI
+              4. WiFi vuelve → evento `online` se dispara automáticamente
+              5. Frontend ejecuta `DELETE /api/v1/delete/:fileName` → servidor limpia el archivo parcial
+              6. Sistema queda limpio y listo para reintentar el upload desde cero
+            	
+            	
+              ## Autenticación
+              Requiere header:
+              Authorization: Bearer {token}
+
+              ## Path Parameter
+
+              | Parámetro | Tipo | Descripción |
+              |-----------|------|-------------|
+              | `:fileName` | string | Nombre del chunk que se estaba enviando cuando falló (ej: `archivo_parte2.txt`) |
+
+              ## Qué hace el backend
+
+              Convierte internamente el nombre del chunk al nombre del archivo ensamblado en disco
+              eliminando los dígitos (`archivo_parte2.txt` → `archivo_parte.txt`) y lo borra.
+              La base de datos **no se ve afectada** porque los datos solo se insertan cuando el
+              archivo está 100% completo.
+
+              ## Respuesta exitosa (200)
+              ```json
+              {
+                "success": true,
+                "message": "Archivo eliminado exitosamente"
+              }
+
+              Errores posibles
+
+              - 400 — El nombre del archivo es requerido
+              - 401 — token no proporcionado / token inválido / token expirado
+              - 500 — failed to delete file from storage
+          sortKey: -1740873600000
+        method: DELETE
+        authentication:
+          type: bearer
+          token: "{{ _.token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_feb256923080d1e0023cbf80c16b2877dad34336
+    created: 1773324708213
+    modified: 1773324708213
+environments:
+  name: Base Environment
+  meta:
+    id: env_1658fe5bd58a4db885ee00ec6bdc0604
+    created: 1740873600000
+    modified: 1773324708099
+    isPrivate: false
+  data:
+    base_url: ""
+    token: ""
+  subEnvironments:
+    - name: Local Development
+      meta:
+        id: env_657d95b69209463ebf33ea53784d1dcd
+        created: 1740873600000
+        modified: 1773324708101
+        isPrivate: false
+        sortKey: 1740873600000
+      data:
+        base_url: http://localhost:8082/api/v1
+        token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoxLCJlbWFpbCI6InRlc3RAdGVzdC5jb20iLCJyb2xlIjoiZnVuY2lvbmFyaW8iLCJleHAiOjE5NzIwMDAwMDB9.bA3sUWyT-bNmb9PrOnk_521-uTxohui_VzkRzbKIbuo
+      color: "#7d69cb"

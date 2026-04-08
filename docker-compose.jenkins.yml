@@ -3,7 +3,8 @@
 #  en Docker-in-Docker (DinD).
 #
 #  Uso (solo desde Jenkins, vía Jenkinsfile):
-#    docker compose -f docker-compose.qa.yml -f docker-compose.jenkins.yml ...
+#    docker compose -p qa-pipeline -f docker-compose.qa.yml -f docker-compose.jenkins.yml ...
+#  El nombre de proyecto lo fija docker-compose.qa.yml / qa_fuc.yml (name: qa-pipeline).
 # ═══════════════════════════════════════════════════════════════
 
 services:

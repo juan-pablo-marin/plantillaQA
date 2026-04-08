@@ -462,6 +462,11 @@
             color: var(--fail);
         }
 
+        .folder-header .folder-stats .metric-label {
+            color: var(--text-muted);
+            margin-right: 2px;
+        }
+
         .folder-body {
             padding: 6px 0 0 16px;
             display: none;
@@ -672,6 +677,13 @@
             display: block;
         }
 
+        .repro-title {
+            margin-top: 10px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
         /* ── Loading state ── */
         .loading {
             display: flex;
@@ -843,6 +855,37 @@
             return proto + host + port + path;
         }
 
+        function buildReproJson(exec) {
+            const req = exec.request || {};
+            const body = req.body || {};
+            const headers = (req.header || []).map(h => ({ key: h.key, value: h.value }));
+            const auth = req.auth || null;
+            const url = buildUrl(req.url);
+            let parsedBody = null;
+            let rawBody = null;
+            let bodyMode = body.mode || null;
+
+            if (bodyMode === 'raw') {
+                rawBody = body.raw || '';
+                try { parsedBody = JSON.parse(rawBody); } catch { parsedBody = null; }
+            } else if (bodyMode === 'urlencoded') {
+                parsedBody = (body.urlencoded || []).map(x => ({ key: x.key, value: x.value }));
+            } else if (bodyMode === 'formdata') {
+                parsedBody = (body.formdata || []).map(x => ({ key: x.key, value: x.value, type: x.type }));
+            }
+
+            return {
+                name: exec.item?.name || null,
+                method: req.method || 'GET',
+                url,
+                headers,
+                auth,
+                bodyMode,
+                body: parsedBody || rawBody,
+                note: 'Replica esta request en Postman/curl con los mismos headers, auth y body.'
+            };
+        }
+
         function escapeHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
         function tryPrettyJson(s) { try { return JSON.stringify(JSON.parse(s), null, 2); } catch { return s; } }
 
@@ -987,6 +1030,12 @@
             const passedAssertions = totalAssertions - stats.assertions.failed;
             const failedAssertions = stats.assertions.failed;
             const passRate = pct(passedAssertions, totalAssertions);
+            const totalRequestsExec = executions.length;
+            const passedRequestsExec = executions.filter(e => {
+                const code = Number(e?.response?.code || 0);
+                return code >= 200 && code < 400;
+            }).length;
+            const failedRequestsExec = totalRequestsExec - passedRequestsExec;
 
             // Stats
             content.insertAdjacentHTML('beforeend', `
@@ -1000,6 +1049,16 @@
         <div class="label">Requests</div>
         <div class="value">${stats.requests.total}</div>
         <div class="sub">${stats.requests.failed} fallidos</div>
+      </div>
+      <div class="stat-card ${failedRequestsExec > 0 ? 'warn' : 'success'}">
+        <div class="label">Endpoints HTTP OK</div>
+        <div class="value">${passedRequestsExec}/${totalRequestsExec}</div>
+        <div class="sub">2xx/3xx: ${passedRequestsExec} · 4xx/5xx: ${failedRequestsExec}</div>
+      </div>
+      <div class="stat-card ${failedAssertions > 0 ? 'warn' : 'success'}">
+        <div class="label">Assertions Ejecutadas</div>
+        <div class="value">${totalAssertions}</div>
+        <div class="sub">✓ ${passedAssertions} · ✗ ${failedAssertions}</div>
       </div>
       <div class="stat-card success">
         <div class="label">Assertions ✓</div>
@@ -1081,8 +1140,13 @@
 
             let folderIdx = 0;
             folders.forEach((execs, folderName) => {
-                const fPassCount = execs.reduce((s, e) => s + (e.assertions || []).filter(a => !a.error).length, 0);
-                const fFailCount = execs.reduce((s, e) => s + (e.assertions || []).filter(a => a.error).length, 0);
+                const fHttpPassCount = execs.filter(e => {
+                    const code = Number(e?.response?.code || 0);
+                    return code >= 200 && code < 400;
+                }).length;
+                const fHttpFailCount = execs.length - fHttpPassCount;
+                const fAssertPassCount = execs.reduce((s, e) => s + (e.assertions || []).filter(a => !a.error).length, 0);
+                const fAssertFailCount = execs.reduce((s, e) => s + (e.assertions || []).filter(a => a.error).length, 0);
                 const fId = 'folder-' + folderIdx++;
 
                 let requestCards = execs.map((exec, ri) => {
@@ -1097,6 +1161,10 @@
                     const assertions = exec.assertions || [];
                     const body = decodeStream(res.stream);
                     const detailId = fId + '-req-' + ri;
+                    const hasAssertionError = assertions.some(a => !!a.error);
+                    const isHttpError = code >= 400;
+                    const shouldShowRepro = hasAssertionError || isHttpError;
+                    const reproJson = shouldShowRepro ? JSON.stringify(buildReproJson(exec), null, 2) : '';
 
                     let assertionsHtml = assertions.map(a => {
                         const pass = !a.error;
@@ -1122,6 +1190,10 @@
               <button class="response-toggle" onclick="toggleBody(this)">▶ Ver Response Body</button>
               <div class="response-body">${escapeHtml(tryPrettyJson(body))}</div>
             ` : ''}
+            ${shouldShowRepro ? `
+              <div class="repro-title">JSON para replicar error</div>
+              <div class="response-body open">${escapeHtml(reproJson)}</div>
+            ` : ''}
           </div>
         </div>`;
                 }).join('');
@@ -1132,8 +1204,8 @@
           <span class="chevron">▶</span>
           <span class="folder-name">📁 ${escapeHtml(folderName)}</span>
           <span class="folder-stats">
-            <span class="pass">✓ ${fPassCount}</span>
-            <span class="fail">✗ ${fFailCount}</span>
+            <span><span class="metric-label">HTTP</span><span class="pass">✓ ${fHttpPassCount}</span> <span class="fail">✗ ${fHttpFailCount}</span></span>
+            <span><span class="metric-label">Assert</span><span class="pass">✓ ${fAssertPassCount}</span> <span class="fail">✗ ${fAssertFailCount}</span></span>
           </span>
         </div>
         <div class="folder-body">${requestCards}</div>
