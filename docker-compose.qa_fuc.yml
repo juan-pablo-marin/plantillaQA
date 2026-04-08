@@ -106,16 +106,17 @@ services:
     ports:
       - "${BACKEND_PORT:-8088}:8080"
     healthcheck:
-      # Go/Gin: si existe /health (2xx), ok; si no, / suele ser 200 o 404 mientras el servidor ya escucha (mismo criterio que RAV).
+      # Go: (1) /health 2xx (2) / 2xx (3) / con 200|404 sin -f (Gin) (4) puerto TCP abierto (imagen sin curl, p. ej. solo busybox nc).
+      # Imagen scratch/distroless sin /bin/sh: sustituir healthcheck en el Dockerfile del backend o usar stage final con sh+curl/wget/nc.
       test:
         [
           "CMD-SHELL",
-          'curl -sf http://127.0.0.1:8080/health >/dev/null || { c=$$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/) && { [ "$$c" = "404" ] || [ "$$c" = "200" ]; }; }',
+          'curl -sf http://127.0.0.1:8080/health >/dev/null 2>&1 || curl -sf http://127.0.0.1:8080/ >/dev/null 2>&1 || { c=$$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/ 2>/dev/null); [ "$$c" = "404" ] || [ "$$c" = "200" ]; } || nc -z -w 2 127.0.0.1 8080 2>/dev/null || wget -q --spider http://127.0.0.1:8080/ 2>/dev/null',
         ]
       interval: 10s
       timeout: 8s
-      retries: 10
-      start_period: 90s
+      retries: 18
+      start_period: 120s
     networks:
       - qa-network
 
