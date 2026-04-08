@@ -106,8 +106,12 @@ services:
     ports:
       - "${BACKEND_PORT:-8088}:8080"
     healthcheck:
-      # El bucle Jenkins espera BE_ST=healthy; Node/conn Mongo suele tardar más que 30s en cold start.
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      # Go/Gin: si existe /health (2xx), ok; si no, / suele ser 200 o 404 mientras el servidor ya escucha (mismo criterio que RAV).
+      test:
+        [
+          "CMD-SHELL",
+          'curl -sf http://127.0.0.1:8080/health >/dev/null || { c=$$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/) && { [ "$$c" = "404" ] || [ "$$c" = "200" ]; }; }',
+        ]
       interval: 10s
       timeout: 8s
       retries: 10
