@@ -648,11 +648,13 @@ HTML_EOF
                 try {
                     sh '''
                         PROJECT_NAME=$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\r')
+                        GRAFANA_PORT=$(grep '^GRAFANA_HOST_PORT=' ${ENV_FILE} 2>/dev/null | cut -d'=' -f2 | tr -d '\r')
+                        GRAFANA_PORT=${GRAFANA_PORT:-3010}
                         echo "=> Aguardando procesamiento CE task de SonarQube..."
                         sleep 30
                         echo "   Servicios activos para revisión (db/backend/frontend siguen arriba; volumenes Docker no se eliminan):"
                         echo "     - SonarQube    → http://localhost:9000"
-                        echo "     - Grafana      → http://localhost:3001"
+                        echo "     - Grafana      → http://localhost:${GRAFANA_PORT}"
                         echo "     - InfluxDB     → http://localhost:8086"
                         echo "     - Newman HTML  → http://localhost:8181  (FUC: qa/reports/fuc/newman; RAV: qa/reports/rav/newman; historial en anterior/)"
                         echo "     - Playwright   → http://localhost:8182"

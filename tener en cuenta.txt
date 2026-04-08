@@ -198,7 +198,7 @@ docker compose -p qa-pipeline --env-file .env.qa -f docker-compose.qa.yml -f doc
 --profile all levanta todo lo que en el compose está bajo el perfil all (incluido Jenkins si aplica).
 
 Cambiar de FUC a RAV (o al revés) en el mismo equipo
-Mismo proyecto qa-pipeline y muchos puertos iguales (9000, 8086, 3001, etc.): no conviene tener los dos stacks completos a la vez. Antes de subir el otro, baja el actual sin borrar volúmenes:
+Mismo proyecto qa-pipeline y muchos puertos iguales (9000, 8086, GRAFANA_HOST_PORT por defecto 3010, etc.): no conviene tener los dos stacks completos a la vez. Antes de subir el otro, baja el actual sin borrar volúmenes:
 
 Tras FUC, para pasar a RAV:
 
