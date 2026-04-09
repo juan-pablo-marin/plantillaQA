@@ -46,6 +46,9 @@ pipeline {
                         export DOCKER_BUILDKIT=1
                         export COMPOSE_DOCKER_CLI_BUILD=1
                         export COMPOSE_PROJECT_NAME=qa-pipeline
+                        # Influx/Grafana/Prometheus/cAdvisor usan perfil test-e2e (no sonar). Sin esto,
+                        # Compose puede crear contenedores pero no aplicar el grafo de dependencias al iniciar.
+                        export COMPOSE_PROFILES="test-e2e,sonar"
 
                         # Leer PROJECT_NAME del config actual (fuente unica de verdad)
                         PROJECT_NAME=$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\r')
@@ -62,31 +65,48 @@ pipeline {
                         rm -rf ${JENKINS_REPORTS_DIR}/coverage-backend.out ${JENKINS_REPORTS_DIR}/coverage-backend.xml ${JENKINS_REPORTS_DIR}/govet.txt ${JENKINS_REPORTS_DIR}/k6 ${JENKINS_REPORTS_DIR}/js-test-report.xml ${JENKINS_REPORTS_DIR}/go-test-report.json
 
                         echo "=> Levantando servicios persistentes (sin recrear si ya existen)..."
-                        ${COMPOSE_CMD} --profile sonar up -d --no-recreate \
-                            sonar-db sonarqube influxdb cadvisor prometheus \
+                        ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d --no-recreate \
+                            sonar-db sonarqube influxdb \
                         || {
                             echo "  WARN: Conflicto de contenedores (probable cambio de proyecto compose)."
                             echo "  Removiendo contenedores huerfanos y reintentando..."
                             docker rm -f ${PROJECT_NAME}-influxdb \
                                 ${PROJECT_NAME}-sonar-db ${PROJECT_NAME}-sonarqube \
                                 ${PROJECT_NAME}-prometheus ${PROJECT_NAME}-cadvisor 2>/dev/null || true
-                            ${COMPOSE_CMD} --profile sonar up -d \
-                                sonar-db sonarqube influxdb cadvisor prometheus
+                            ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d \
+                                sonar-db sonarqube influxdb
                         }
 
+                        echo "=> Levantando cadvisor -> prometheus (orden explicito; evita estado Created sin start)..."
+                        ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d cadvisor
+                        sleep 3
+                        ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d prometheus
+                        sleep 2
+                        for SVC in cadvisor prometheus; do
+                          C="${PROJECT_NAME}-${SVC}"
+                          ST=$(docker inspect --format='{{.State.Status}}' "${C}" 2>/dev/null || echo missing)
+                          if [ "$ST" = "created" ]; then
+                            echo "  Forzando docker start ${C} (estaba created)..."
+                            docker start "${C}" || echo "  WARN: start ${C} fallo"
+                          fi
+                        done
 
                         echo "=> Levantando Report Viewers (preserva reportes entre builds)..."
                         # Docker Compose solo recrea si la configuración cambió.
                         # El contenido inyectado por docker cp persiste en la capa
                         # de escritura del contenedor mientras no se recree.
-                        ${COMPOSE_CMD} up -d newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
-                        ${COMPOSE_CMD} up -d playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
+                        ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
+                        ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
 
                         echo "=> Levantando Grafana (provisioning embebido en imagen)..."
-                        # Solo contenedor: los datos siguen en el volumen nombrado grafana_data.
-                        # --build reconstruye la imagen si Dockerfile.grafana o provisioning cambiaron.
+                        # Grafana depende de influx healthy + prometheus started; sin test-e2e activo a veces queda solo Created.
                         docker rm -f ${PROJECT_NAME}-grafana 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --build cadvisor prometheus grafana || echo "  WARN: Grafana/Prometheus/cAdvisor fallaron al iniciar (no detiene pruebas)"
+                        ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d --build grafana || echo "  WARN: compose up grafana devolvio error; intentando start..."
+                        G_ST=$(docker inspect --format='{{.State.Status}}' "${PROJECT_NAME}-grafana" 2>/dev/null || echo missing)
+                        if [ "$G_ST" = "created" ]; then
+                          echo "  Forzando docker start ${PROJECT_NAME}-grafana..."
+                          docker start "${PROJECT_NAME}-grafana" || echo "  WARN: start grafana fallo"
+                        fi
                         sleep 5
 
                         echo "=> Levantando servicios transientes de la aplicación..."
@@ -262,6 +282,10 @@ pipeline {
                         script {
                             echo "=> Ejecutando k6 Tests..."
                             sh """
+                                export COMPOSE_PROFILES=test-e2e,sonar
+                                PROJECT_NAME=\$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r')
+                                ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d cadvisor prometheus grafana || true
+                                docker start \${PROJECT_NAME}-cadvisor \${PROJECT_NAME}-prometheus \${PROJECT_NAME}-grafana 2>/dev/null || true
                                 ${COMPOSE_CMD} run --no-deps --name qa-runner-k6 \\
                                 -e REPORTS_DIR=${QA_REPORTS_DIR} \\
                                 -e RUN_NEWMAN=false \\

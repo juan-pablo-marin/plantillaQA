@@ -413,6 +413,8 @@ else
 fi
 
 # 5. k6 (carga/estrés)
+# Requiere InfluxDB (y opcionalmente Grafana/Prometheus) ya levantados en el host vía Compose.
+# Perfiles: test-e2e (+ sonar en Jenkins). Este contenedor qa-runner no ejecuta docker compose.
 echo "[5/6] k6 Performance Tests..."
 if [ "$RUN_K6" != "true" ]; then
     echo " SKIP: RUN_K6=$RUN_K6"
