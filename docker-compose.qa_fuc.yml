@@ -217,6 +217,8 @@ services:
       - SONAR_HOST_URL=http://sonarqube:9000
       - SONAR_TOKEN=${SONAR_TOKEN:-}
       - PROJECT_KEY=${PROJECT_KEY:-qa-project}
+      - K6_AUTH_ID_USER=${K6_AUTH_ID_USER:-}
+      - K6_AUTH_PASSWORD=${K6_AUTH_PASSWORD:-}
       # ── Flags de pruebas (false = desactivado, true = activo) ──
       - RUN_NEWMAN=${RUN_NEWMAN:-false}
       - RUN_SONAR=${RUN_SONAR:-false}
@@ -268,6 +270,47 @@ services:
     networks:
       - qa-network
 
+  # --- cAdvisor (métricas de contenedores → Prometheus; open source) ---
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: ${PROJECT_NAME}-cadvisor
+    profiles: [ "perf", "jenkins", "all", "test-e2e" ]
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "${CADVISOR_HOST_PORT:-8089}:8080"
+    command:
+      - --housekeeping_interval=10s
+      - --docker_only=true
+    networks:
+      - qa-network
+
+  # --- Prometheus (scraping cAdvisor; Grafana como UI) ---
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: ${PROJECT_NAME}-prometheus
+    profiles: [ "perf", "jenkins", "all", "test-e2e" ]
+    restart: unless-stopped
+    depends_on:
+      - cadvisor
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./qa/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "${PROMETHEUS_HOST_PORT:-9090}:9090"
+    networks:
+      - qa-network
+
   # --- Grafana (dashboard de métricas k6) ---
   # Provisioning embebido vía Dockerfile (fix DinD bind mounts)
   grafana:
@@ -280,6 +323,8 @@ services:
     depends_on:
       influxdb:
         condition: service_healthy
+      prometheus:
+        condition: service_started
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -316,6 +361,8 @@ services:
         condition: service_healthy
     environment:
       - BACKEND_URL=http://backend:8080
+      - K6_AUTH_ID_USER=${K6_AUTH_ID_USER:-}
+      - K6_AUTH_PASSWORD=${K6_AUTH_PASSWORD:-}
     volumes:
       - ./qa/reports:/qa/reports
       - ./qa/performance:/qa/performance:ro

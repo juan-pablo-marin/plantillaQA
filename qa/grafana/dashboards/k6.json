@@ -155,7 +155,8 @@
       "type": "timeseries",
       "targets": [
         { "datasource": { "type": "influxdb", "uid": "influxdb-k6" }, "alias": "health", "query": "SELECT mean(\"value\") FROM \"health_latency\" WHERE $timeFilter GROUP BY time($__interval) fill(null)", "rawQuery": true, "refId": "A", "resultFormat": "time_series" },
-        { "datasource": { "type": "influxdb", "uid": "influxdb-k6" }, "alias": "users", "query": "SELECT mean(\"value\") FROM \"users_latency\" WHERE $timeFilter GROUP BY time($__interval) fill(null)", "rawQuery": true, "refId": "B", "resultFormat": "time_series" }
+        { "datasource": { "type": "influxdb", "uid": "influxdb-k6" }, "alias": "users", "query": "SELECT mean(\"value\") FROM \"users_latency\" WHERE $timeFilter GROUP BY time($__interval) fill(null)", "rawQuery": true, "refId": "B", "resultFormat": "time_series" },
+        { "datasource": { "type": "influxdb", "uid": "influxdb-k6" }, "alias": "geo", "query": "SELECT mean(\"value\") FROM \"geo_latency\" WHERE $timeFilter GROUP BY time($__interval) fill(null)", "rawQuery": true, "refId": "C", "resultFormat": "time_series" }
       ]
     },
     {

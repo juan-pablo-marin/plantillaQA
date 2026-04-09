@@ -10,6 +10,7 @@ const AUTH_PASSWORD = __ENV.K6_AUTH_PASSWORD;
 const errors = new Rate('errors');
 const healthLatency = new Trend('health_latency');
 const usersLatency = new Trend('users_latency');
+const geoLatency = new Trend('geo_latency');
 
 // export const options = {
 //   stages: [
@@ -37,6 +38,7 @@ export const options = {
     http_req_duration: ['p(95)<500'],   // 95% de requests < 500ms
     errors: ['rate<0.1'],               // < 10% de errores
     health_latency: ['p(99)<200'],      // health check < 200ms
+    geo_latency: ['p(95)<800'],
   },
 };
 
@@ -98,8 +100,10 @@ export default function (data) {
 
   group('API - Geographic data', () => {
     const res = http.get(`${BACKEND_URL}/api/v1/geo/`);
+    geoLatency.add(res.timings.duration);
     const ok = check(res, {
       'geo status 200': (r) => r.status === 200,
+      'geo response < 800ms': (r) => r.timings.duration < 800,
     });
     errors.add(!ok);
   });

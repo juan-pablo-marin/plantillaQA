@@ -422,7 +422,8 @@ elif [ -f "performance/k6-tests_fuc.js" ]; then
     echo "  Push interval InfluxDB: ${K6_INFLUXDB_PUSH_INTERVAL:-1s} (K6_INFLUXDB_PUSH_INTERVAL)"
     k6 run performance/k6-tests_fuc.js \
       -e BACKEND_URL="$BACKEND_URL" \
-      -e TEST_TOKEN="$TEST_TOKEN" \
+      -e K6_AUTH_ID_USER="${K6_AUTH_ID_USER:-}" \
+      -e K6_AUTH_PASSWORD="${K6_AUTH_PASSWORD:-}" \
       -e K6_DIR="$K6_DIR" \
       --tag build="${BUILD_TAG}" \
       --tag environment="qa" \

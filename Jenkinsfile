@@ -36,7 +36,6 @@ pipeline {
     }
 
     stages {
-cd 
         stage('Preparar Entorno y Dependencias Docker') {
             steps {
                 script {
@@ -64,14 +63,15 @@ cd
 
                         echo "=> Levantando servicios persistentes (sin recrear si ya existen)..."
                         ${COMPOSE_CMD} --profile sonar up -d --no-recreate \
-                            sonar-db sonarqube influxdb \
+                            sonar-db sonarqube influxdb cadvisor prometheus \
                         || {
                             echo "  WARN: Conflicto de contenedores (probable cambio de proyecto compose)."
                             echo "  Removiendo contenedores huerfanos y reintentando..."
                             docker rm -f ${PROJECT_NAME}-influxdb \
-                                ${PROJECT_NAME}-sonar-db ${PROJECT_NAME}-sonarqube 2>/dev/null || true
+                                ${PROJECT_NAME}-sonar-db ${PROJECT_NAME}-sonarqube \
+                                ${PROJECT_NAME}-prometheus ${PROJECT_NAME}-cadvisor 2>/dev/null || true
                             ${COMPOSE_CMD} --profile sonar up -d \
-                                sonar-db sonarqube influxdb
+                                sonar-db sonarqube influxdb cadvisor prometheus
                         }
 
 
@@ -86,7 +86,7 @@ cd
                         # Solo contenedor: los datos siguen en el volumen nombrado grafana_data.
                         # --build reconstruye la imagen si Dockerfile.grafana o provisioning cambiaron.
                         docker rm -f ${PROJECT_NAME}-grafana 2>/dev/null || true
-                        ${COMPOSE_CMD} up -d --build grafana || echo "  WARN: Grafana falló al iniciar (no detiene pruebas)"
+                        ${COMPOSE_CMD} up -d --build cadvisor prometheus grafana || echo "  WARN: Grafana/Prometheus/cAdvisor fallaron al iniciar (no detiene pruebas)"
                         sleep 5
 
                         echo "=> Levantando servicios transientes de la aplicación..."
@@ -624,11 +624,17 @@ cd
                         PROJECT_NAME=$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\r')
                         GRAFANA_PORT=$(grep '^GRAFANA_HOST_PORT=' ${ENV_FILE} 2>/dev/null | cut -d'=' -f2 | tr -d '\r')
                         GRAFANA_PORT=${GRAFANA_PORT:-3010}
+                        PROMETHEUS_PORT=$(grep '^PROMETHEUS_HOST_PORT=' ${ENV_FILE} 2>/dev/null | cut -d'=' -f2 | tr -d '\r')
+                        PROMETHEUS_PORT=${PROMETHEUS_PORT:-9090}
+                        CADVISOR_PORT=$(grep '^CADVISOR_HOST_PORT=' ${ENV_FILE} 2>/dev/null | cut -d'=' -f2 | tr -d '\r')
+                        CADVISOR_PORT=${CADVISOR_PORT:-8089}
                         echo "=> Aguardando procesamiento CE task de SonarQube..."
                         sleep 30
                         echo "   Servicios activos para revisión (db/backend/frontend siguen arriba; volumenes Docker no se eliminan):"
                         echo "     - SonarQube    → http://localhost:9000"
-                        echo "     - Grafana      → http://localhost:${GRAFANA_PORT}"
+                        echo "     - Grafana      → http://localhost:${GRAFANA_PORT}  (k6: Influx | Infra: Prometheus)"
+                        echo "     - Prometheus   → http://localhost:${PROMETHEUS_PORT}"
+                        echo "     - cAdvisor     → http://localhost:${CADVISOR_PORT}"
                         echo "     - InfluxDB     → http://localhost:8086"
                         echo "     - Newman HTML  → http://localhost:8181  (FUC: qa/reports/fuc/newman; RAV: qa/reports/rav/newman; historial en anterior/)"
                         echo "     - Playwright   → http://localhost:8182"
