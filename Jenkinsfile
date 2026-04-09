@@ -6,7 +6,7 @@ pipeline {
         booleanParam(name: 'RUN_SONAR',      defaultValue: true,  description: 'Ejecutar análisis estático con SonarQube')
         booleanParam(name: 'RUN_PLAYWRIGHT', defaultValue: true,  description: 'Ejecutar pruebas End-to-End con Playwright')
         booleanParam(name: 'RUN_K6',         defaultValue: false, description: 'Ejecutar pruebas de estrés/rendimiento con k6')
-        booleanParam(name: 'RUN_CLAUDE',     defaultValue: false, description: 'Ejecutar análisis inteligente con Claude AI y generar reporte HTML')
+        // booleanParam(name: 'RUN_CLAUDE',     defaultValue: false, description: 'Ejecutar análisis inteligente con Claude AI y generar reporte HTML')
     }
 
     triggers {
@@ -282,242 +282,242 @@ cd
             }
         }
 
-        stage('Análisis Inteligente con Claude API') {
-            when { expression { return params.RUN_CLAUDE } }
-            steps {
-                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                    script {
-                        echo "════════════════════════════════════════"
-                        echo "ANALIZANDO RESULTADOS CON CLAUDE API"
-                        echo "════════════════════════════════════════"
-                        withCredentials([string(credentialsId: 'CLAUDE_API_KEY', variable: 'CLAUDE_API_KEY')]) {
-                        sh '''
-                            mkdir -p ${JENKINS_REPORTS_DIR}/claude-analysis
+        // stage('Análisis Inteligente con Claude API') {
+        //     when { expression { return params.RUN_CLAUDE } }
+        //     steps {
+        //         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+        //             script {
+        //                 echo "════════════════════════════════════════"
+        //                 echo "ANALIZANDO RESULTADOS CON CLAUDE API"
+        //                 echo "════════════════════════════════════════"
+        //                 withCredentials([string(credentialsId: 'CLAUDE_API_KEY', variable: 'CLAUDE_API_KEY')]) {
+        //                 sh '''
+        //                     mkdir -p ${JENKINS_REPORTS_DIR}/claude-analysis
 
-                            NEWMAN_DATA="{}"
-                            [ -f "${JENKINS_REPORTS_DIR}/newman/summary.json" ] && \
-                                NEWMAN_DATA=$(cat "${JENKINS_REPORTS_DIR}/newman/summary.json")
+        //                     NEWMAN_DATA="{}"
+        //                     [ -f "${JENKINS_REPORTS_DIR}/newman/summary.json" ] && \
+        //                         NEWMAN_DATA=$(cat "${JENKINS_REPORTS_DIR}/newman/summary.json")
 
-                            PLAYWRIGHT_DATA="{}"
-                            [ -f "${JENKINS_REPORTS_DIR}/playwright/test-results.json" ] && \
-                                PLAYWRIGHT_DATA=$(cat "${JENKINS_REPORTS_DIR}/playwright/test-results.json")
+        //                     PLAYWRIGHT_DATA="{}"
+        //                     [ -f "${JENKINS_REPORTS_DIR}/playwright/test-results.json" ] && \
+        //                         PLAYWRIGHT_DATA=$(cat "${JENKINS_REPORTS_DIR}/playwright/test-results.json")
 
-                            K6_DATA="{}"
-                            [ -f "${JENKINS_REPORTS_DIR}/k6/summary.json" ] && \
-                                K6_DATA=$(cat "${JENKINS_REPORTS_DIR}/k6/summary.json")
+        //                     K6_DATA="{}"
+        //                     [ -f "${JENKINS_REPORTS_DIR}/k6/summary.json" ] && \
+        //                         K6_DATA=$(cat "${JENKINS_REPORTS_DIR}/k6/summary.json")
 
-                            COVERAGE_DATA="{}"
-                            [ -f "${JENKINS_REPORTS_DIR}/coverage-backend.xml" ] && \
-                                COVERAGE_DATA='{"coverage":"present"}'
+        //                     COVERAGE_DATA="{}"
+        //                     [ -f "${JENKINS_REPORTS_DIR}/coverage-backend.xml" ] && \
+        //                         COVERAGE_DATA='{"coverage":"present"}'
 
-                            PROMPT_TEXT=$(printf '%s\n%s\n%s\n%s\n%s' \
-                                "Eres un QA profesional senior. Analiza estos resultados y responde SOLO con JSON valido con estos campos: resumen_ejecutivo (string), metricas_clave (objeto con newman_tests, playwright_tests, k6_requests, coverage), riesgos_detectados (array), recomendaciones_prioritarias (array de 3), proximos_pasos (array de 2). SIN texto adicional, SOLO JSON." \
-                                "Newman: $NEWMAN_DATA" \
-                                "Playwright: $PLAYWRIGHT_DATA" \
-                                "K6: $K6_DATA" \
-                                "Coverage: $COVERAGE_DATA")
+        //                     PROMPT_TEXT=$(printf '%s\n%s\n%s\n%s\n%s' \
+        //                         "Eres un QA profesional senior. Analiza estos resultados y responde SOLO con JSON valido con estos campos: resumen_ejecutivo (string), metricas_clave (objeto con newman_tests, playwright_tests, k6_requests, coverage), riesgos_detectados (array), recomendaciones_prioritarias (array de 3), proximos_pasos (array de 2). SIN texto adicional, SOLO JSON." \
+        //                         "Newman: $NEWMAN_DATA" \
+        //                         "Playwright: $PLAYWRIGHT_DATA" \
+        //                         "K6: $K6_DATA" \
+        //                         "Coverage: $COVERAGE_DATA")
 
-                            jq -n \
-                                --arg model "claude-3-5-sonnet-20241022" \
-                                --arg content "$PROMPT_TEXT" \
-                                '{"model": $model, "max_tokens": 1024, "messages": [{"role": "user", "content": $content}]}' \
-                                > /tmp/claude-payload.json
+        //                     jq -n \
+        //                         --arg model "claude-3-5-sonnet-20241022" \
+        //                         --arg content "$PROMPT_TEXT" \
+        //                         '{"model": $model, "max_tokens": 1024, "messages": [{"role": "user", "content": $content}]}' \
+        //                         > /tmp/claude-payload.json
 
-                            echo "Enviando análisis a Claude API..."
+        //                     echo "Enviando análisis a Claude API..."
 
-                            RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
-                                -H "x-api-key: ${CLAUDE_API_KEY}" \
-                                -H "anthropic-version: 2023-06-01" \
-                                -H "content-type: application/json" \
-                                -d @/tmp/claude-payload.json)
+        //                     RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+        //                         -H "x-api-key: ${CLAUDE_API_KEY}" \
+        //                         -H "anthropic-version: 2023-06-01" \
+        //                         -H "content-type: application/json" \
+        //                         -d @/tmp/claude-payload.json)
 
-                            ANALYSIS=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+        //                     ANALYSIS=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
 
-                            if [ -z "$ANALYSIS" ]; then
-                                echo "Claude API no devolvió análisis. Respuesta:"
-                                echo "$RESPONSE" | jq '.' || echo "$RESPONSE"
-                                exit 1
-                            fi
+        //                     if [ -z "$ANALYSIS" ]; then
+        //                         echo "Claude API no devolvió análisis. Respuesta:"
+        //                         echo "$RESPONSE" | jq '.' || echo "$RESPONSE"
+        //                         exit 1
+        //                     fi
 
-                            jq -n \
-                                --arg ts "$(date -Iseconds)" \
-                                --argjson bn "${BUILD_NUMBER}" \
-                                --arg bu "${BUILD_URL}" \
-                                --arg an "$ANALYSIS" \
-                                '{"timestamp": $ts, "build_number": $bn, "build_url": $bu, "analysis": $an}' \
-                                > ${JENKINS_REPORTS_DIR}/claude-analysis/analysis-report.json
+        //                     jq -n \
+        //                         --arg ts "$(date -Iseconds)" \
+        //                         --argjson bn "${BUILD_NUMBER}" \
+        //                         --arg bu "${BUILD_URL}" \
+        //                         --arg an "$ANALYSIS" \
+        //                         '{"timestamp": $ts, "build_number": $bn, "build_url": $bu, "analysis": $an}' \
+        //                         > ${JENKINS_REPORTS_DIR}/claude-analysis/analysis-report.json
 
-                            echo "Análisis guardado"
-                            echo "$ANALYSIS"
-                        '''
-                        }
-                    }
-                }
-            }
-        }
+        //                     echo "Análisis guardado"
+        //                     echo "$ANALYSIS"
+        //                 '''
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
-        stage('Generar Reporte HTML Visual') {
-            when {
-                allOf {
-                    expression { return params.RUN_CLAUDE }
-                    expression { return fileExists("${JENKINS_REPORTS_DIR}/claude-analysis/analysis-report.json") }
-                }
-            }
-            steps {
-                script {
-                    echo "════════════════════════════════════════"
-                    echo "GENERANDO HTML VISUAL"
-                    echo "════════════════════════════════════════"
-                    sh '''
-                        REPORT_DIR="${JENKINS_REPORTS_DIR}"
-                        ANALYSIS_FILE="${REPORT_DIR}/claude-analysis/analysis-report.json"
+//         stage('Generar Reporte HTML Visual') {
+//             when {
+//                 allOf {
+//                     expression { return params.RUN_CLAUDE }
+//                     expression { return fileExists("${JENKINS_REPORTS_DIR}/claude-analysis/analysis-report.json") }
+//                 }
+//             }
+//             steps {
+//                 script {
+//                     echo "════════════════════════════════════════"
+//                     echo "GENERANDO HTML VISUAL"
+//                     echo "════════════════════════════════════════"
+//                     sh '''
+//                         REPORT_DIR="${JENKINS_REPORTS_DIR}"
+//                         ANALYSIS_FILE="${REPORT_DIR}/claude-analysis/analysis-report.json"
 
-                        if [ ! -f "$ANALYSIS_FILE" ]; then
-                            echo "Archivo de análisis no encontrado: $ANALYSIS_FILE"
-                            exit 1
-                        fi
+//                         if [ ! -f "$ANALYSIS_FILE" ]; then
+//                             echo "Archivo de análisis no encontrado: $ANALYSIS_FILE"
+//                             exit 1
+//                         fi
 
-                        BUILD_NUM=$(jq -r '.build_number' "$ANALYSIS_FILE")
-                        TIMESTAMP=$(jq -r '.timestamp'    "$ANALYSIS_FILE")
-                        ANALYSIS=$(jq  -r '.analysis'     "$ANALYSIS_FILE")
+//                         BUILD_NUM=$(jq -r '.build_number' "$ANALYSIS_FILE")
+//                         TIMESTAMP=$(jq -r '.timestamp'    "$ANALYSIS_FILE")
+//                         ANALYSIS=$(jq  -r '.analysis'     "$ANALYSIS_FILE")
 
-                        if echo "$ANALYSIS" | grep -Eqi "PASS|ÉXITO|SUCCESS|exitoso"; then
-                            STATUS="EXITOSO"
-                            COLOR="28a745"
-                            BG="#d4edda"
-                            BORDER="#c3e6cb"
-                        elif echo "$ANALYSIS" | grep -Eqi "WARN|ATENCIÓN|WARNING"; then
-                            STATUS="ATENCIÓN"
-                            COLOR="ffc107"
-                            BG="#fff3cd"
-                            BORDER="#ffeeba"
-                        else
-                            STATUS="FALLÓ"
-                            COLOR="dc3545"
-                            BG="#f8d7da"
-                            BORDER="#f5c6cb"
-                        fi
+//                         if echo "$ANALYSIS" | grep -Eqi "PASS|ÉXITO|SUCCESS|exitoso"; then
+//                             STATUS="EXITOSO"
+//                             COLOR="28a745"
+//                             BG="#d4edda"
+//                             BORDER="#c3e6cb"
+//                         elif echo "$ANALYSIS" | grep -Eqi "WARN|ATENCIÓN|WARNING"; then
+//                             STATUS="ATENCIÓN"
+//                             COLOR="ffc107"
+//                             BG="#fff3cd"
+//                             BORDER="#ffeeba"
+//                         else
+//                             STATUS="FALLÓ"
+//                             COLOR="dc3545"
+//                             BG="#f8d7da"
+//                             BORDER="#f5c6cb"
+//                         fi
 
-                        ANALYSIS_HTML=$(printf '%s' "$ANALYSIS" | jq -sRr @html)
+//                         ANALYSIS_HTML=$(printf '%s' "$ANALYSIS" | jq -sRr @html)
 
-                        cat > ${REPORT_DIR}/claude-analysis/index.html <<HTML_EOF
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QA Analysis Report — Claude AI</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px 30px;
-            text-align: center;
-        }
-        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
-        .subtitle { font-size: 1.1em; opacity: 0.9; margin-bottom: 20px; }
-        .build-info {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid rgba(255,255,255,0.3);
-            font-size: 0.95em;
-        }
-        .content { padding: 40px 30px; }
-        .status-section {
-            border-radius: 8px;
-            padding: 30px;
-            margin-bottom: 40px;
-            text-align: center;
-        }
-        .status-badge { font-size: 2em; font-weight: bold; margin-bottom: 15px; }
-        .section { margin-bottom: 40px; }
-        .section h2 {
-            color: #667eea;
-            font-size: 1.8em;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid #667eea;
-        }
-        .analysis-box {
-            background: #f8f9fa;
-            border-left: 4px solid #667eea;
-            padding: 20px;
-            border-radius: 4px;
-            white-space: pre-wrap;
-            word-break: break-word;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-            max-height: 600px;
-            overflow-y: auto;
-        }
-        .footer {
-            background: #f8f9fa;
-            border-top: 1px solid #dee2e6;
-            padding: 20px 30px;
-            text-align: center;
-            color: #666;
-            font-size: 0.9em;
-        }
-        @media (max-width: 768px) {
-            .header { padding: 30px 20px; }
-            .header h1 { font-size: 1.8em; }
-            .content { padding: 20px 15px; }
-            .build-info { flex-direction: column; gap: 15px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>QA Analysis Report</h1>
-            <p class="subtitle">Análisis Inteligente con Claude AI</p>
-            <div class="build-info">
-                <span>Build #${BUILD_NUM}</span>
-                <span>${TIMESTAMP}</span>
-            </div>
-        </div>
-        <div class="content">
-            <div class="status-section" style="background: ${BG}; border: 2px solid ${BORDER};">
-                <div class="status-badge" style="color: #${COLOR};">${STATUS}</div>
-                <div>Análisis completado con Claude AI</div>
-            </div>
-            <div class="section">
-                <h2>Análisis Completo</h2>
-                <div class="analysis-box">${ANALYSIS_HTML}</div>
-            </div>
-        </div>
-        <div class="footer">
-            <p>Claude AI QA Pipeline - Análisis Automatizado</p>
-            <p>Generado: ${TIMESTAMP}</p>
-        </div>
-    </div>
-</body>
-</html>
-HTML_EOF
+//                         cat > ${REPORT_DIR}/claude-analysis/index.html <<HTML_EOF
+// <!DOCTYPE html>
+// <html lang="es">
+// <head>
+//     <meta charset="UTF-8">
+//     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+//     <title>QA Analysis Report — Claude AI</title>
+//     <style>
+//         * { margin: 0; padding: 0; box-sizing: border-box; }
+//         body {
+//             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+//             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+//             min-height: 100vh;
+//             padding: 20px;
+//         }
+//         .container {
+//             max-width: 1200px;
+//             margin: 0 auto;
+//             background: white;
+//             border-radius: 12px;
+//             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+//             overflow: hidden;
+//         }
+//         .header {
+//             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+//             color: white;
+//             padding: 40px 30px;
+//             text-align: center;
+//         }
+//         .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+//         .subtitle { font-size: 1.1em; opacity: 0.9; margin-bottom: 20px; }
+//         .build-info {
+//             display: flex;
+//             justify-content: center;
+//             gap: 30px;
+//             margin-top: 20px;
+//             padding-top: 20px;
+//             border-top: 1px solid rgba(255,255,255,0.3);
+//             font-size: 0.95em;
+//         }
+//         .content { padding: 40px 30px; }
+//         .status-section {
+//             border-radius: 8px;
+//             padding: 30px;
+//             margin-bottom: 40px;
+//             text-align: center;
+//         }
+//         .status-badge { font-size: 2em; font-weight: bold; margin-bottom: 15px; }
+//         .section { margin-bottom: 40px; }
+//         .section h2 {
+//             color: #667eea;
+//             font-size: 1.8em;
+//             margin-bottom: 20px;
+//             padding-bottom: 10px;
+//             border-bottom: 3px solid #667eea;
+//         }
+//         .analysis-box {
+//             background: #f8f9fa;
+//             border-left: 4px solid #667eea;
+//             padding: 20px;
+//             border-radius: 4px;
+//             white-space: pre-wrap;
+//             word-break: break-word;
+//             font-family: 'Courier New', monospace;
+//             font-size: 0.9em;
+//             max-height: 600px;
+//             overflow-y: auto;
+//         }
+//         .footer {
+//             background: #f8f9fa;
+//             border-top: 1px solid #dee2e6;
+//             padding: 20px 30px;
+//             text-align: center;
+//             color: #666;
+//             font-size: 0.9em;
+//         }
+//         @media (max-width: 768px) {
+//             .header { padding: 30px 20px; }
+//             .header h1 { font-size: 1.8em; }
+//             .content { padding: 20px 15px; }
+//             .build-info { flex-direction: column; gap: 15px; }
+//         }
+//     </style>
+// </head>
+// <body>
+//     <div class="container">
+//         <div class="header">
+//             <h1>QA Analysis Report</h1>
+//             <p class="subtitle">Análisis Inteligente con Claude AI</p>
+//             <div class="build-info">
+//                 <span>Build #${BUILD_NUM}</span>
+//                 <span>${TIMESTAMP}</span>
+//             </div>
+//         </div>
+//         <div class="content">
+//             <div class="status-section" style="background: ${BG}; border: 2px solid ${BORDER};">
+//                 <div class="status-badge" style="color: #${COLOR};">${STATUS}</div>
+//                 <div>Análisis completado con Claude AI</div>
+//             </div>
+//             <div class="section">
+//                 <h2>Análisis Completo</h2>
+//                 <div class="analysis-box">${ANALYSIS_HTML}</div>
+//             </div>
+//         </div>
+//         <div class="footer">
+//             <p>Claude AI QA Pipeline - Análisis Automatizado</p>
+//             <p>Generado: ${TIMESTAMP}</p>
+//         </div>
+//     </div>
+// </body>
+// </html>
+// HTML_EOF
 
-                        echo "HTML generado en ${REPORT_DIR}/claude-analysis/index.html"
-                    '''
-                }
-            }
-        }
+//                         echo "HTML generado en ${REPORT_DIR}/claude-analysis/index.html"
+//                     '''
+//                 }
+//             }
+//         }
 
     }
 
