@@ -367,6 +367,7 @@ else
                 -Dsonar.tests=frontend/src,backend \
                 -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
                 -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
+                -Dsonar.sourceEncoding=UTF-8 \
                 -Dsonar.scm.disabled=true \
                 -Dsonar.plugins.downloadOnlyRequired=true \
                 -Dsonar.javascript.node.maxspace=8192 \
