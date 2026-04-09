@@ -80,7 +80,7 @@ pipeline {
                         echo "=> Levantando cadvisor -> prometheus (orden explicito; evita estado Created sin start)..."
                         ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d cadvisor
                         sleep 3
-                        ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d prometheus
+                        ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d --build prometheus
                         sleep 2
                         for SVC in cadvisor prometheus; do
                           C="${PROJECT_NAME}-${SVC}"
@@ -284,7 +284,7 @@ pipeline {
                             sh """
                                 export COMPOSE_PROFILES=test-e2e,sonar
                                 PROJECT_NAME=\$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r')
-                                ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d cadvisor prometheus grafana || true
+                                ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d --build cadvisor prometheus grafana || true
                                 docker start \${PROJECT_NAME}-cadvisor \${PROJECT_NAME}-prometheus \${PROJECT_NAME}-grafana 2>/dev/null || true
                                 ${COMPOSE_CMD} run --no-deps --name qa-runner-k6 \\
                                 -e REPORTS_DIR=${QA_REPORTS_DIR} \\

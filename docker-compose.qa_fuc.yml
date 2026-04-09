@@ -293,8 +293,11 @@ services:
       - qa-network
 
   # --- Prometheus (scraping cAdvisor; Grafana como UI) ---
+  # Imagen propia con prometheus.yml copiado (sin bind mount: compatible Jenkins + DinD/socket host).
   prometheus:
-    image: prom/prometheus:v2.54.1
+    build:
+      context: .
+      dockerfile: ./qa/Dockerfile.prometheus
     container_name: ${PROJECT_NAME}-prometheus
     profiles: [ "perf", "jenkins", "all", "test-e2e" ]
     restart: unless-stopped
@@ -304,8 +307,6 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --web.enable-lifecycle
-    volumes:
-      - ./qa/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "${PROMETHEUS_HOST_PORT:-9090}:9090"
     networks:
