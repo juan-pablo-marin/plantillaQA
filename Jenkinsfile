@@ -36,33 +36,7 @@ pipeline {
     }
 
     stages {
-
-        stage('Sync Latest Code from qa-team') {
-            steps {
-                script {
-                    echo "════════════════════════════════════════"
-                    echo "SINCRONIZANDO CÓDIGO DESDE qa-team"
-                    echo "════════════════════════════════════════"
-                    sh '''
-                        cd ${WORKSPACE}
-                        
-                        echo "=> Obtener información de rama actual..."
-                        git branch -a | grep qa-team || echo "Rama qa-team no existe localmente"
-                        
-                        echo "=> Intentando checkout a qa-team..."
-                        git checkout qa-team 2>/dev/null || git checkout -b qa-team origin/qa-team
-                        
-                        echo "=> Haciendo pull de los últimos cambios..."
-                        git pull origin qa-team --ff-only
-                        
-                        echo "✅ Código sincronizado exitosamente"
-                        echo "=> Commit actual:"
-                        git log -1 --oneline
-                    '''
-                }
-            }
-        }
-
+cd 
         stage('Preparar Entorno y Dependencias Docker') {
             steps {
                 script {
