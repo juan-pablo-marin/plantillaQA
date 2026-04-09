@@ -1,6 +1,6 @@
 {
   "annotations": { "list": [] },
-  "description": "CPU y memoria por servicio Docker (cAdvisor → Prometheus). Complementa k6 para criterios de uso de recursos.",
+  "description": "CPU y memoria por servicio (cAdvisor → Prometheus). Vista solo-infra; el mismo contenido está integrado en el dashboard unificado k6 + Infra (uid k6-perf).",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
