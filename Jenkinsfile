@@ -281,6 +281,7 @@ pipeline {
                     steps {
                         script {
                             echo "=> Ejecutando k6 Tests..."
+                            // No pasar K6_INFLUXDB_PUSH_INTERVAL=1s aquí: con K6_PEAK_VUS alto Influx devuelve 413 y Grafana pierde telemetría.
                             sh """
                                 export COMPOSE_PROFILES=test-e2e,sonar
                                 PROJECT_NAME=\$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r')
