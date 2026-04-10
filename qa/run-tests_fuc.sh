@@ -423,12 +423,18 @@ elif [ -f "performance/k6-tests_fuc.js" ]; then
     echo "  Etiqueta de build: $BUILD_TAG"
     export K6_PEAK_VUS="${K6_PEAK_VUS:-100}"
     export K6_INFLUXDB_CONCURRENT_WRITES="${K6_INFLUXDB_CONCURRENT_WRITES:-1}"
-    # Influx 1.x rechaza POST grandes (413). Jenkins/compose a veces fuerza 1s → con miles de VUs
-    # el flush acumula >14s (ver log) y Grafana muestra un "agujero" hasta el ramp-down (~1–2k VUs).
+    # Telemetría Influx 1.x: intervalo corto + muchas VUs → flush > intervalo (avisos k6) o POST > max-body (413).
+    # Orden de umbrales: 100k VUs necesita lotes más espaciados; 10k usa 500ms como compromiso estable.
     _k6_push="${K6_INFLUXDB_PUSH_INTERVAL:-}"
-    if [ "$K6_PEAK_VUS" -ge 8000 ] 2>/dev/null; then
+    if [ "$K6_PEAK_VUS" -ge 50000 ] 2>/dev/null; then
         if [ -z "$_k6_push" ] || [ "$_k6_push" = "1s" ] || [ "$_k6_push" = "1000ms" ]; then
-            export K6_INFLUXDB_PUSH_INTERVAL=100ms
+            export K6_INFLUXDB_PUSH_INTERVAL=3s
+        else
+            export K6_INFLUXDB_PUSH_INTERVAL="$_k6_push"
+        fi
+    elif [ "$K6_PEAK_VUS" -ge 8000 ] 2>/dev/null; then
+        if [ -z "$_k6_push" ] || [ "$_k6_push" = "1s" ] || [ "$_k6_push" = "1000ms" ]; then
+            export K6_INFLUXDB_PUSH_INTERVAL=500ms
         else
             export K6_INFLUXDB_PUSH_INTERVAL="$_k6_push"
         fi

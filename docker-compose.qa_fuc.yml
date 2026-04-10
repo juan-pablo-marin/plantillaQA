@@ -266,7 +266,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1g
+          # Subir (p. ej. 4g) si pruebas ≥50k VUs y Influx OOM o 413 pese a max-body-size alto.
+          memory: 2g
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8086/ping"]
       interval: 15s
@@ -386,8 +387,10 @@ services:
           export K6_PEAK_VUS="$${K6_PEAK_VUS:-100}"
           export K6_INFLUXDB_CONCURRENT_WRITES="$${K6_INFLUXDB_CONCURRENT_WRITES:-1}"
           _p="$${K6_INFLUXDB_PUSH_INTERVAL:-}"
-          if [ "$$K6_PEAK_VUS" -ge 8000 ] 2>/dev/null; then
-            if [ -z "$$_p" ] || [ "$$_p" = "1s" ] || [ "$$_p" = "1000ms" ]; then export K6_INFLUXDB_PUSH_INTERVAL=100ms; else export K6_INFLUXDB_PUSH_INTERVAL="$$_p"; fi
+          if [ "$$K6_PEAK_VUS" -ge 50000 ] 2>/dev/null; then
+            if [ -z "$$_p" ] || [ "$$_p" = "1s" ] || [ "$$_p" = "1000ms" ]; then export K6_INFLUXDB_PUSH_INTERVAL=3s; else export K6_INFLUXDB_PUSH_INTERVAL="$$_p"; fi
+          elif [ "$$K6_PEAK_VUS" -ge 8000 ] 2>/dev/null; then
+            if [ -z "$$_p" ] || [ "$$_p" = "1s" ] || [ "$$_p" = "1000ms" ]; then export K6_INFLUXDB_PUSH_INTERVAL=500ms; else export K6_INFLUXDB_PUSH_INTERVAL="$$_p"; fi
           elif [ "$$K6_PEAK_VUS" -ge 3000 ] 2>/dev/null; then
             if [ -z "$$_p" ] || [ "$$_p" = "1s" ] || [ "$$_p" = "1000ms" ]; then export K6_INFLUXDB_PUSH_INTERVAL=250ms; else export K6_INFLUXDB_PUSH_INTERVAL="$$_p"; fi
           else

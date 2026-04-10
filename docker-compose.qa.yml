@@ -252,7 +252,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1g
+          memory: 2g
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8086/ping"]
       interval: 15s

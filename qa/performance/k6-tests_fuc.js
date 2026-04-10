@@ -7,8 +7,9 @@ const BACKEND_URL = __ENV.BACKEND_URL || 'http://backend:8080';
 const AUTH_ID_USER = __ENV.K6_AUTH_ID_USER;
 const AUTH_PASSWORD = __ENV.K6_AUTH_PASSWORD;
 
-// Pico de VUs (p. ej. 10000). Rampas: 10% → 50% → 100%. Telemetría: run-tests_fuc.sh usa push más frecuente si pico ≥3000.
-// 413 en Influx: subir INFLUXDB_HTTP_MAX_BODY_SIZE y recrear el contenedor influxdb; opcional K6_INFLUXDB_PUSH_INTERVAL=250ms.
+// Pico vía K6_PEAK_VUS (p. ej. 10000 o 100000). Rampas: 30s→10%, 1m→50%, 30s→100%, 30s→0.
+// 100k VUs en un solo k6 exige máquina muy potente o ejecución distribuida (cloud / varios runners).
+// Influx: run-tests_fuc.sh ajusta push por defecto (≥8k→500ms, ≥50k→3s); 413 → más max-body + recrear influxdb.
 const peakParsed = Number.parseInt(__ENV.K6_PEAK_VUS || '100', 10);
 const PEAK_VUS = Number.isFinite(peakParsed) && peakParsed > 0 ? peakParsed : 100;
 const stage10 = Math.max(1, Math.round(PEAK_VUS * 0.1));
