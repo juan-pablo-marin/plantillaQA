@@ -421,12 +421,17 @@ if [ "$RUN_K6" != "true" ]; then
 elif [ -f "performance/k6-tests_fuc.js" ]; then
     BUILD_TAG="${BUILD_NUMBER:-manual_$(date +%Y%m%d_%H%M%S)}"
     echo "  Etiqueta de build: $BUILD_TAG"
-    echo "  Push interval InfluxDB: ${K6_INFLUXDB_PUSH_INTERVAL:-1s} (K6_INFLUXDB_PUSH_INTERVAL)"
+    export K6_INFLUXDB_PUSH_INTERVAL="${K6_INFLUXDB_PUSH_INTERVAL:-1s}"
+    export K6_INFLUXDB_CONCURRENT_WRITES="${K6_INFLUXDB_CONCURRENT_WRITES:-1}"
+    export K6_PEAK_VUS="${K6_PEAK_VUS:-100}"
+    echo "  Push interval InfluxDB: $K6_INFLUXDB_PUSH_INTERVAL (K6_INFLUXDB_PUSH_INTERVAL)"
+    echo "  Pico VUs (K6_PEAK_VUS): $K6_PEAK_VUS"
     k6 run performance/k6-tests_fuc.js \
       -e BACKEND_URL="$BACKEND_URL" \
       -e K6_AUTH_ID_USER="${K6_AUTH_ID_USER:-}" \
       -e K6_AUTH_PASSWORD="${K6_AUTH_PASSWORD:-}" \
       -e K6_DIR="$K6_DIR" \
+      -e K6_PEAK_VUS="$K6_PEAK_VUS" \
       --tag build="${BUILD_TAG}" \
       --tag environment="qa" \
       --out "influxdb=http://influxdb:8086/k6" \

@@ -238,6 +238,8 @@ services:
     environment:
       INFLUXDB_DB: k6
       INFLUXDB_HTTP_AUTH_ENABLED: "false"
+      # k6 con muchos VUs y push largo puede superar el default (~25MB) → 413 Request Entity Too Large
+      INFLUXDB_HTTP_MAX_BODY_SIZE: "104857600"
       INFLUXDB_DATA_CACHE_MAX_MEMORY_SIZE: "1073741824"
       INFLUXDB_DATA_CACHE_SNAPSHOT_MEMORY_SIZE: "52428800"
       INFLUXDB_DATA_COMPACT_FULL_WRITE_COLD_DURATION: "4h"

@@ -7,32 +7,25 @@ const BACKEND_URL = __ENV.BACKEND_URL || 'http://backend:8080';
 const AUTH_ID_USER = __ENV.K6_AUTH_ID_USER;
 const AUTH_PASSWORD = __ENV.K6_AUTH_PASSWORD;
 
+// Pico de VUs (p. ej. 1000). Rampas: 10% → 50% → 100% del pico. Evita editar el script por escenario.
+// Si Influx devuelve 413 (Request Entity Too Large), acortar K6_INFLUXDB_PUSH_INTERVAL y/o subir max-body-size en Influx.
+const peakParsed = Number.parseInt(__ENV.K6_PEAK_VUS || '100', 10);
+const PEAK_VUS = Number.isFinite(peakParsed) && peakParsed > 0 ? peakParsed : 100;
+const stage10 = Math.max(1, Math.round(PEAK_VUS * 0.1));
+const stage50 = Math.max(stage10, Math.round(PEAK_VUS * 0.5));
+const stage100 = Math.max(stage50, PEAK_VUS);
+
 const errors = new Rate('errors');
 const healthLatency = new Trend('health_latency');
 const usersLatency = new Trend('users_latency');
 const geoLatency = new Trend('geo_latency');
 
-// export const options = {
-//   stages: [
-//     { duration: '1m',  target: 100 },  // ramp-up suave
-//     { duration: '2m',  target: 300 },  // carga media
-//     { duration: '2m',  target: 500 },  // carga máxima
-//     { duration: '1m',  target: 500 },  // carga sostenida
-//     { duration: '1m',  target: 0 },    // ramp-down
-//   ],
-//   thresholds: {
-//     http_req_duration: ['p(95)<500'],
-//     errors: ['rate<0.1'],
-//     health_latency: ['p(99)<200'],
-//   },
-// };
-
 export const options = {
   stages: [
-    { duration: '30s', target: 10 },   // ramp-up
-    { duration: '1m',  target: 50 },   // carga sostenida
-    { duration: '30s', target: 100 },  // pico
-    { duration: '30s', target: 0 },    // ramp-down
+    { duration: '30s', target: stage10 },
+    { duration: '1m',  target: stage50 },
+    { duration: '30s', target: stage100 },
+    { duration: '30s', target: 0 },
   ],
   thresholds: {
     http_req_duration: ['p(95)<500'],   // 95% de requests < 500ms
