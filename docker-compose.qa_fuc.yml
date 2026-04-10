@@ -220,7 +220,8 @@ services:
       - K6_AUTH_ID_USER=${K6_AUTH_ID_USER:-}
       - K6_AUTH_PASSWORD=${K6_AUTH_PASSWORD:-}
       - K6_PEAK_VUS=${K6_PEAK_VUS:-100}
-      - K6_INFLUXDB_PUSH_INTERVAL=${K6_INFLUXDB_PUSH_INTERVAL:-1s}
+      # Sin default: run-tests_fuc.sh elige intervalo según K6_PEAK_VUS (evita 413 con 10k VUs).
+      - K6_INFLUXDB_PUSH_INTERVAL=${K6_INFLUXDB_PUSH_INTERVAL:-}
       - K6_INFLUXDB_CONCURRENT_WRITES=${K6_INFLUXDB_CONCURRENT_WRITES:-1}
       # ── Flags de pruebas (false = desactivado, true = activo) ──
       - RUN_NEWMAN=${RUN_NEWMAN:-false}
@@ -251,8 +252,8 @@ services:
     environment:
       INFLUXDB_DB: k6
       INFLUXDB_HTTP_AUTH_ENABLED: "false"
-      # k6 con muchos VUs y push largo supera el default (~25MB) → 413 Request Entity Too Large
-      INFLUXDB_HTTP_MAX_BODY_SIZE: "104857600"
+      # k6 con miles de VUs: lotes de métricas >100MB → 413. Tras cambiar esto: recrear influxdb.
+      INFLUXDB_HTTP_MAX_BODY_SIZE: "536870912"
       INFLUXDB_DATA_CACHE_MAX_MEMORY_SIZE: "1073741824"
       INFLUXDB_DATA_CACHE_SNAPSHOT_MEMORY_SIZE: "52428800"
       INFLUXDB_DATA_COMPACT_FULL_WRITE_COLD_DURATION: "4h"
@@ -370,14 +371,30 @@ services:
       - K6_AUTH_ID_USER=${K6_AUTH_ID_USER:-}
       - K6_AUTH_PASSWORD=${K6_AUTH_PASSWORD:-}
       - K6_PEAK_VUS=${K6_PEAK_VUS:-100}
-      - K6_INFLUXDB_PUSH_INTERVAL=${K6_INFLUXDB_PUSH_INTERVAL:-1s}
+      - K6_INFLUXDB_PUSH_INTERVAL=${K6_INFLUXDB_PUSH_INTERVAL:-}
       - K6_INFLUXDB_CONCURRENT_WRITES=${K6_INFLUXDB_CONCURRENT_WRITES:-1}
     volumes:
       - ./qa/reports:/qa/reports
       - ./qa/performance:/qa/performance:ro
       - playwright_cache:/ms-playwright
       - pnpm_cache:/pnpm-cache
-    command: [ "bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests_fuc.js -e BACKEND_URL=$$BACKEND_URL --out influxdb=http://influxdb:8086/k6 --summary-export /qa/reports/k6/summary.json" ]
+    command:
+      - bash
+      - -lc
+      - |
+          set -e
+          export K6_PEAK_VUS="${K6_PEAK_VUS:-100}"
+          export K6_INFLUXDB_CONCURRENT_WRITES="${K6_INFLUXDB_CONCURRENT_WRITES:-1}"
+          if [ -n "${K6_INFLUXDB_PUSH_INTERVAL:-}" ]; then export K6_INFLUXDB_PUSH_INTERVAL
+          elif [ "$K6_PEAK_VUS" -ge 8000 ] 2>/dev/null; then export K6_INFLUXDB_PUSH_INTERVAL=250ms
+          elif [ "$K6_PEAK_VUS" -ge 3000 ] 2>/dev/null; then export K6_INFLUXDB_PUSH_INTERVAL=500ms
+          else export K6_INFLUXDB_PUSH_INTERVAL=1s; fi
+          mkdir -p /qa/reports/k6
+          k6 run /qa/performance/k6-tests_fuc.js \
+            -e BACKEND_URL="$$BACKEND_URL" \
+            -e K6_PEAK_VUS="$$K6_PEAK_VUS" \
+            --out influxdb=http://influxdb:8086/k6 \
+            --summary-export /qa/reports/k6/summary.json
     networks:
       - qa-network
 

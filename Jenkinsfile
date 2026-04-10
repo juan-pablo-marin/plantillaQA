@@ -292,8 +292,6 @@ pipeline {
                                 -e RUN_SONAR=false \\
                                 -e RUN_PLAYWRIGHT=false \\
                                 -e RUN_K6=true \\
-                                -e K6_INFLUXDB_PUSH_INTERVAL=1s \\
-                                -e K6_INFLUXDB_CONCURRENT_WRITES=1 \\
                                 -e BUILD_NUMBER=${env.BUILD_NUMBER} \\
                                 qa-runner || true
                             """

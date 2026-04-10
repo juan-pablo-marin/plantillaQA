@@ -7,8 +7,8 @@ const BACKEND_URL = __ENV.BACKEND_URL || 'http://backend:8080';
 const AUTH_ID_USER = __ENV.K6_AUTH_ID_USER;
 const AUTH_PASSWORD = __ENV.K6_AUTH_PASSWORD;
 
-// Pico de VUs (p. ej. 1000). Rampas: 10% → 50% → 100% del pico. Evita editar el script por escenario.
-// Si Influx devuelve 413 (Request Entity Too Large), acortar K6_INFLUXDB_PUSH_INTERVAL y/o subir max-body-size en Influx.
+// Pico de VUs (p. ej. 10000). Rampas: 10% → 50% → 100%. Telemetría: run-tests_fuc.sh usa push más frecuente si pico ≥3000.
+// 413 en Influx: subir INFLUXDB_HTTP_MAX_BODY_SIZE y recrear el contenedor influxdb; opcional K6_INFLUXDB_PUSH_INTERVAL=250ms.
 const peakParsed = Number.parseInt(__ENV.K6_PEAK_VUS || '100', 10);
 const PEAK_VUS = Number.isFinite(peakParsed) && peakParsed > 0 ? peakParsed : 100;
 const stage10 = Math.max(1, Math.round(PEAK_VUS * 0.1));

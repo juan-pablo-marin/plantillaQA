@@ -421,9 +421,18 @@ if [ "$RUN_K6" != "true" ]; then
 elif [ -f "performance/k6-tests_fuc.js" ]; then
     BUILD_TAG="${BUILD_NUMBER:-manual_$(date +%Y%m%d_%H%M%S)}"
     echo "  Etiqueta de build: $BUILD_TAG"
-    export K6_INFLUXDB_PUSH_INTERVAL="${K6_INFLUXDB_PUSH_INTERVAL:-1s}"
-    export K6_INFLUXDB_CONCURRENT_WRITES="${K6_INFLUXDB_CONCURRENT_WRITES:-1}"
     export K6_PEAK_VUS="${K6_PEAK_VUS:-100}"
+    export K6_INFLUXDB_CONCURRENT_WRITES="${K6_INFLUXDB_CONCURRENT_WRITES:-1}"
+    # Con muchos VUs, lotes de 1s superan max-body de Influx → 413 y "hueco" en Grafana.
+    if [ -n "${K6_INFLUXDB_PUSH_INTERVAL:-}" ]; then
+        export K6_INFLUXDB_PUSH_INTERVAL
+    elif [ "$K6_PEAK_VUS" -ge 8000 ] 2>/dev/null; then
+        export K6_INFLUXDB_PUSH_INTERVAL=250ms
+    elif [ "$K6_PEAK_VUS" -ge 3000 ] 2>/dev/null; then
+        export K6_INFLUXDB_PUSH_INTERVAL=500ms
+    else
+        export K6_INFLUXDB_PUSH_INTERVAL=1s
+    fi
     echo "  Push interval InfluxDB: $K6_INFLUXDB_PUSH_INTERVAL (K6_INFLUXDB_PUSH_INTERVAL)"
     echo "  Pico VUs (K6_PEAK_VUS): $K6_PEAK_VUS"
     k6 run performance/k6-tests_fuc.js \
