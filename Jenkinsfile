@@ -322,10 +322,23 @@ pipeline {
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/accessibility-html"
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/lighthouse"
                             // Copiar reportes Playwright HTML (incluye evidencias de axe + lighthouse)
-                            sh "docker cp qa-runner-a11y:${QA_REPORTS_DIR}/playwright-html/. ${JENKINS_REPORTS_DIR}/accessibility-html/ || true"
+                            sh "docker cp qa-runner-a11y:${QA_REPORTS_DIR}/accessibility-html/. ${JENKINS_REPORTS_DIR}/accessibility-html/ || true"
                             // Copiar reportes Lighthouse HTML/JSON dedicados
                             sh "docker cp qa-runner-a11y:${QA_REPORTS_DIR}/lighthouse/. ${JENKINS_REPORTS_DIR}/lighthouse/ || true"
                             sh "docker rm -f qa-runner-a11y || true"
+
+                            // ── Sincronizar reportes al viewer (DinD: bind mounts no funcionan) ──
+                            def a11yViewer = sh(script: "grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r'", returnStdout: true).trim() + '-accessibility-viewer'
+                            echo "Accessibility: sincronizando reportes al viewer (${a11yViewer})..."
+                            sh """
+                                if docker ps -q -f name=${a11yViewer} | grep -q .; then
+                                    docker exec ${a11yViewer} sh -c 'rm -rf /usr/share/nginx/html/*' || true
+                                    docker cp ${JENKINS_REPORTS_DIR}/accessibility-html/. ${a11yViewer}:/usr/share/nginx/html/ || true
+                                    echo '  Accessibility viewer actualizado'
+                                else
+                                    echo '  WARN: Accessibility viewer no esta corriendo'
+                                fi
+                            """
                         }
                     }
                 }
@@ -708,6 +721,7 @@ pipeline {
                         echo "     - InfluxDB     → http://localhost:8086"
                         echo "     - Newman HTML  → http://localhost:8181  (FUC: qa/reports/fuc/newman; RAV: qa/reports/rav/newman; historial en anterior/)"
                         echo "     - Playwright   → http://localhost:8182"
+                        echo "     - Accesibility → http://localhost:8183"
                         echo "     - App (db, backend, frontend) → puertos según .env.qa / .env.qa_fuc"
                         echo "   Reportes HTML disponibles en Jenkins → Sidebar del build"
                         docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 qa-runner-a11y 2>/dev/null || true

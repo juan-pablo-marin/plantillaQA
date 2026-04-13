@@ -414,6 +414,11 @@ if [ "$RUN_ACCESSIBILITY" != "true" ]; then
 elif [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
     echo "  Ejecutando auditorías de accesibilidad y Lighthouse..."
     mkdir -p "$REPORTS_DIR/accessibility" "$REPORTS_DIR/lighthouse"
+    mkdir -p "$REPORTS_DIR/accessibility-html" "$REPORTS_DIR/accessibility-results"
+
+    # Exportar rutas específicas para que la auditoría no sobreescriba los reportes E2E compartidos en bind mount
+    export PLAYWRIGHT_HTML_DIR="$REPORTS_DIR/accessibility-html"
+    export PLAYWRIGHT_RESULTS_DIR="$REPORTS_DIR/accessibility-results"
 
     # Proyecto 'accessibility' (axe-core WCAG 2.1 AA)
     echo "  → axe-core: Escaneando páginas para cumplimiento WCAG 2.1 AA..."
