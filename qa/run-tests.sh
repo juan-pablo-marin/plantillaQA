@@ -420,19 +420,14 @@ elif [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
     export PLAYWRIGHT_HTML_DIR="$REPORTS_DIR/accessibility-html"
     export PLAYWRIGHT_RESULTS_DIR="$REPORTS_DIR/accessibility-results"
 
-    # Proyecto 'accessibility' (axe-core WCAG 2.1 AA)
-    echo "  → axe-core: Escaneando páginas para cumplimiento WCAG 2.1 AA..."
-    PLAYWRIGHT_JSON_OUTPUT_NAME=accessibility-results.json npx playwright test \
+    # Ejecutar conjuntamente 'accessibility' y 'lighthouse' 
+    # (Se hace en un solo comando para evitar que el reporte HTML de uno borre al otro)
+    echo "  → Ejecutando axe-core (WCAG 2.1 AA) y Lighthouse (Core Web Vitals)..."
+    PLAYWRIGHT_JSON_OUTPUT_NAME=usability-results.json npx playwright test \
         --config=playwright.config.ts \
         --project=accessibility \
-        || echo "  WARN: Algunas auditorías de accesibilidad reportaron violaciones."
-
-    # Proyecto 'lighthouse' (Core Web Vitals)
-    echo "  → Lighthouse: Midiendo Core Web Vitals (LCP, TBT, CLS)..."
-    PLAYWRIGHT_JSON_OUTPUT_NAME=lighthouse-results.json npx playwright test \
-        --config=playwright.config.ts \
         --project=lighthouse \
-        || echo "  WARN: Algunas auditorías de Lighthouse no alcanzaron los umbrales."
+        || echo "  WARN: Algunas auditorías reportaron violaciones o fallos de performance."
 
     echo "  Reportes de accesibilidad generados en: $REPORTS_DIR/"
 else
