@@ -16,10 +16,11 @@
 #    - Performance:      docker compose --env-file .env.qa -f docker-compose.qa.yml --profile perf up -d
 #
 #  Flags de pruebas (en .env.qa o como variables de entorno):
-#    RUN_NEWMAN=true      → Activa tests de API con Newman
-#    RUN_SONAR=true       → Activa análisis estático con SonarQube
-#    RUN_PLAYWRIGHT=true  → Activa tests E2E con Playwright
-#    RUN_K6=true          → Activa tests de rendimiento con k6
+#    RUN_NEWMAN=true        → Activa tests de API con Newman
+#    RUN_SONAR=true         → Activa análisis estático con SonarQube
+#    RUN_PLAYWRIGHT=true    → Activa tests E2E con Playwright
+#    RUN_K6=true            → Activa tests de rendimiento con k6
+#    RUN_ACCESSIBILITY=true → Activa auditorías de Accesibilidad (axe-core) + Lighthouse
 # ═══════════════════════════════════════════════════════════════
 
 # Mismo criterio que Jenkins (COMPOSE_PROJECT_NAME=qa-pipeline): todo el stack bajo un único
@@ -228,6 +229,7 @@ services:
       - RUN_SONAR=${RUN_SONAR:-false}
       - RUN_PLAYWRIGHT=${RUN_PLAYWRIGHT:-false}
       - RUN_K6=${RUN_K6:-false}
+      - RUN_ACCESSIBILITY=${RUN_ACCESSIBILITY:-false}
       # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-20m}
