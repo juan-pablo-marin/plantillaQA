@@ -481,6 +481,22 @@ services:
     networks:
       - qa-network
 
+  # --- Accessibility + Lighthouse Report Viewer ---
+  # Viewer Nginx para reportes de accesibilidad (axe-core WCAG 2.1 AA)
+  # y rendimiento UX (Lighthouse Core Web Vitals).
+  # Jenkins inyecta reportes vía 'docker cp' al finalizar el stage de Usabilidad.
+  accessibility-viewer:
+    build:
+      context: .
+      dockerfile: ./qa/Dockerfile.viewer
+    container_name: ${PROJECT_NAME}-accessibility-viewer
+    profiles: [ "test-e2e", "jenkins", "all", "report" ]
+    restart: unless-stopped
+    ports:
+      - "8183:80"
+    networks:
+      - qa-network
+
   # --- Jenkins (CI/CD Orchestrator) ---
   jenkins:
     build:

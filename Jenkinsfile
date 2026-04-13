@@ -322,7 +322,7 @@ pipeline {
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/accessibility-html"
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/lighthouse"
                             // Copiar reportes Playwright HTML (incluye evidencias de axe + lighthouse)
-                            sh "docker cp qa-runner-a11y:/qa/reports/playwright-html/. ${JENKINS_REPORTS_DIR}/accessibility-html/ || true"
+                            sh "docker cp qa-runner-a11y:${QA_REPORTS_DIR}/playwright-html/. ${JENKINS_REPORTS_DIR}/accessibility-html/ || true"
                             // Copiar reportes Lighthouse HTML/JSON dedicados
                             sh "docker cp qa-runner-a11y:${QA_REPORTS_DIR}/lighthouse/. ${JENKINS_REPORTS_DIR}/lighthouse/ || true"
                             sh "docker rm -f qa-runner-a11y || true"

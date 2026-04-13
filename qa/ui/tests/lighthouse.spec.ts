@@ -46,8 +46,8 @@ test.describe('Lighthouse — Core Web Vitals y Rendimiento UX', () => {
       const lhOutputDir = path.join(REPORTS_DIR, 'lighthouse');
       fs.mkdirSync(lhOutputDir, { recursive: true });
 
-      const jsonPath = path.join(lhOutputDir, `lighthouse-${pageInfo.name}.json`);
-      const htmlPath = path.join(lhOutputDir, `lighthouse-${pageInfo.name}.html`);
+      const jsonPath = path.join(lhOutputDir, `lighthouse-${pageInfo.name}.report.json`);
+      const htmlPath = path.join(lhOutputDir, `lighthouse-${pageInfo.name}.report.html`);
 
       // Detectar si Chrome o Chromium están disponibles
       let chromePath = '';
@@ -87,14 +87,15 @@ test.describe('Lighthouse — Core Web Vitals y Rendimiento UX', () => {
       }
 
       // Ejecutar Lighthouse como proceso CLI
+      const outputPath = path.join(lhOutputDir, `lighthouse-${pageInfo.name}`);
       const lhCommand = [
-        'npx', 'lighthouse', `"${targetUrl}"`,
-        `--chrome-flags="--headless --no-sandbox --disable-gpu --disable-dev-shm-usage"`,
-        `--chromePath="${chromePath}"`,
+        'npx', 'lighthouse', targetUrl,
+        '--chrome-flags="--headless --no-sandbox --disable-gpu --disable-dev-shm-usage"',
+        `--chromePath=${chromePath}`,
         '--output=json,html',
-        `--output-path="${path.join(lhOutputDir, `lighthouse-${pageInfo.name}`)}"`,
+        `--output-path=${outputPath}`,
         '--only-categories=performance,accessibility,best-practices',
-        '--throttling-method=provided',  // Sin throttling artificial en red Docker interna
+        '--throttling-method=provided',
         '--max-wait-for-load=45000',
         '--quiet',
       ].join(' ');
