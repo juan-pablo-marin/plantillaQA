@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Calidad y Seguridad - Ficha Caracterización</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #0ea5e9;
+            --accent: #f59e0b;
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #22c55e;
+            --gradient: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%);
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        header {
+            background: var(--gradient);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+            clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            margin-bottom: 1rem;
+        }
+
+        header p {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 2rem 4rem;
+        }
+
+        section {
+            background: var(--surface);
+            border-radius: 1rem;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: transform 0.3s ease;
+        }
+
+        section:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            margin: 1.5rem 0 0.75rem;
+            color: var(--text-main);
+            font-weight: 700;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+        }
+
+        .example-box {
+            background-color: #f0fdf4;
+            border-left: 4px solid var(--success);
+            padding: 1rem;
+            margin: 0.5rem 0 1.5rem 0;
+            border-radius: 0 0.5rem 0.5rem 0;
+            font-size: 0.95rem;
+            color: #166534;
+        }
+
+        .example-box strong {
+            color: #15803d;
+        }
+
+        ul {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            color: var(--text-muted);
+        }
+
+        li::before {
+            content: "→";
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .evidence-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .evidence-card {
+            background: #f1f5f9;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            border: 2px dashed var(--primary-light);
+        }
+
+        .evidence-placeholder {
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #e2e8f0;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .evidence-placeholder i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .evidence-label {
+            padding: 1rem;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-align: center;
+            color: var(--primary);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-right: 0.5rem;
+        }
+
+        .badge-qa { background: #dcfce7; color: #166534; }
+        .badge-sec { background: #fee2e2; color: #991b1b; }
+
+        footer {
+            text-align: center;
+            padding: 3rem;
+            background: #1e293b;
+            color: white;
+            font-size: 0.875rem;
+        }
+
+        .metadata {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 2rem;
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header h1 { font-size: 2rem; }
+            section { padding: 1.5rem; }
+            .evidence-placeholder { height: 250px; }
+        }
+
+        /* Micro-animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade {
+            animation: fadeIn 0.8s ease forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="animate-fade">
+            <h1>Calidad y Seguridad del Software</h1>
+            <p>Reporte Técnico Institucional — Ciclo de Vida del Proyecto: <strong>Ficha Caracterización</strong></p>
+            <div class="metadata">
+                <span><strong>Rol:</strong> Equipo QA Profesional</span>
+                <span><strong>Fecha:</strong> 11 de Abril, 2026</span>
+                <span><strong>Estado:</strong> En Revisión</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        
+        <!-- RESUMEN EJECUTIVO -->
+        <section class="animate-fade" style="animation-delay: 0.1s;">
+            <h2>Resumen Ejecutivo</h2>
+            <p>
+                Este documento consolida las evidencias de aseguramiento de calidad y controles de seguridad implementados en el proyecto 
+                <strong>Ficha Caracterización</strong>. Se detallan las estrategias de pruebas funcionales y no funcionales, así como el análisis 
+                estático de código y controles de seguridad perimetral y de aplicación. Todas estas validaciones son orquestadas automáticamente 
+                mediante nuestra arquitectura de integración continua (CI/CD) con Docker y Jenkins.
+            </p>
+        </section>
+
+        <!-- DIMENSIÓN 1: CALIDAD -->
+        <section class="animate-fade" style="animation-delay: 0.2s;">
+            <h2><span class="badge badge-qa">QA</span> Dimensión 1 — Calidad del Software</h2>
+            
+            <h3>Estándares de Desarrollo y Revisión (Code Review)</h3>
+            <p>Se han adoptado convenciones estrictas para mantener el código ordenado y unificado:</p>
+            <ul>
+                <li><strong>Estrategia de Versionamiento:</strong> Utilizamos una estructura controlada de ramas en Git. Tenemos una rama principal donde reside el código estable y ramas secundarias para desarrollar nuevas características sin afectar el sistema actual.</li>
+                <li><strong>Code Review:</strong> Ningún código nuevo entra al sistema sin que otro programador del equipo lo revise y lo apruebe.</li>
+            </ul>
+
+            <h3 style="margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 2rem;">Pruebas Funcionales: Asegurando que el sistema hace lo que debe</h3>
+            <p>El stack de pruebas funcionales garantiza que el sistema cumpla con todos los requerimientos y que ninguna funcionalidad esté rota para el usuario.</p>
+            
+            <h4>1. Pruebas End-to-End (E2E) con Playwright</h4>
+            <p>
+                Utilizamos <strong>Playwright</strong> para simular el comportamiento exacto de un usuario real utilizando el sistema a través de un navegador web, validando la interfaz gráfica.
+            </p>
+            <div class="example-box">
+                <strong>💡 En palabras sencillas:</strong> Playwright es como un "robot" que configuramos para que entre a nuestra página web, haga clic en los botones, llene los formularios de registro de inicio a fin y pulse "Guardar". Su trabajo es asegurar que todo funcione tal y como lo haría una persona real frente a su pantalla, comprobando que no existan errores visuales o procesos atascados.
+            </div>
+
+            <h4>2. Pruebas de API con Newman</h4>
+            <p>
+                Mediante <strong>Newman</strong> (la versión automatizada de Postman), evaluamos directamente la capa de servicios (el backend o motor del sistema) comprobando que las reglas de negocio y los datos viajen correctamente.
+            </p>
+            <div class="example-box">
+                <strong>💡 En palabras sencillas:</strong> Si el sistema fuera un restaurante, Newman sería un supervisor que llama constantemente desde la cocina directamente a los cocineros para verificar que estén entregando el menú correcto con los ingredientes correctos, sin tener que esperar a que el mesero (la pantalla del usuario) le lleve el plato.
+            </div>
+
+            <h3 style="margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 2rem;">Pruebas No Funcionales: Asegurando rendimiento y capacidad</h3>
+            <p>Validamos la resiliencia del sistema bajo carga y medimos detalladamente los recursos técnicos consumidos.</p>
+
+            <h4>1. Pruebas de Carga y Estrés con k6</h4>
+            <p>
+                Usamos <strong>k6</strong> para generar tráfico masivo al sistema, simular múltiples conexiones simultáneas e identificar el límite en el cual la aplicación podría empezar a degradarse.
+            </p>
+            <div class="example-box">
+                <strong>💡 En palabras sencillas:</strong> k6 nos permite simular un "Black Friday" digital. Enviamos docenas o cientos de visitantes virtuales al mismo tiempo a la plataforma para comprobar que no se sature, que no se caiga y que las respuestas sigan siendo rápidas, incluso cuando todos hacen clic a la vez.
+            </div>
+
+            <h4>2. Monitoreo y Telemetría con Grafana, Prometheus y cAdvisor</h4>
+            <p>
+                Para tener visibilidad completa durante las simulaciones de carga y la salud del sistema, utilizamos un conjunto de herramientas complementarias que extraen, almacenan y grafican datos vitales de nuestra infraestructura.
+            </p>
+            <div class="example-box">
+                <strong>💡 En palabras sencillas:</strong> Si la plataforma fuera un vuelo comercial, <strong>cAdvisor</strong> y <strong>Prometheus</strong> serían los múltiples sensores externos adheridos a los motores y al fuselaje recopilando datos de temperatura y presión segundo a segundo. Por su parte, <strong>Grafana</strong> funciona como las pantallas del tablero de mandos en la cabina del piloto, traduciendo toda esa complejidad de sensores en gráficos visualmente amigables con agujas y alertas de colores para tomar decisiones rápidamente.
+            </div>
+
+        </section>
+
+        <!-- DIMENSIÓN 1.5: USABILIDAD -->
+        <section class="animate-fade" style="animation-delay: 0.25s;">
+            <h2><span class="badge" style="background: #e0e7ff; color: #3730a3;">UX</span> Dimensión 1.5 — Usabilidad del Software</h2>
+            
+            <h3>Accesibilidad (WCAG 2.1 AA) con axe-core</h3>
+            <p>
+                Utilizamos <strong>axe-core</strong> integrado con Playwright para escanear cada pantalla de la aplicación de forma automática, 
+                verificando que cumpla con los estándares internacionales de accesibilidad web <strong>WCAG 2.1 nivel AA</strong>.
+            </p>
+            <div class="example-box">
+                <strong>💡 En palabras sencillas:</strong> axe-core es como un inspector de accesibilidad universal que entra a cada pantalla 
+                de nuestra aplicación y revisa que personas con discapacidades visuales, motoras o cognitivas puedan usarla sin problemas. 
+                Verifica que los colores tengan suficiente contraste para ser leídos, que todos los botones y campos tengan etiquetas claras 
+                para lectores de pantalla, y que la navegación con el teclado funcione correctamente.
+            </div>
+
+            <h3 style="margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 2rem;">Core Web Vitals con Lighthouse</h3>
+            <p>
+                Integramos <strong>Google Lighthouse</strong> para medir automáticamente las métricas de experiencia de usuario que 
+                Google considera esenciales para una buena interacción: tiempos de carga, estabilidad visual y capacidad de respuesta.
+            </p>
+            <div class="example-box">
+                <strong>💡 En palabras sencillas:</strong> Lighthouse es como el "velocímetro de calidad" que usa Google para evaluar 
+                las páginas web. Mide tres cosas fundamentales: (1) <strong>LCP</strong> — ¿cuánto tarda en aparecer el contenido 
+                principal en la pantalla?; (2) <strong>TBT</strong> — ¿la página responde rápido cuando el usuario intenta hacer clic?; 
+                y (3) <strong>CLS</strong> — ¿se mueven los botones o textos mientras carga la página, haciendo que el usuario haga clic 
+                en el lugar equivocado? Estas métricas determinan si la experiencia del usuario es fluida o frustrante.
+            </div>
+
+        </section>
+
+        <!-- DIMENSIÓN 2: SEGURIDAD -->
+        <section class="animate-fade" style="animation-delay: 0.3s;">
+            <h2><span class="badge badge-sec">SEC</span> Dimensión 2 — Seguridad del Software</h2>
+            
+            <h3>Controles de Acceso</h3>
+            <p>Implementamos mecanismos robustos definidos por la experta de seguridad para la protección de la identidad:</p>
+            <ul>
+                <li><strong>Autenticación:</strong> Uso de JWT (JSON Web Tokens) para sesiones cifradas y seguras.</li>
+                <li><strong>Autorización:</strong> Control de acceso basado en roles (las personas solo pueden ver la información a la cual tienen permisos asignados).</li>
+            </ul>
+
+            <h3 style="margin-top: 2rem; border-top: 1px solid #e2e8f0; padding-top: 2rem;">Desarrollo Seguro: Análisis Estático con SonarQube</h3>
+            <p>
+                Se ha integrado <strong>SonarQube</strong>, una herramienta de Análisis Estático de Seguridad de Aplicaciones (SAST), orientada a mitigar riesgos basados en el estándar <strong>OWASP Top 10</strong> (prevención contra inyecciones SQL y ataques del tipo Cross-Site Scripting).
+            </p>
+            <div class="example-box">
+                <strong>💡 En palabras sencillas:</strong> SonarQube actúa como un corrector ortográfico o un auditor hiper-avanzado que lee todo el código que escriben los programadores antes de que este se convierta en la aplicación final. En lugar de buscar comas mal puestas, el auditor busca "debilidades de seguridad" invisibles y "malas prácticas" previniendo que un cibercriminal aproveche esas fisuras en el futuro.
+            </div>
+
+        </section>
+
+        <!-- EVIDENCIAS TÉCNICAS -->
+        <section class="animate-fade" style="animation-delay: 0.4s;">
+            <h2>Resultados y Evidencias de Ejecución</h2>
+            <p>A continuación se consolidan los espacios técnicos formales exigidos para depositar las capturas de pantalla o reportes automatizados que dan fe de la ejecución exitosa de los ciclos de QA.</p>
+
+            <div class="evidence-grid">
+                
+                <!-- Evidencia 1: SonarQube -->
+                <div class="evidence-card">
+                    <div class="evidence-placeholder">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                        <p>[ AGREGAR AQUÍ: CAPTURA DE PANTALLA DE SONARQUBE DASHBOARD ]</p>
+                        <p style="font-size: 0.75rem;">Muestre el Quality Gate en "Passed" (Aprobado) y las métricas resumidas que indican cero vulnerabilidades detectadas en el código fuente.</p>
+                    </div>
+                    <div class="evidence-label">Evidencia 01: Análisis Estático de Código (SonarQube)</div>
+                </div>
+
+                <!-- Evidencia 2: Newman -->
+                <div class="evidence-card">
+                    <div class="evidence-placeholder">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                        <p>[ AGREGAR AQUÍ: CAPTURA DE PANTALLA DE REPORTE NEWMAN HTML ]</p>
+                        <p style="font-size: 0.75rem;">Muestre el resumen visual del visor HTML con las peticiones de prueba ejecutadas internamente al backend y los tests "aprobados".</p>
+                    </div>
+                    <div class="evidence-label">Evidencia 02: Pruebas Funcionales Backend (Newman API)</div>
+                </div>
+
+                <!-- Evidencia 3: Playwright -->
+                <div class="evidence-card">
+                    <div class="evidence-placeholder">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                        <p>[ AGREGAR AQUÍ: CAPTURA DE PANTALLA DE REPORTE PLAYWRIGHT ]</p>
+                        <p style="font-size: 0.75rem;">Muestre la hoja resumen de Playwright indicando el porcentaje de flujos de prueba exitosos que el entorno automatizado simuló desde el navegador.</p>
+                    </div>
+                    <div class="evidence-label">Evidencia 03: Pruebas Funcionales Frontend (Playwright E2E)</div>
+                </div>
+
+                <!-- Evidencia 4: Grafana/k6 -->
+                <div class="evidence-card">
+                    <div class="evidence-placeholder">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                        <p>[ AGREGAR AQUÍ: CAPTURA DE PANTALLA DE DASHBOARD GRAFANA ]</p>
+                        <p style="font-size: 0.75rem;">Muestre el Tablero Principal de Grafana exponiendo las líneas de carga de usuarios por k6 y el rendimiento de los contenedores supervisados por cAdvisor/Prometheus.</p>
+                    </div>
+                    <div class="evidence-label">Evidencia 04: Rendimiento y Telemetría (Grafana + Prometheus + cAdvisor)</div>
+                </div>
+
+                <!-- Evidencia 5: Accesibilidad (axe-core) -->
+                <div class="evidence-card">
+                    <div class="evidence-placeholder">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>
+                        <p>[ AGREGAR AQUÍ: CAPTURA DE PANTALLA DE REPORTE AXE-CORE (ACCESIBILIDAD) ]</p>
+                        <p style="font-size: 0.75rem;">Muestre el resumen de la auditoría de accesibilidad WCAG 2.1 AA: número de violaciones encontradas, detalles de las reglas incumplidas (contraste, labels, estructura de encabezados) y los elementos afectados en cada pantalla auditada.</p>
+                    </div>
+                    <div class="evidence-label">Evidencia 05: Auditoría de Accesibilidad (axe-core — WCAG 2.1 AA)</div>
+                </div>
+
+                <!-- Evidencia 6: Lighthouse (Core Web Vitals) -->
+                <div class="evidence-card">
+                    <div class="evidence-placeholder">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"></path><path d="m16.2 7.8 2.9-2.9"></path><path d="M18 12h4"></path><path d="m16.2 16.2 2.9 2.9"></path><path d="M12 18v4"></path><path d="m4.9 19.1 2.9-2.9"></path><path d="M2 12h4"></path><path d="m4.9 4.9 2.9 2.9"></path></svg>
+                        <p>[ AGREGAR AQUÍ: CAPTURA DE PANTALLA DE REPORTE LIGHTHOUSE ]</p>
+                        <p style="font-size: 0.75rem;">Muestre las métricas Core Web Vitals: LCP (Largest Contentful Paint), TBT (Total Blocking Time), CLS (Cumulative Layout Shift), junto con los puntajes de Performance, Accessibility y Best Practices.</p>
+                    </div>
+                    <div class="evidence-label">Evidencia 06: Rendimiento UX y Core Web Vitals (Lighthouse)</div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- CONCLUSIÓN -->
+        <section class="animate-fade" style="animation-delay: 0.5s;">
+            <h2>Conclusión</h2>
+            <p>
+                La implementación de estas herramientas de QA y los mecanismos de monitoreo continuos (CI/CD a través de Jenkins) cumplen 
+                satisfactoriamente con los lineamientos de Calidad y Seguridad de la información exigidos. Esto garantiza que todos los módulos de 
+                <strong>Ficha Caracterización</strong> son validados técnica, funcional y operativamente antes de cualquier entrega productiva, brindando 
+                confianza y resiliencia al sistema durante su uso proyectado.
+            </p>
+        </section>
+
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Ficha Caracterización — Fábrica de Software</p>
+        <p style="margin-top: 0.5rem; opacity: 0.7;">Generado mediante QA Pipeline Automático</p>
+    </footer>
+
+</body>
+</html>

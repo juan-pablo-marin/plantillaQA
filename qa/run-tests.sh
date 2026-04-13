@@ -13,10 +13,11 @@ SRC_FRONTEND="/src/frontend"
 
 # ── Flags de ejecución ─────────────────────────────────────────────────────
 # Cambia a "true" el servicio que quieras activar; el resto se omite.
-RUN_NEWMAN="${RUN_NEWMAN:-false}"          # Tests de API con Newman/Postman
-RUN_SONAR="${RUN_SONAR:-true}"            # Análisis estático con SonarQube
-RUN_PLAYWRIGHT="${RUN_PLAYWRIGHT:-false}"  # Tests E2E con Playwright
-RUN_K6="${RUN_K6:-false}"                  # Tests de rendimiento con k6
+RUN_NEWMAN="${RUN_NEWMAN:-false}"              # Tests de API con Newman/Postman
+RUN_SONAR="${RUN_SONAR:-true}"                # Análisis estático con SonarQube
+RUN_PLAYWRIGHT="${RUN_PLAYWRIGHT:-false}"      # Tests E2E con Playwright
+RUN_K6="${RUN_K6:-false}"                      # Tests de rendimiento con k6
+RUN_ACCESSIBILITY="${RUN_ACCESSIBILITY:-false}" # Accesibilidad (axe-core) + Lighthouse (Core Web Vitals)
 # ───────────────────────────────────────────────────────────────────────────
 
 SONAR_WAIT_SECONDS="${SONAR_WAIT_SECONDS:-300}"
@@ -35,10 +36,11 @@ echo " Backend:    $BACKEND_URL"
 echo " Frontend:   $FRONTEND_URL"
 echo " Sonar:      $SONAR_URL"
 echo "--------------------------------------------"
-echo " Newman:     RUN_NEWMAN=$RUN_NEWMAN"
-echo " SonarQube:  RUN_SONAR=$RUN_SONAR"
-echo " Playwright: RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT"
-echo " k6:         RUN_K6=$RUN_K6"
+echo " Newman:        RUN_NEWMAN=$RUN_NEWMAN"
+echo " SonarQube:     RUN_SONAR=$RUN_SONAR"
+echo " Playwright:    RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT"
+echo " k6:            RUN_K6=$RUN_K6"
+echo " Accessibility: RUN_ACCESSIBILITY=$RUN_ACCESSIBILITY"
 echo "============================================"
 
 # 0. Preparar reportes
@@ -393,15 +395,43 @@ echo "[4/6] Ejecutando Playwright..."
 if [ "$RUN_PLAYWRIGHT" != "true" ]; then
     echo " SKIP: RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT"
 elif [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
-    echo "  Ejecutando tests desde playwright.config.ts (testDir: ./ui/tests)"
+    echo "  Ejecutando tests E2E desde playwright.config.ts (proyecto: chromium)"
     echo "  Limpiando reportes anteriores (HTML + artefactos)..."
     mkdir -p "$REPORTS_DIR/playwright-html" "$REPORTS_DIR/playwright-results"
     find "$REPORTS_DIR/playwright-html" -mindepth 1 -delete 2>/dev/null || true
     find "$REPORTS_DIR/playwright-results" -mindepth 1 -delete 2>/dev/null || true
 
-    PLAYWRIGHT_JSON_OUTPUT_NAME=results.json npx playwright test --config=playwright.config.ts || echo "  WARN: Algunos tests fallaron."
+    # Solo ejecuta el proyecto 'chromium' (E2E funcionales), sin incluir accessibility ni lighthouse
+    PLAYWRIGHT_JSON_OUTPUT_NAME=results.json npx playwright test --config=playwright.config.ts --project=chromium || echo "  WARN: Algunos tests E2E fallaron."
 else
     echo " SKIP: No se encontro playwright.config.ts en /qa."
+fi
+
+# 4.5. Accesibilidad + Lighthouse
+echo "[4.5/6] Pruebas de Accesibilidad (axe-core) + Lighthouse (Core Web Vitals)..."
+if [ "$RUN_ACCESSIBILITY" != "true" ]; then
+    echo " SKIP: RUN_ACCESSIBILITY=$RUN_ACCESSIBILITY"
+elif [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
+    echo "  Ejecutando auditorías de accesibilidad y Lighthouse..."
+    mkdir -p "$REPORTS_DIR/accessibility" "$REPORTS_DIR/lighthouse"
+
+    # Proyecto 'accessibility' (axe-core WCAG 2.1 AA)
+    echo "  → axe-core: Escaneando páginas para cumplimiento WCAG 2.1 AA..."
+    PLAYWRIGHT_JSON_OUTPUT_NAME=accessibility-results.json npx playwright test \
+        --config=playwright.config.ts \
+        --project=accessibility \
+        || echo "  WARN: Algunas auditorías de accesibilidad reportaron violaciones."
+
+    # Proyecto 'lighthouse' (Core Web Vitals)
+    echo "  → Lighthouse: Midiendo Core Web Vitals (LCP, TBT, CLS)..."
+    PLAYWRIGHT_JSON_OUTPUT_NAME=lighthouse-results.json npx playwright test \
+        --config=playwright.config.ts \
+        --project=lighthouse \
+        || echo "  WARN: Algunas auditorías de Lighthouse no alcanzaron los umbrales."
+
+    echo "  Reportes de accesibilidad generados en: $REPORTS_DIR/"
+else
+    echo " SKIP: No se encontró playwright.config.ts"
 fi
 
 # 5. k6 (carga/estrés)

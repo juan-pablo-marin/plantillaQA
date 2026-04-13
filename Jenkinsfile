@@ -2,10 +2,11 @@ pipeline {
     agent any
 
     parameters {
-        booleanParam(name: 'RUN_NEWMAN',     defaultValue: true,  description: 'Ejecutar pruebas de API con Newman')
-        booleanParam(name: 'RUN_SONAR',      defaultValue: true,  description: 'Ejecutar análisis estático con SonarQube')
-        booleanParam(name: 'RUN_PLAYWRIGHT', defaultValue: true,  description: 'Ejecutar pruebas End-to-End con Playwright')
-        booleanParam(name: 'RUN_K6',         defaultValue: false, description: 'Ejecutar pruebas de estrés/rendimiento con k6')
+        booleanParam(name: 'RUN_NEWMAN',         defaultValue: true,  description: 'Ejecutar pruebas de API con Newman')
+        booleanParam(name: 'RUN_SONAR',          defaultValue: true,  description: 'Ejecutar análisis estático con SonarQube')
+        booleanParam(name: 'RUN_PLAYWRIGHT',     defaultValue: true,  description: 'Ejecutar pruebas End-to-End con Playwright')
+        booleanParam(name: 'RUN_K6',             defaultValue: false, description: 'Ejecutar pruebas de estrés/rendimiento con k6')
+        booleanParam(name: 'RUN_ACCESSIBILITY',  defaultValue: true,  description: 'Ejecutar auditorías de Accesibilidad (axe-core) y Lighthouse (Core Web Vitals)')
         // booleanParam(name: 'RUN_CLAUDE',     defaultValue: false, description: 'Ejecutar análisis inteligente con Claude AI y generar reporte HTML')
     }
 
@@ -299,6 +300,32 @@ pipeline {
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/"
                             sh "docker cp qa-runner-k6:${QA_REPORTS_DIR}/k6 ${JENKINS_REPORTS_DIR}/ || true"
                             sh "docker rm -f qa-runner-k6 || true"
+                        }
+                    }
+                }
+
+                stage('Usabilidad (Accesibilidad + Lighthouse)') {
+                    when { expression { return params.RUN_ACCESSIBILITY } }
+                    steps {
+                        script {
+                            echo "=> Ejecutando Auditorías de Accesibilidad (axe-core) y Lighthouse..."
+                            sh """
+                                ${COMPOSE_CMD} run --no-deps --name qa-runner-a11y \\
+                                -e REPORTS_DIR=${QA_REPORTS_DIR} \\
+                                -e RUN_NEWMAN=false \\
+                                -e RUN_SONAR=false \\
+                                -e RUN_PLAYWRIGHT=false \\
+                                -e RUN_K6=false \\
+                                -e RUN_ACCESSIBILITY=true \\
+                                qa-runner || true
+                            """
+                            sh "mkdir -p ${JENKINS_REPORTS_DIR}/accessibility-html"
+                            sh "mkdir -p ${JENKINS_REPORTS_DIR}/lighthouse"
+                            // Copiar reportes Playwright HTML (incluye evidencias de axe + lighthouse)
+                            sh "docker cp qa-runner-a11y:/qa/reports/playwright-html/. ${JENKINS_REPORTS_DIR}/accessibility-html/ || true"
+                            // Copiar reportes Lighthouse HTML/JSON dedicados
+                            sh "docker cp qa-runner-a11y:${QA_REPORTS_DIR}/lighthouse/. ${JENKINS_REPORTS_DIR}/lighthouse/ || true"
+                            sh "docker rm -f qa-runner-a11y || true"
                         }
                     }
                 }
@@ -620,6 +647,26 @@ pipeline {
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/accessibility-html/index.html")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/accessibility-html/**/*", allowEmptyArchive: true
+                            publishHTML(target: [
+                                reportName         : 'Accessibility & Lighthouse Report',
+                                reportDir          : "${env.RELATIVE_REPORTS_DIR}/accessibility-html",
+                                reportFiles        : 'index.html',
+                                keepAll            : true,
+                                alwaysLinkToLastBuild: true,
+                                allowMissing       : true
+                            ])
+                        }
+                    }
+
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/lighthouse")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/lighthouse/**/*", allowEmptyArchive: true
+                        }
+                    }
+
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                         if (fileExists("${env.RELATIVE_REPORTS_DIR}/allure-results")) {
                             allure includeProperties: false, jdk: '', commandline: 'allure',
                                    results: [[path: "${env.RELATIVE_REPORTS_DIR}/allure-results"]],
@@ -663,7 +710,7 @@ pipeline {
                         echo "     - Playwright   → http://localhost:8182"
                         echo "     - App (db, backend, frontend) → puertos según .env.qa / .env.qa_fuc"
                         echo "   Reportes HTML disponibles en Jenkins → Sidebar del build"
-                        docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 2>/dev/null || true
+                        docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 qa-runner-a11y 2>/dev/null || true
                     '''
                 } catch (e) {
                     echo "Limpieza post-pipeline omitida: ${e.message}"

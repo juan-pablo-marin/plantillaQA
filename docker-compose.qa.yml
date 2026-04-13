@@ -217,6 +217,7 @@ services:
       - RUN_SONAR=${RUN_SONAR:-false}
       - RUN_PLAYWRIGHT=${RUN_PLAYWRIGHT:-false}
       - RUN_K6=${RUN_K6:-false}
+      - RUN_ACCESSIBILITY=${RUN_ACCESSIBILITY:-false}
       # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-20m}

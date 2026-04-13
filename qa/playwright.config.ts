@@ -26,9 +26,28 @@ export default defineConfig({
   },
 
   projects: [
+    // ── Proyecto principal: Tests E2E funcionales ──
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: ['**/accessibility.spec.ts', '**/lighthouse.spec.ts'],
+    },
+
+    // ── Proyecto de Accesibilidad: axe-core WCAG 2.1 AA ──
+    {
+      name: 'accessibility',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: '**/accessibility.spec.ts',
+      retries: 0,  // Accesibilidad no necesita reintentos — el resultado es determinístico
+    },
+
+    // ── Proyecto Lighthouse: Core Web Vitals y rendimiento UX ──
+    {
+      name: 'lighthouse',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: '**/lighthouse.spec.ts',
+      retries: 0,
+      timeout: 180_000,  // Lighthouse necesita más tiempo por auditoría
     },
   ],
 });
