@@ -451,7 +451,7 @@ elif [ -f "performance/k6-tests_fuc.js" ]; then
     BUILD_TAG="${BUILD_NUMBER:-manual_$(date +%Y%m%d_%H%M%S)}"
     echo "  Etiqueta de build: $BUILD_TAG"
     export K6_PEAK_VUS="${K6_PEAK_VUS:-100}"
-    export K6_INFLUXDB_CONCURRENT_WRITES="${K6_INFLUXDB_CONCURRENT_WRITES:-1}"
+    export K6_INFLUXDB_CONCURRENT_WRITES="${K6_INFLUXDB_CONCURRENT_WRITES:-4}"
     # Telemetría Influx 1.x: intervalo corto + muchas VUs → flush > intervalo (avisos k6) o POST > max-body (413).
     # Orden de umbrales: 100k VUs necesita lotes más espaciados; 10k usa 500ms como compromiso estable.
     _k6_push="${K6_INFLUXDB_PUSH_INTERVAL:-}"
@@ -463,7 +463,7 @@ elif [ -f "performance/k6-tests_fuc.js" ]; then
         fi
     elif [ "$K6_PEAK_VUS" -ge 8000 ] 2>/dev/null; then
         if [ -z "$_k6_push" ] || [ "$_k6_push" = "1s" ] || [ "$_k6_push" = "1000ms" ]; then
-            export K6_INFLUXDB_PUSH_INTERVAL=500ms
+            export K6_INFLUXDB_PUSH_INTERVAL=2s
         else
             export K6_INFLUXDB_PUSH_INTERVAL="$_k6_push"
         fi
@@ -489,6 +489,9 @@ elif [ -f "performance/k6-tests_fuc.js" ]; then
       --out "influxdb=http://influxdb:8086/k6" \
       --summary-export "$K6_DIR/summary.json" \
       || echo "  WARN: k6 fallo o no cumplio thresholds."
+    # Dar tiempo a k6 para drenar métricas pendientes hacia InfluxDB
+    echo "  Esperando 15s para drenar métricas residuales hacia InfluxDB..."
+    sleep 15
 else
     echo " SKIP: No se encontro performance/k6-tests.js"
 fi

@@ -1,2 +1,4 @@
 CREATE DATABASE k6
 ALTER RETENTION POLICY "autogen" ON "k6" DURATION 90d REPLICATION 1 SHARD DURATION 7d DEFAULT
+CREATE RETENTION POLICY "downsample_1m" ON "k6" DURATION 365d REPLICATION 1 SHARD DURATION 30d
+CREATE CONTINUOUS QUERY "cq_http_req_duration_1m" ON "k6" BEGIN SELECT mean("value") AS "mean", max("value") AS "max", percentile("value", 95) AS "p95" INTO "downsample_1m"."http_req_duration" FROM "http_req_duration" GROUP BY time(1m), * END
