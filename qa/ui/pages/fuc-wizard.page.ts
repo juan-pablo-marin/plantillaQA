@@ -77,7 +77,28 @@ export class FucWizardPage {
     // Inyectamos el CSS de deshabilitación lo antes posible
     await this.disableAccessibilityWidget();
 
-    // Selectores basados en Labels (según snapshot del usuario) para mayor robustez
+    // Seleccionar el tipo de documento abriendo explícitamente el combobox
+    // Esto evita usar selectOption() en selects ocultos que no disparan eventos en React
+    const tipoDocContainer = this.page.locator('label').filter({ hasText: /Tipo de documento/i }).locator('..');
+    
+    try {
+      const combobox = tipoDocContainer.locator('[role="combobox"], select').first();
+      const tagName = await combobox.evaluate(el => el.tagName.toLowerCase());
+      
+      if (tagName === 'select') {
+         await combobox.selectOption({ label: 'Cédula de Ciudadanía' });
+      } else {
+         await combobox.click({ force: true, timeout: 5000 });
+         await this.page.waitForTimeout(500); // esperar animación de menú
+         await this.page.getByRole('option', { name: /Cédula de Ciudadanía/i }).click({ force: true });
+      }
+    } catch {
+      // Fallback si no tiene rol combobox explícito
+      await tipoDocContainer.click();
+      await this.page.waitForTimeout(500);
+      await this.page.getByText(/Cédula de Ciudadanía/i).click();
+    }
+
     await this.page.getByLabel(/Número de documento/i).fill(id);
     await this.page.locator('input[name="password"]').fill(pass);
 

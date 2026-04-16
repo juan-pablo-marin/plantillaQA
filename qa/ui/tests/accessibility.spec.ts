@@ -84,6 +84,25 @@ test.describe('Auditoría de Accesibilidad (WCAG 2.1 AA)', () => {
 
     // Intentar autenticación
     try {
+      const tipoDocContainer = page.locator('label').filter({ hasText: /Tipo de documento/i }).locator('..');
+      
+      try {
+        const combobox = tipoDocContainer.locator('[role="combobox"], select').first();
+        const tagName = await combobox.evaluate(el => el.tagName.toLowerCase());
+        
+        if (tagName === 'select') {
+           await combobox.selectOption({ label: 'Cédula de Ciudadanía' });
+        } else {
+           await combobox.click({ force: true, timeout: 5000 });
+           await page.waitForTimeout(500); 
+           await page.getByRole('option', { name: /Cédula de Ciudadanía/i }).click({ force: true });
+        }
+      } catch {
+        await tipoDocContainer.click();
+        await page.waitForTimeout(500);
+        await page.getByText(/Cédula de Ciudadanía/i).click();
+      }
+
       await page.getByLabel(/Número de documento/i).fill('1088236798');
       await page.locator('input[name="password"]').fill('Masterkey123.');
       await page.locator('input[name="password"]').press('Enter');
