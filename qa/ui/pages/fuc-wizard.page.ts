@@ -323,28 +323,8 @@ export class FucWizardPage {
     const combobox = container.locator('[role="combobox"]').first();
     const hiddenSelect = container.locator('select').first();
 
-    // ESTRATEGIA 0: Intentar primero seleccionar por el select HTML subyacente (más robusto)
-    try {
-      const selectCount = await hiddenSelect.count();
-      if (selectCount > 0) {
-        const options = await hiddenSelect.locator('option').all();
-        console.log(`Select encontrado con ${options.length} opciones`);
-        
-        for (const opt of options) {
-          const text = await opt.textContent();
-          if (text && text.toLowerCase().includes(optionTextToClick.toLowerCase())) {
-            const value = await opt.getAttribute('value');
-            if (value) {
-              await hiddenSelect.selectOption(value);
-              console.log(`✓ Opción seleccionada por SELECT HTML: ${optionTextToClick}`);
-              return;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.log(`Select HTML strategy falló: ${e.message}`);
-    }
+    // ESTRATEGIA 0 (Eliminada): No interactuar con "hidden select" ya que rompe la sincronización
+    // de los valores del form en componentes React modernos (Hook Form, NextUI, Radix, etc.).
 
     // ESTRATEGIA 1: Búsqueda visual con rol="option"
     // Hacer scroll
@@ -366,36 +346,31 @@ export class FucWizardPage {
     // Buscar el input dentro del combobox O en el popup que se abre
     let inputLoc = null;
     
-    // Buscar en el combobox primero
+    // Buscar en el combobox primero o si el combobox es el input en si mismo
     try {
-      inputLoc = combobox.locator('input').first();
-      const isVisible = await inputLoc.isVisible({ timeout: 500 });
-      if (isVisible) {
-        console.log(`Input encontrado en combobox`);
+      const tagName = await combobox.evaluate(el => el.tagName.toLowerCase());
+      if (tagName === 'input') {
+        inputLoc = combobox;
+        console.log(`El combobox es un input`);
       } else {
-        inputLoc = null;
-      }
-    } catch (e) {
-      console.log(`Input no en combobox`);
-    }
-
-    // Si no está en combobox, buscar en la página
-    if (!inputLoc) {
-      try {
-        const pageInputs = this.page.locator('input[type="text"], input:not([type])');
-        const count = await pageInputs.count();
-        for (let i = 0; i < count; i++) {
-          const inp = pageInputs.nth(i);
-          const isVis = await inp.isVisible({ timeout: 300 }).catch(() => false);
-          if (isVis) {
-            inputLoc = inp;
-            console.log(`Input encontrado en página (index ${i})`);
-            break;
+        inputLoc = combobox.locator('input').first();
+        const isVisible = await inputLoc.isVisible({ timeout: 500 }).catch(() => false);
+        if (isVisible) {
+          console.log(`Input encontrado dentro del combobox`);
+        } else {
+          // A veces el listbox abre un input flotante, lo buscamos allí
+          const popupInput = this.page.locator('[role="listbox"]').locator('..').locator('input').first();
+          if (await popupInput.isVisible({ timeout: 500 }).catch(() => false)) {
+            inputLoc = popupInput;
+            console.log(`Input encontrado en el popup listbox`);
+          } else {
+            inputLoc = null;
           }
         }
-      } catch (e) {
-        console.log(`Búsqueda de inputs en página falló`);
       }
+    } catch (e) {
+      console.log(`Input no encontrado en DOM local: ${e}`);
+      inputLoc = null;
     }
 
     // Escribir en el input
