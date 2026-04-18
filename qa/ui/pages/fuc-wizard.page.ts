@@ -1,4 +1,12 @@
 import { Page, expect } from '@playwright/test';
+import * as fs from 'fs';
+const LOG_FILE = 'c:\\Users\\Windows\\Desktop\\debug_playwright.log';
+
+function logDebug(msg: string) {
+  try {
+    fs.appendFileSync(LOG_FILE, new Date().toISOString() + ': ' + msg + '\n');
+  } catch (e) {}
+}
 
 export class FucWizardPage {
   constructor(private readonly page: Page) { }
@@ -353,18 +361,25 @@ export class FucWizardPage {
         inputLoc = combobox;
         console.log(`El combobox es un input`);
       } else {
-        inputLoc = combobox.locator('input').first();
-        const isVisible = await inputLoc.isVisible({ timeout: 500 }).catch(() => false);
+        inputLoc = combobox.locator('input:not([type="hidden"])').first();
+        const isVisible = await inputLoc.isVisible({ timeout: 2000 }).catch(() => false);
         if (isVisible) {
           console.log(`Input encontrado dentro del combobox`);
         } else {
-          // A veces el listbox abre un input flotante, lo buscamos allí
-          const popupInput = this.page.locator('[role="listbox"]').locator('..').locator('input').first();
-          if (await popupInput.isVisible({ timeout: 500 }).catch(() => false)) {
-            inputLoc = popupInput;
-            console.log(`Input encontrado en el popup listbox`);
+          // Intentar un locator más agresivo en todo el container
+          const anyInput = container.locator('input[type="text"]').first();
+          if (await anyInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+             inputLoc = anyInput;
+             console.log(`Input encontrado en container general`);
           } else {
-            inputLoc = null;
+            // A veces el listbox abre un input flotante, lo buscamos allí
+            const popupInput = this.page.locator('[role="listbox"]').locator('..').locator('input').first();
+            if (await popupInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+               inputLoc = popupInput;
+               console.log(`Input encontrado en el popup listbox`);
+            } else {
+               inputLoc = null;
+            }
           }
         }
       }
@@ -411,18 +426,40 @@ export class FucWizardPage {
     // Buscar role="option"
     try {
       const options = this.page.getByRole('option');
+      await options.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       const count = await options.count();
       console.log(`Opciones encontradas: ${count}`);
       
+      const optionToMatch = optionTextToClick.replace(/\s+/g, ' ').trim().toLowerCase();
+      // First pass: try exact includes
       for (let i = 0; i < count; i++) {
         const opt = options.nth(i);
-        const text = await opt.textContent();
-        if (text && text.toLowerCase().includes(optionTextToClick.toLowerCase())) {
-          await opt.click({ force: true });
-          console.log(`✓ Opción seleccionada por role="option": ${optionTextToClick}`);
-          return;
+        const textRaw = await opt.textContent();
+        if (textRaw) {
+          const textNorm = textRaw.replace(/\s+/g, ' ').trim().toLowerCase();
+          if (textNorm.includes(optionToMatch)) {
+            await opt.click({ force: true });
+            console.log(`✓ Opción exacta seleccionada: ${optionTextToClick}`);
+            return;
+          }
         }
       }
+      
+      // Second pass: try partial match
+      const optionPart = optionToMatch.split(',')[0].trim();
+      for (let i = 0; i < count; i++) {
+        const opt = options.nth(i);
+        const textRaw = await opt.textContent();
+        if (textRaw) {
+          const textNorm = textRaw.replace(/\s+/g, ' ').trim().toLowerCase();
+          if (textNorm.includes(optionPart)) {
+            await opt.click({ force: true });
+            console.log(`✓ Opción parcial seleccionada: ${textRaw}`);
+            return;
+          }
+        }
+      }
+      
     } catch (e) {
       console.log(`Búsqueda por role="option" falló: ${e.message}`);
     }
