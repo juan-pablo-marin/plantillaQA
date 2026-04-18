@@ -1,12 +1,4 @@
 import { Page, expect } from '@playwright/test';
-import * as fs from 'fs';
-const LOG_FILE = 'c:\\Users\\Windows\\Desktop\\debug_playwright.log';
-
-function logDebug(msg: string) {
-  try {
-    fs.appendFileSync(LOG_FILE, new Date().toISOString() + ': ' + msg + '\n');
-  } catch (e) {}
-}
 
 export class FucWizardPage {
   constructor(private readonly page: Page) { }
@@ -167,7 +159,27 @@ export class FucWizardPage {
     await this.page.getByLabel(label).fill(value);
   }
 
-  // Helper para componentes "Select" customizados que requieren click y luego selección de opción
+  /**
+   * Espera a que el paso actual del wizard esté listo para interacción.
+   * Busca indicadores de que la transición de paso se completó.
+   */
+  async waitForStepReady(timeout = 3000) {
+    await this.page.waitForTimeout(800);
+    await this.disableAccessibilityWidget();
+    // Esperar a que no haya spinners/loaders visibles
+    try {
+      await this.page.locator('[class*="loading"], [class*="spinner"], [role="progressbar"]')
+        .waitFor({ state: 'hidden', timeout });
+    } catch {
+      // Sin spinners visibles, continuar
+    }
+  }
+
+  /**
+   * Helper para componentes "Select" customizados (Radix UI, shadcn, NextUI) que requieren
+   * click y luego selección de opción. Soporta tanto `<select>` nativos como comboboxes con
+   * role="combobox" (e.g. Radix Select triggers).
+   */
   async selectDropdownOptionByLabel(label: string, optionText: string) {
     console.log(`Seleccionando dropdown [${label}] -> ${optionText}`);
 
@@ -175,90 +187,17 @@ export class FucWizardPage {
     await this.disableAccessibilityWidget();
     await this.page.waitForTimeout(300);
 
-    let dropdown = null;
+    // Intentar primero encontrar un <select> nativo asociado al label (más robusto y rápido)
+    const nativeSelected = await this.tryNativeSelect(label, optionText);
+    if (nativeSelected) return;
 
-    // Estrategia 1: Buscar por label directo (primeros 25 caracteres para ser más flexible)
-    try {
-      const labelLoc = this.page.locator('label').filter({ hasText: new RegExp(label.substring(0, 25), 'i') }).first();
-      const cont = labelLoc.locator('..');
-      dropdown = cont.locator('[role="combobox"]').first();
-      if (await dropdown.isVisible({ timeout: 1500 })) {
-        console.log(`Dropdown encontrado por label`);
-      } else {
-        dropdown = null;
-      }
-    } catch (e) {
-      console.log(`Estrategia label falló`);
-    }
-
-    // Estrategia 2: Buscar por combobox role con parte del label
-    if (!dropdown) {
-      try {
-        dropdown = this.page.getByRole('combobox', { name: new RegExp(label.substring(0, 25), 'i') }).first();
-        if (await dropdown.isVisible({ timeout: 1500 })) {
-          console.log(`Dropdown encontrado por role`);
-        } else {
-          dropdown = null;
-        }
-      } catch (e) {
-        console.log(`Estrategia role falló`);
-      }
-    }
-
-    // Estrategia 3: Buscar cualquier combobox visible cercano
-    if (!dropdown) {
-      try {
-        const allCb = this.page.locator('[role="combobox"]');
-        const cnt = await allCb.count();
-        if (cnt > 0) {
-          dropdown = allCb.first();
-          console.log(`Dropdown encontrado como primer combobox`);
-        }
-      } catch (e) {
-        console.log(`Estrategia combobox falló`);
-      }
-    }
-
+    // Si no hay select nativo, buscar combobox visual (Radix/shadcn style)
+    const dropdown = await this.findDropdownByLabel(label);
     if (!dropdown) {
       throw new Error(`No se encontró dropdown: ${label}`);
     }
 
-    // Encontrar el contenedor para buscar <select> subyacente
-    let container = null;
-    try {
-      const labelLoc = this.page.locator('label').filter({ hasText: new RegExp(label.substring(0, 25), 'i') }).first();
-      container = labelLoc.locator('..');
-    } catch {
-      container = dropdown.locator('..');
-    }
-
-    // ESTRATEGIA 0: Intentar primero seleccionar por el select HTML subyacente (más robusto)
-    if (container) {
-      try {
-        const hiddenSelect = container.locator('select').first();
-        const selectCount = await hiddenSelect.count();
-        if (selectCount > 0) {
-          const options = await hiddenSelect.locator('option').all();
-          console.log(`Select encontrado con ${options.length} opciones`);
-          
-          for (const opt of options) {
-            const text = await opt.textContent();
-            if (text && text.toLowerCase().includes(optionText.toLowerCase())) {
-              const value = await opt.getAttribute('value');
-              if (value) {
-                await hiddenSelect.selectOption(value);
-                console.log(`✓ Opción seleccionada por SELECT HTML: ${optionText}`);
-                return;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.log(`Select HTML strategy falló: ${e.message}`);
-      }
-    }
-
-    // Hacer scroll y clic
+    // Click y selección visual
     await dropdown.scrollIntoViewIfNeeded();
     await this.page.waitForTimeout(400);
 
@@ -272,215 +211,599 @@ export class FucWizardPage {
 
     // Esperar a que el listbox aparezca
     try {
-      await this.page.locator('[role="listbox"]').waitFor({ state: 'visible', timeout: 2000 });
+      await this.page.locator('[role="listbox"]').waitFor({ state: 'visible', timeout: 3000 });
     } catch (e) {
-      console.log(`Listbox no apareció en 2s, continuando...`);
+      console.log(`Listbox no apareció en 3s, continuando...`);
     }
 
     await this.page.waitForTimeout(500);
 
-    // Buscar opción sin anclas estrictas para evitar problemas de espaciado DOM
-    const option = this.page.getByRole('option', { name: new RegExp(optionText, 'i') }).first();
-    try {
-      await option.waitFor({ state: 'visible', timeout: 10000 });
-      await option.click({ force: true });
-      console.log(`Opción "${optionText}" seleccionada`);
-    } catch (e) {
-      // Fallback: búsqueda parcial con primera palabra
-      try {
-        const firstWord = optionText.split(' ')[0];
-        const optPart = this.page.getByRole('option', { name: new RegExp(`^${firstWord}`, 'i') }).first();
-        await optPart.waitFor({ state: 'visible', timeout: 8000 });
-        await optPart.click({ force: true });
-        console.log(`Opción (parcial) "${firstWord}" seleccionada`);
-      } catch (fallbackError) {
-        // Último fallback: primera opción disponible
-        try {
-          const firstOption = this.page.getByRole('option').first();
-          await firstOption.waitFor({ state: 'visible', timeout: 5000 });
-          const firstText = await firstOption.textContent();
-          await firstOption.click({ force: true });
-          console.log(`Primera opción seleccionada como fallback: "${firstText}"`);
-        } catch (finalError) {
-          throw new Error(`No se encontró opción "${optionText}" en dropdown "${label}"`);
-        }
-      }
-    }
+    // Buscar y seleccionar la opción
+    await this.selectVisibleOption(optionText, label);
   }
 
-  // Helper para selectores "Searchable" como municipios
-  async searchAndSelectDropdownOption(label: string, searchText: string, optionTextToClick: string) {
-    console.log(`Buscando en ${label}: ${searchText}`);
+  /**
+   * Intenta seleccionar mediante un <select> nativo asociado al label.
+   */
+  private async tryNativeSelect(label: string, optionText: string): Promise<boolean> {
+    const labelSearch = label.substring(0, 25);
+    const containers = [
+      // Contenedor por <label> HTML
+      async () => {
+        const labelLoc = this.page.locator('label').filter({ hasText: new RegExp(labelSearch, 'i') }).first();
+        return labelLoc.locator('..');
+      },
+      // Contenedor por texto visible
+      async () => {
+        const textEl = this.page.getByText(labelSearch, { exact: false }).first();
+        return textEl.locator('..');
+      },
+      // Contenedor por texto + dos niveles arriba (Radix wraps deeper)
+      async () => {
+        const textEl = this.page.getByText(labelSearch, { exact: false }).first();
+        return textEl.locator('../..');
+      },
+    ];
 
-    // Desabilitar widget de accesibilidad antes de interactuar
-    await this.disableAccessibilityWidget();
-    await this.page.waitForTimeout(800);
-
-    // Encontrar el contenedor
-    let container;
-    try {
-      container = this.page.locator('label').filter({ hasText: label }).locator('..');
-      if (await container.count() === 0) {
-        throw new Error("No es un label estricto");
-      }
-    } catch {
-      const labelTextElement = this.page.getByText(label, { exact: false }).first();
-      container = labelTextElement.locator('..');
-    }
-
-    const combobox = container.locator('[role="combobox"]').first();
-    const hiddenSelect = container.locator('select').first();
-
-    // ESTRATEGIA 0 (Eliminada): No interactuar con "hidden select" ya que rompe la sincronización
-    // de los valores del form en componentes React modernos (Hook Form, NextUI, Radix, etc.).
-
-    // ESTRATEGIA 1: Búsqueda visual con rol="option"
-    // Hacer scroll
-    await combobox.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(400);
-
-    // Hacer clic para abrir
-    try {
-      await combobox.click({ force: true, timeout: 8000 });
-      console.log(`Combobox clickeado`);
-    } catch (e) {
-      console.log(`Clic falló: ${e.message}`);
-      await this.page.waitForTimeout(500);
-      await combobox.click({ force: true });
-    }
-
-    await this.page.waitForTimeout(1000); // Esperar más tiempo para que se abra el dropdown
-
-    // Buscar el input dentro del combobox O en el popup que se abre
-    let inputLoc = null;
-    
-    // Buscar en el combobox primero o si el combobox es el input en si mismo
-    try {
-      const tagName = await combobox.evaluate(el => el.tagName.toLowerCase());
-      if (tagName === 'input') {
-        inputLoc = combobox;
-        console.log(`El combobox es un input`);
-      } else {
-        inputLoc = combobox.locator('input:not([type="hidden"])').first();
-        const isVisible = await inputLoc.isVisible({ timeout: 2000 }).catch(() => false);
-        if (isVisible) {
-          console.log(`Input encontrado dentro del combobox`);
-        } else {
-          // Intentar un locator más agresivo en todo el container
-          const anyInput = container.locator('input[type="text"]').first();
-          if (await anyInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-             inputLoc = anyInput;
-             console.log(`Input encontrado en container general`);
-          } else {
-            // A veces el listbox abre un input flotante, lo buscamos allí
-            const popupInput = this.page.locator('[role="listbox"]').locator('..').locator('input').first();
-            if (await popupInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-               inputLoc = popupInput;
-               console.log(`Input encontrado en el popup listbox`);
-            } else {
-               inputLoc = null;
+    for (const getContainer of containers) {
+      try {
+        const container = await getContainer();
+        const hiddenSelect = container.locator('select').first();
+        const selectCount = await hiddenSelect.count();
+        if (selectCount > 0) {
+          const options = await hiddenSelect.locator('option').all();
+          console.log(`Select nativo encontrado con ${options.length} opciones para "${label.substring(0, 30)}..."`);
+          
+          for (const opt of options) {
+            const text = await opt.textContent();
+            if (text && text.toLowerCase().includes(optionText.toLowerCase())) {
+              const value = await opt.getAttribute('value');
+              if (value) {
+                await hiddenSelect.selectOption(value);
+                console.log(`✓ Opción seleccionada por SELECT HTML: ${optionText}`);
+                return true;
+              }
             }
           }
         }
+      } catch {
+        continue;
       }
-    } catch (e) {
-      console.log(`Input no encontrado en DOM local: ${e}`);
-      inputLoc = null;
     }
+    return false;
+  }
 
-    // Escribir en el input
-    const query = searchText.includes(',') ? searchText.split(',')[0].trim() : searchText;
-    
-    if (inputLoc) {
+  /**
+   * Busca un dropdown (combobox) por su label asociado usando múltiples estrategias.
+   * Especialmente diseñado para Radix UI Select triggers donde no hay <label> HTML.
+   */
+  private async findDropdownByLabel(label: string) {
+    const labelSearch = label.substring(0, 25);
+
+    const strategies = [
+      // Estrategia 1: <label> HTML directo + combobox en contenedor padre
+      async () => {
+        const labelLoc = this.page.locator('label').filter({ hasText: new RegExp(labelSearch, 'i') }).first();
+        const cont = labelLoc.locator('..');
+        const cb = cont.locator('[role="combobox"]').first();
+        if (await cb.isVisible({ timeout: 1500 })) {
+          console.log(`  Dropdown encontrado por label HTML`);
+          return cb;
+        }
+        return null;
+      },
+      // Estrategia 2: aria-label / aria-labelledby del combobox
+      async () => {
+        const cb = this.page.getByRole('combobox', { name: new RegExp(labelSearch, 'i') }).first();
+        if (await cb.isVisible({ timeout: 1500 })) {
+          console.log(`  Dropdown encontrado por role+name`);
+          return cb;
+        }
+        return null;
+      },
+      // Estrategia 3: <fieldset>/<legend> pattern (usado por Radix UI en FUC - Sisben, etc.)
+      async () => {
+        const legend = this.page.locator('legend').filter({ hasText: new RegExp(labelSearch, 'i') }).first();
+        if (await legend.isVisible({ timeout: 1000 }).catch(() => false)) {
+          // El combobox está en el fieldset padre de la legend
+          const fieldset = legend.locator('..');
+          const cb = fieldset.locator('[role="combobox"]').first();
+          if (await cb.isVisible({ timeout: 1000 }).catch(() => false)) {
+            console.log(`  Dropdown encontrado por fieldset/legend`);
+            return cb;
+          }
+          // A veces hay divs intermedios
+          const cbDeep = fieldset.locator('div [role="combobox"]').first();
+          if (await cbDeep.isVisible({ timeout: 500 }).catch(() => false)) {
+            console.log(`  Dropdown encontrado por fieldset/legend (deep)`);
+            return cbDeep;
+          }
+        }
+        return null;
+      },
+      // Estrategia 4: Texto visible + combobox como hermano o en padre
+      async () => {
+        // Buscar textos que contengan el label (usar locator más preciso)
+        const allTextMatches = this.page.locator(`text="${labelSearch}"`);
+        const count = await allTextMatches.count();
+        
+        for (let t = 0; t < Math.min(count, 3); t++) {
+          const textEl = allTextMatches.nth(t);
+          // Buscar combobox en padre directo
+          const container = textEl.locator('..');
+          const cb = container.locator('[role="combobox"]').first();
+          if (await cb.isVisible({ timeout: 500 }).catch(() => false)) {
+            console.log(`  Dropdown encontrado cerca de texto (match ${t})`);
+            return cb;
+          }
+        }
+        return null;
+      },
+      // Estrategia 5: Texto visible + combobox en ancestros (Radix envuelve más capas)
+      async () => {
+        const textEl = this.page.getByText(labelSearch, { exact: false }).first();
+        for (let depth = 2; depth <= 6; depth++) {
+          const ancestorPath = Array(depth).fill('..').join('/');
+          const ancestor = textEl.locator(ancestorPath);
+          const cb = ancestor.locator('[role="combobox"]').first();
+          if (await cb.isVisible({ timeout: 500 }).catch(() => false)) {
+            console.log(`  Dropdown encontrado en ancestro (nivel ${depth})`);
+            return cb;
+          }
+        }
+        return null;
+      },
+      // Estrategia 6: JS evaluate para buscar el combobox más cercano al texto
+      async () => {
+        const comboboxIndex = await this.page.evaluate((searchText) => {
+          const allComboboxes = Array.from(document.querySelectorAll('[role="combobox"]'));
+          
+          // Buscar todos los nodos de texto que contienen el label
+          const walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+            { acceptNode: (node) => {
+              const text = node.textContent?.trim();
+              return text && text.toLowerCase().includes(searchText.toLowerCase())
+                ? NodeFilter.FILTER_ACCEPT
+                : NodeFilter.FILTER_REJECT;
+            }}
+          );
+          
+          let textNode = walker.nextNode();
+          while (textNode) {
+            let el = textNode.parentElement;
+            // Subir por ancestros hasta encontrar un contenedor con un combobox
+            for (let i = 0; i < 8 && el; i++) {
+              const cb = el.querySelector('[role="combobox"]');
+              if (cb) {
+                const idx = allComboboxes.indexOf(cb);
+                if (idx >= 0) return idx;
+              }
+              // También buscar en hermanos
+              const siblings = el.parentElement?.children;
+              if (siblings) {
+                for (const sib of Array.from(siblings)) {
+                  if (sib !== el && sib.getAttribute?.('role') === 'combobox') {
+                    const idx = allComboboxes.indexOf(sib);
+                    if (idx >= 0) return idx;
+                  }
+                  const cbInSib = sib.querySelector?.('[role="combobox"]');
+                  if (cbInSib) {
+                    const idx = allComboboxes.indexOf(cbInSib);
+                    if (idx >= 0) return idx;
+                  }
+                }
+              }
+              el = el.parentElement;
+            }
+            textNode = walker.nextNode();
+          }
+          return -1;
+        }, labelSearch);
+        
+        if (comboboxIndex >= 0) {
+          const cb = this.page.locator('[role="combobox"]').nth(comboboxIndex);
+          if (await cb.isVisible({ timeout: 500 }).catch(() => false)) {
+            console.log(`  Dropdown encontrado por JS evaluate (combobox #${comboboxIndex})`);
+            return cb;
+          }
+        }
+        return null;
+      },
+    ];
+
+    for (const strategy of strategies) {
       try {
-        await inputLoc.focus();
-        await inputLoc.fill('', { force: true });
-        await inputLoc.fill(query, { delay: 50 });
-        console.log(`Input rellenado con "fillText: ${query}"`);
-      } catch (e) {
-        console.log(`Fill falló: ${e.message}, usando type...`);
-        try {
-          await inputLoc.focus();
-          await this.page.keyboard.type(query, { delay: 100 });
-          console.log(`Input rellenado con keyboard.type: ${query}`);
-        } catch (keyboardError) {
-          console.log(`Keyboard.type también falló: ${keyboardError.message}`);
-        }
+        const result = await strategy();
+        if (result) return result;
+      } catch {
+        continue;
       }
-    } else {
-      console.log(`Input no encontrado, escribiendo keyboard directo...`);
-      await this.page.keyboard.type(query, { delay: 100 });
     }
 
-    // Esperar a que el listbox y opciones aparezcan
-    console.log(`Esperando listbox...`);
+    console.log(`  ⚠ No se encontró dropdown específico para "${label}"`);
+    return null;
+  }
+
+  /**
+   * Selecciona una opción visible en un listbox/dropdown ya abierto.
+   */
+  private async selectVisibleOption(optionText: string, label: string) {
+    const optNorm = optionText.replace(/\s+/g, ' ').trim().toLowerCase();
+
+    // Intentar por role="option"
+    const option = this.page.getByRole('option', { name: new RegExp(optionText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') }).first();
     try {
-      await this.page.locator('[role="listbox"]').waitFor({ state: 'visible', timeout: 5000 });
-      console.log(`Listbox visible`);
-    } catch (e) {
-      console.log(`Listbox no apareció tras 5s`);
-    }
+      await option.waitFor({ state: 'visible', timeout: 5000 });
+      await option.click({ force: true });
+      console.log(`Opción "${optionText}" seleccionada por role`);
+      return;
+    } catch { }
 
-    await this.page.waitForTimeout(2000); // Tiempo extra para que las opciones se rendericen
-
-    // Buscar role="option"
+    // Iterar sobre todas las opciones con normalización
     try {
-      const options = this.page.getByRole('option');
-      await options.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      const count = await options.count();
-      console.log(`Opciones encontradas: ${count}`);
+      const allOptions = this.page.getByRole('option');
+      const count = await allOptions.count();
+      console.log(`  Buscando "${optNorm}" entre ${count} opciones visibles...`);
       
-      const optionToMatch = optionTextToClick.replace(/\s+/g, ' ').trim().toLowerCase();
-      // First pass: try exact includes
       for (let i = 0; i < count; i++) {
-        const opt = options.nth(i);
-        const textRaw = await opt.textContent();
-        if (textRaw) {
-          const textNorm = textRaw.replace(/\s+/g, ' ').trim().toLowerCase();
-          if (textNorm.includes(optionToMatch)) {
-            await opt.click({ force: true });
-            console.log(`✓ Opción exacta seleccionada: ${optionTextToClick}`);
-            return;
-          }
+        const text = await allOptions.nth(i).textContent();
+        if (!text) continue;
+        const textNorm = text.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (textNorm.includes(optNorm) || optNorm.includes(textNorm)) {
+          await allOptions.nth(i).click({ force: true });
+          console.log(`✓ Opción "${text.trim()}" seleccionada (match normalizado)`);
+          return;
         }
       }
-      
-      // Second pass: try partial match
-      const optionPart = optionToMatch.split(',')[0].trim();
+
+      // Match parcial (primera palabra)
+      const firstWord = optNorm.split(/[\s\-]/)[0];
       for (let i = 0; i < count; i++) {
-        const opt = options.nth(i);
-        const textRaw = await opt.textContent();
-        if (textRaw) {
-          const textNorm = textRaw.replace(/\s+/g, ' ').trim().toLowerCase();
-          if (textNorm.includes(optionPart)) {
-            await opt.click({ force: true });
-            console.log(`✓ Opción parcial seleccionada: ${textRaw}`);
-            return;
-          }
+        const text = await allOptions.nth(i).textContent();
+        if (!text) continue;
+        const textNorm = text.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (textNorm.startsWith(firstWord)) {
+          await allOptions.nth(i).click({ force: true });
+          console.log(`✓ Opción "${text.trim()}" seleccionada (match parcial)`);
+          return;
         }
       }
-      
     } catch (e) {
-      console.log(`Búsqueda por role="option" falló: ${e.message}`);
+      console.log(`  Error iterando opciones: ${e.message}`);
     }
 
-    // Fallback: Clic en primer elemento visible en listbox
+    // Fallback: buscar en listbox directamente
     try {
       const listbox = this.page.locator('[role="listbox"]').first();
-      const allChildren = listbox.locator('> div, > li, > [role="option"]');
-      const childCount = await allChildren.count();
-      console.log(`Elementos en listbox: ${childCount}`);
-      
-      if (childCount > 0) {
-        await allChildren.first().click({ force: true });
-        console.log(`✓ Primer elemento del listbox clickeado`);
-        return;
+      const items = listbox.locator('[role="option"], > div, > li');
+      const count = await items.count();
+      for (let i = 0; i < count; i++) {
+        const text = await items.nth(i).textContent();
+        if (!text) continue;
+        if (text.toLowerCase().includes(optNorm)) {
+          await items.nth(i).click({ force: true });
+          console.log(`✓ Opción "${text.trim()}" seleccionada (listbox fallback)`);
+          return;
+        }
       }
-    } catch (e) {
-      console.log(`Fallback listbox falló: ${e.message}`);
+    } catch { }
+
+    throw new Error(`No se encontró opción "${optionText}" en dropdown "${label}"`);
+  }
+
+  /**
+   * Helper para selectores "Searchable" como municipios.
+   * Reescrito para máxima robustez con múltiples estrategias de búsqueda y selección.
+   */
+  async searchAndSelectDropdownOption(label: string, searchText: string, optionTextToClick: string) {
+    console.log(`\n=== searchAndSelectDropdownOption ===`);
+    console.log(`  Label: "${label}"`);
+    console.log(`  Search: "${searchText}"`);
+    console.log(`  Option: "${optionTextToClick}"`);
+
+    // Desabilitar widget de accesibilidad antes de interactuar
+    await this.disableAccessibilityWidget();
+    await this.page.waitForTimeout(500);
+
+    // Extraer solo la primera parte (ciudad) para la búsqueda
+    const query = searchText.includes(',') ? searchText.split(',')[0].trim() : searchText;
+    console.log(`  Query a escribir: "${query}"`);
+
+    // === PASO 1: Encontrar el combobox ===
+    const combobox = await this.findComboboxByLabel(label);
+    if (!combobox) {
+      throw new Error(`No se encontró combobox para: "${label}"`);
     }
 
-    throw new Error(`No se pudo seleccionar opción para: "${label}" buscando "${optionTextToClick}"`);
+    // === PASO 2: Intentar selección (con reintento) ===
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`\n  --- Intento ${attempt}/${maxAttempts} ---`);
+
+      try {
+        // Scroll al combobox
+        await combobox.scrollIntoViewIfNeeded();
+        await this.page.waitForTimeout(300);
+
+        // Cerrar cualquier dropdown previamente abierto
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+
+        // Clic para abrir el dropdown
+        await combobox.click({ force: true, timeout: 5000 });
+        console.log(`  Combobox clickeado`);
+        await this.page.waitForTimeout(800);
+
+        // === PASO 3: Escribir en el input de búsqueda ===
+        const typed = await this.typeInSearchableCombobox(combobox, query);
+        if (!typed) {
+          console.log(`  No se pudo escribir la búsqueda, reintentando...`);
+          continue;
+        }
+
+        // Esperar a que las opciones de búsqueda se carguen
+        console.log(`  Esperando resultados de búsqueda...`);
+        await this.page.waitForTimeout(2000);
+
+        // === PASO 4: Buscar y hacer clic en la opción ===
+        const selected = await this.selectOptionFromResults(optionTextToClick);
+        if (selected) {
+          console.log(`  ✓ Selección completada exitosamente`);
+          await this.page.waitForTimeout(500);
+          return;
+        }
+
+        console.log(`  No se encontró la opción, reintentando...`);
+
+      } catch (e) {
+        console.log(`  Error en intento ${attempt}: ${e.message}`);
+      }
+
+      // Cerrar dropdown antes de reintentar
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(500);
+    }
+
+    // Si ningún intento funcionó, lanzar error descriptivo
+    throw new Error(`No se pudo seleccionar opción para: "${label}" buscando "${optionTextToClick}" después de ${maxAttempts} intentos`);
+  }
+
+  /**
+   * Busca un combobox por su label asociado usando múltiples estrategias.
+   */
+  private async findComboboxByLabel(label: string) {
+    const strategies = [
+      // Estrategia 1: Por label HTML + contenedor padre
+      async () => {
+        const labelLoc = this.page.locator('label').filter({ hasText: new RegExp(label.substring(0, 25), 'i') }).first();
+        const cont = labelLoc.locator('..');
+        const cb = cont.locator('[role="combobox"]').first();
+        if (await cb.isVisible({ timeout: 2000 })) {
+          console.log(`  Combobox encontrado por label HTML`);
+          return cb;
+        }
+        return null;
+      },
+      // Estrategia 2: Por aria-label o name del combobox
+      async () => {
+        const cb = this.page.getByRole('combobox', { name: new RegExp(label.substring(0, 25), 'i') }).first();
+        if (await cb.isVisible({ timeout: 2000 })) {
+          console.log(`  Combobox encontrado por role + name`);
+          return cb;
+        }
+        return null;
+      },
+      // Estrategia 3: Buscar por texto visible y luego combobox cercano
+      async () => {
+        const textEl = this.page.getByText(label, { exact: false }).first();
+        if (await textEl.isVisible({ timeout: 1500 })) {
+          // Buscar combobox en ancestros
+          const ancestors = [
+            textEl.locator('..'),
+            textEl.locator('../..'),
+            textEl.locator('../../..'),
+          ];
+          for (const ancestor of ancestors) {
+            const cb = ancestor.locator('[role="combobox"]').first();
+            if (await cb.isVisible({ timeout: 500 }).catch(() => false)) {
+              console.log(`  Combobox encontrado por texto + ancestor`);
+              return cb;
+            }
+          }
+        }
+        return null;
+      },
+      // Estrategia 4: Buscar por placeholder o aria-label en inputs
+      async () => {
+        const cb = this.page.locator(`[role="combobox"][aria-label*="${label.substring(0, 20)}"]`).first();
+        if (await cb.isVisible({ timeout: 1000 }).catch(() => false)) {
+          console.log(`  Combobox encontrado por aria-label`);
+          return cb;
+        }
+        return null;
+      }
+    ];
+
+    for (const strategy of strategies) {
+      try {
+        const result = await strategy();
+        if (result) return result;
+      } catch (e) {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Escribe texto en un combobox searchable.
+   * Usa múltiples estrategias para encontrar el input e insertar texto.
+   */
+  private async typeInSearchableCombobox(combobox, query: string): Promise<boolean> {
+    // Verificar si el combobox ES el input
+    try {
+      const tagName = await combobox.evaluate(el => el.tagName.toLowerCase());
+      if (tagName === 'input') {
+        await combobox.fill('');
+        await combobox.pressSequentially(query, { delay: 80 });
+        console.log(`  Texto escrito directamente en combobox-input: "${query}"`);
+        return true;
+      }
+    } catch { /* no es un input */ }
+
+    // Buscar input dentro del combobox
+    const inputStrategies = [
+      () => combobox.locator('input:not([type="hidden"])').first(),
+      () => combobox.locator('input').first(),
+      () => combobox.locator('..').locator('input:not([type="hidden"])').first(),
+      () => this.page.locator('[role="listbox"]').locator('..').locator('input').first(),
+      () => this.page.locator('input[aria-expanded="true"]').first(),
+      () => this.page.locator('input:focus').first(),
+    ];
+
+    for (const getInput of inputStrategies) {
+      try {
+        const input = getInput();
+        const isVisible = await input.isVisible({ timeout: 1000 }).catch(() => false);
+        if (isVisible) {
+          // Limpiar y escribir
+          try {
+            await input.fill('');
+            await input.pressSequentially(query, { delay: 80 });
+            console.log(`  Texto escrito en input encontrado: "${query}"`);
+            return true;
+          } catch (fillError) {
+            console.log(`  Fill/pressSequentially falló: ${fillError.message}`);
+            // Intentar con keyboard directo
+            try {
+              await input.focus();
+              await input.press('Control+a');
+              await this.page.keyboard.type(query, { delay: 100 });
+              console.log(`  Texto escrito con keyboard.type: "${query}"`);
+              return true;
+            } catch (kbError) {
+              console.log(`  keyboard.type también falló: ${kbError.message}`);
+            }
+          }
+        }
+      } catch { }
+    }
+
+    // Último recurso: escribir con keyboard directo sin buscar input
+    try {
+      console.log(`  Intentando keyboard.type directo sin input localizado...`);
+      await this.page.keyboard.type(query, { delay: 100 });
+      return true;
+    } catch (e) {
+      console.log(`  keyboard.type directo falló: ${e.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Busca y selecciona una opción de los resultados visibles.
+   * Usa múltiples estrategias de matching (exacto, parcial, normalizado).
+   */
+  private async selectOptionFromResults(optionText: string): Promise<boolean> {
+    const optionNorm = optionText.replace(/\s+/g, ' ').trim().toLowerCase();
+    const optionCity = optionNorm.split(',')[0].trim();
+
+    // Esperar a que al menos una opción sea visible
+    try {
+      await this.page.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 });
+    } catch {
+      console.log(`  No hay opciones visibles en el listbox`);
+
+      // Intentar buscar en divs dentro de listbox
+      try {
+        const listbox = this.page.locator('[role="listbox"]');
+        if (await listbox.isVisible({ timeout: 1000 }).catch(() => false)) {
+          const children = listbox.locator('> *');
+          const count = await children.count();
+          console.log(`  Listbox tiene ${count} hijos directos`);
+          if (count > 0) {
+            for (let i = 0; i < count; i++) {
+              const child = children.nth(i);
+              const text = (await child.textContent()) || '';
+              const textNorm = text.replace(/\s+/g, ' ').trim().toLowerCase();
+              console.log(`    Hijo ${i}: "${textNorm}"`);
+              if (textNorm.includes(optionCity) || textNorm.includes(optionNorm)) {
+                await child.click({ force: true });
+                console.log(`  ✓ Opción seleccionada de listbox hijo: "${text.trim()}"`);
+                return true;
+              }
+            }
+            // Fallback: click primer hijo
+            const firstText = await children.first().textContent();
+            if (firstText && firstText.trim().length > 0) {
+              await children.first().click({ force: true });
+              console.log(`  ✓ Primer hijo del listbox seleccionado como fallback: "${firstText.trim()}"`);
+              return true;
+            }
+          }
+        }
+      } catch (e) {
+        console.log(`  Búsqueda en listbox hijos falló: ${e.message}`);
+      }
+      return false;
+    }
+
+    // Obtener todas las opciones con role="option"
+    const options = this.page.getByRole('option');
+    const count = await options.count();
+    console.log(`  Opciones encontradas: ${count}`);
+
+    if (count === 0) return false;
+
+    // Primer paso: match exacto (con normalización de espacios)
+    for (let i = 0; i < count; i++) {
+      const opt = options.nth(i);
+      const textRaw = await opt.textContent();
+      if (!textRaw) continue;
+      const textNorm = textRaw.replace(/\s+/g, ' ').trim().toLowerCase();
+      console.log(`    Opción ${i}: "${textNorm}"`);
+
+      if (textNorm === optionNorm || textNorm.includes(optionNorm)) {
+        await opt.click({ force: true });
+        console.log(`  ✓ Match exacto/incluye: "${textRaw.trim()}"`);
+        return true;
+      }
+    }
+
+    // Segundo paso: match parcial (solo ciudad)
+    for (let i = 0; i < count; i++) {
+      const opt = options.nth(i);
+      const textRaw = await opt.textContent();
+      if (!textRaw) continue;
+      const textNorm = textRaw.replace(/\s+/g, ' ').trim().toLowerCase();
+
+      if (textNorm.includes(optionCity)) {
+        await opt.click({ force: true });
+        console.log(`  ✓ Match parcial (ciudad): "${textRaw.trim()}"`);
+        return true;
+      }
+    }
+
+    // Tercer paso: si solo hay 1 opción visible, seleccionarla
+    if (count === 1) {
+      const firstText = await options.first().textContent();
+      await options.first().click({ force: true });
+      console.log(`  ✓ Única opción seleccionada: "${firstText?.trim()}"`);
+      return true;
+    }
+
+    // Cuarto paso: click en la primera opción como última opción
+    if (count > 0) {
+      const firstText = await options.first().textContent();
+      await options.first().click({ force: true });
+      console.log(`  ✓ Primera opción seleccionada (fallback): "${firstText?.trim()}"`);
+      return true;
+    }
+
+    return false;
   }
 
   // Helper para componentes "ToggleGroup" (SÍ/NO)
@@ -574,14 +897,23 @@ export class FucWizardPage {
   }
 
   async clickNext() {
-    await this.page.getByRole('button', { name: 'Siguiente' }).click();
-    // Pequeño timeout para permitir transición de React Motion o renderizado
-    await this.page.waitForTimeout(500);
+    console.log(`Haciendo clic en "Siguiente"...`);
+    const nextBtn = this.page.getByRole('button', { name: /Siguiente/i });
+    await nextBtn.scrollIntoViewIfNeeded();
+    await this.page.waitForTimeout(300);
+    await nextBtn.click();
+    // Esperar transición de paso
+    await this.page.waitForTimeout(1000);
+    console.log(`Clic en "Siguiente" completado`);
   }
 
   // --- Step 1: Identificación ---
   async fillIdentificationStep(data: any) {
+    console.log('\n========================================');
     console.log('Llenando Paso 1: Identificación...');
+    console.log('========================================');
+    await this.waitForStepReady();
+
     await this.fillInputByLabel('Primer nombre', data.nombre1);
     await this.fillInputByLabel('Primer apellido', data.apellido1);
 
@@ -610,7 +942,11 @@ export class FucWizardPage {
 
   // --- Step 2: Ubicación ---
   async fillLocationStep(data: any) {
+    console.log('\n========================================');
     console.log('Llenando Paso 2: Ubicación...');
+    console.log('========================================');
+    await this.waitForStepReady();
+
     await this.searchAndSelectDropdownOption('Ciudad de residencia', data.location, data.location);
 
     // Zona de residencia (urbana/rural) - asume Select
@@ -628,10 +964,10 @@ export class FucWizardPage {
 
   // --- Step 3: Características Poblacionales ---
   async fillPopulationSpecifics(data: any) {
+    console.log('\n========================================');
     console.log('Llenando Paso 3: Características Poblacionales...');
-    // Grupo Sisben
-    await this.selectDropdownOptionByLabel('Sisben IV Grupo', data.sisbenGroup);
-    await this.selectDropdownOptionByLabel('Numero de subgrupo', data.sisbenSubgroup);
+    console.log('========================================');
+    await this.waitForStepReady();
 
     // Etnia
     await this.selectDropdownOptionByLabel('De acuerdo con su cultura, pueblo o rasgos físicos, usted es o se reconoce como...', data.ethnicGroup);
@@ -656,13 +992,75 @@ export class FucWizardPage {
 
   // --- Step 4: Salud ---
   async fillHealthStep(data: any) {
+    console.log('\n========================================');
     console.log('Llenando Paso 4: Salud...');
+    console.log('========================================');
+    await this.waitForStepReady();
+
+    // Grupo Sisben (está en el paso de Salud según el wizard real)
+    if (data.sisbenGroup) {
+      await this.selectDropdownOptionByLabel('Sisben IV Grupo', data.sisbenGroup);
+    }
+    if (data.sisbenSubgroup) {
+      await this.selectDropdownOptionByLabel('Numero de subgrupo', data.sisbenSubgroup);
+    }
+
     // Has RLCPD toggle
     const rlcpdLabel = data.hasRlcpd === 'SÍ' ? 'SÍ' : 'NO';
-    await this.selectToggleOption('¿Está inscrito en el Registro de la localización y caracterización de personas con discapacidad del Ministerio de Salud?', rlcpdLabel);
+    
+    // Intentar múltiples variantes del label del toggle RLCPD
+    const rlcpdLabelVariants = [
+      '¿Está inscrito en el Registro de la localización y caracterización de personas con discapacidad del Ministerio de Salud?',
+      'Registro de la localización y caracterización',
+      'RLCPD',
+      '¿Está inscrito en el Registro',
+    ];
 
-    // Usar el label EXACTO del componente frontend StepHealth.tsx
-    await this.selectDropdownOptionByLabel('¿A cúal de los siguientes regímenes de seguridad social en salud está afiliado/a?', data.socialSecurity);
+    let rlcpdSelected = false;
+    for (const variant of rlcpdLabelVariants) {
+      try {
+        await this.selectToggleOption(variant, rlcpdLabel);
+        rlcpdSelected = true;
+        break;
+      } catch (e) {
+        console.log(`  Toggle RLCPD con label "${variant.substring(0, 40)}..." no encontrado, intentando siguiente...`);
+      }
+    }
+    if (!rlcpdSelected) {
+      console.log(`  ⚠ Toggle RLCPD no encontrado con ninguna variante, continuando...`);
+    }
+
+    // Régimen de seguridad social en salud
+    const healthLabelVariants = [
+      '¿A cúal de los siguientes regímenes de seguridad social en salud está afiliado/a?',
+      '¿A cuál de los siguientes regímenes de seguridad social en salud está afiliado',
+      'regímenes de seguridad social',
+      'régimen de seguridad social',
+      'seguridad social en salud',
+    ];
+
+    let healthSelected = false;
+    for (const variant of healthLabelVariants) {
+      try {
+        await this.selectDropdownOptionByLabel(variant, data.socialSecurity);
+        healthSelected = true;
+        break;
+      } catch (e) {
+        console.log(`  Dropdown salud con label "${variant.substring(0, 40)}..." no encontrado, intentando siguiente...`);
+      }
+    }
+    if (!healthSelected) {
+      console.log(`  ⚠ Dropdown de régimen de salud no encontrado, continuando...`);
+    }
+
+    // Campos adicionales de salud (si existen)
+    if (data.eps) {
+      try {
+        await this.selectDropdownOptionByLabel('EPS', data.eps);
+      } catch (e) {
+        console.log(`  EPS dropdown no encontrado: ${e.message}`);
+      }
+    }
 
     console.log('Paso 4 completo. Click en Siguiente...');
     await this.clickNext();
@@ -670,8 +1068,76 @@ export class FucWizardPage {
 
   // --- Step 5: Educación ---
   async fillEducationStep(data: any) {
+    console.log('\n========================================');
     console.log('Llenando Paso 5: Educación...');
-    await this.selectDropdownOptionByLabel('¿Cúal es el máximo nivel educativo alcanzado por usted hasta el momento?', data.maxEducationLevel);
+    console.log('========================================');
+    await this.waitForStepReady();
+
+    // Máximo nivel educativo
+    const educationLabelVariants = [
+      '¿Cúal es el máximo nivel educativo alcanzado por usted hasta el momento?',
+      '¿Cuál es el máximo nivel educativo alcanzado',
+      'máximo nivel educativo',
+      'nivel educativo alcanzado',
+    ];
+
+    let eduSelected = false;
+    for (const variant of educationLabelVariants) {
+      try {
+        await this.selectDropdownOptionByLabel(variant, data.maxEducationLevel);
+        eduSelected = true;
+        break;
+      } catch (e) {
+        console.log(`  Dropdown educación con label "${variant.substring(0, 40)}..." no encontrado, intentando siguiente...`);
+      }
+    }
+    if (!eduSelected) {
+      console.log(`  ⚠ Dropdown de nivel educativo no encontrado, continuando...`);
+    }
+
+    // Campos adicionales de educación formal (si aplican y existen)
+    if (data.currentlyStudying !== undefined) {
+      try {
+        await this.selectToggleOption('¿Actualmente está estudiando?', data.currentlyStudying ? 'SÍ' : 'NO');
+      } catch (e) {
+        console.log(`  Toggle "actualmente estudiando" no encontrado: ${e.message}`);
+      }
+    }
+
+    if (data.icfesScore) {
+      try {
+        await this.fillInputByLabel('Puntaje ICFES', data.icfesScore);
+      } catch (e) {
+        console.log(`  Campo ICFES no encontrado: ${e.message}`);
+      }
+    }
+
+    if (data.educationInstitution) {
+      try {
+        const instLabelVariants = [
+          'Institución educativa',
+          'institución educativa',
+          'centro educativo',
+        ];
+        for (const v of instLabelVariants) {
+          try {
+            await this.fillInputByLabel(v, data.educationInstitution);
+            break;
+          } catch { }
+        }
+      } catch (e) {
+        console.log(`  Campo institución educativa no encontrado: ${e.message}`);
+      }
+    }
+
+    if (data.educationTitle) {
+      try {
+        await this.fillInputByLabel('Título obtenido', data.educationTitle);
+      } catch (e) {
+        console.log(`  Campo título obtenido no encontrado: ${e.message}`);
+      }
+    }
+
     console.log('Paso 5 completo. Click en Siguiente...');
     await this.clickNext();
   }
