@@ -1,53 +1,102 @@
 {
   "info": {
-    "name": "API Tests",
-    "_postman_id": "api-collection-v2",
-    "description": "Suite de tests API — QA Template",
+    "name": "FUC SENA API",
+    "_postman_id": "fuc-insomnia-fuc200426",
+    "description": "Colección importada desde Insomnia (FUC SENA API)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "01 — Health Checks",
+      "name": "1. Auth",
       "item": [
         {
-          "name": "GET /health — Global",
+          "name": "Signup - Registrar usuario",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/health",
+              "raw": "{{baseUrl}}/api/v1/auth/signup",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "health"
+                "api",
+                "v1",
+                "auth",
+                "signup"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_user\": \"12345678\",\n  \"username\": \"juanperez\",\n  \"password\": \"password123\",\n  \"first_name\": \"Juan\",\n  \"middle_name\": \"Carlos\",\n  \"last_name\": \"Pérez\",\n  \"second_last_name\": \"García\",\n  \"birth_country\": \"Colombia\",\n  \"birth_state\": \"Cundinamarca\",\n  \"birth_city\": \"Bogotá\",\n  \"document_type\": \"CC\",\n  \"issue_country\": \"Colombia\",\n  \"issue_state\": \"Cundinamarca\",\n  \"issue_city\": \"Bogotá\",\n  \"email\": \"juanperez@email.com\",\n  \"gender\": \"MASCULINO\",\n  \"lgbtiq_identity\": false\n}"
             }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Health global responde 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Body contiene ok', function () {",
-                  "    pm.expect(pm.response.text()).to.equal('ok');",
-                  "});",
-                  "",
-                  "pm.test('Tiempo de respuesta < 500ms', function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(500);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
+          }
         },
         {
-          "name": "GET /api/v1/users/health — Users module",
+          "name": "Login - Iniciar sesión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_user\": \"12345678\",\n  \"password\": \"password123\",\n  \"document_type\": \"CC\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Validate Email - Verificar disponibilidad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/validate-email?email=test@email.com",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "validate-email"
+              ],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "test@email.com"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Users",
+      "item": [
+        {
+          "name": "Get - Obtener mis datos",
           "request": {
             "method": "GET",
             "header": [
@@ -57,7 +106,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/users/health",
+              "raw": "{{baseUrl}}/api/v1/users/me",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -65,68 +114,50 @@
                 "api",
                 "v1",
                 "users",
-                "health"
+                "me"
               ]
             }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Users health responde 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Respuesta contiene message', function () {",
-                  "    var json = pm.response.json();",
-                  "    pm.expect(json.message).to.equal('user-service-OK');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
+          }
         },
         {
-          "name": "GET /api/v1/general/health — General module",
+          "name": "Update - Actualizar mis datos",
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/general/health",
+              "raw": "{{baseUrl}}/api/v1/users/me",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "general",
-                "health"
+                "users",
+                "me"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Juan Carlos\",\n  \"middle_name\": \"Antonio\",\n  \"last_name\": \"Pérez García\",\n  \"phone_number\": \"3001234567\",\n  \"phone_type\": \"CELULAR\"\n}"
             }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('General health responde 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
+          }
         }
       ]
     },
     {
-      "name": "02 — Users CRUD",
+      "name": "3. Geo",
       "item": [
         {
-          "name": "POST /api/v1/users — Crear usuario valido",
+          "name": "Create - Crear ubicación",
           "request": {
             "method": "POST",
             "header": [
@@ -139,247 +170,8 @@
                 "value": "Bearer {{token}}"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"id_user\": \"1234567890\",\n  \"first_name\": \"Maria\",\n  \"middle_name\": \"Alejandra\",\n  \"last_name\": \"Rodriguez\",\n  \"second_last_name\": \"Lopez\",\n  \"birth_date\": \"1995-06-15T00:00:00Z\",\n  \"birth_place\": \"Bogota\",\n  \"document_type\": \"CC\",\n  \"issue_place\": \"Bogota\",\n  \"issue_date\": \"2013-06-20T00:00:00Z\",\n  \"phone_type\": \"movil\",\n  \"phone_country_code\": \"+57\",\n  \"phone_number\": \"3001234567\",\n  \"email\": \"maria.rodriguez@test.com\",\n  \"gender\": \"Femenino\",\n  \"lgbtiq_identity\": false\n}"
-            },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/users",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Crear usuario responde 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "",
-                  "pm.test('Respuesta contiene mensaje de exito', function () {",
-                  "    var json = pm.response.json();",
-                  "    pm.expect(json.message).to.equal('Usuario creado exitosamente');",
-                  "});",
-                  "",
-                  "pm.test('Respuesta no contiene error', function () {",
-                  "    var json = pm.response.json();",
-                  "    pm.expect(json.error).to.be.undefined;",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "POST /api/v1/users — Usuario duplicado (409)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"id_user\": \"1234567890\",\n  \"first_name\": \"Maria\",\n  \"last_name\": \"Rodriguez\",\n  \"birth_date\": \"1995-06-15T00:00:00Z\",\n  \"birth_place\": \"Bogota\",\n  \"issue_place\": \"Bogota\",\n  \"issue_date\": \"2013-06-20T00:00:00Z\",\n  \"email\": \"maria.rodriguez@test.com\",\n  \"gender\": \"Femenino\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Usuario duplicado responde 409', function () {",
-                  "    pm.response.to.have.status(409);",
-                  "});",
-                  "",
-                  "pm.test('Mensaje indica que ya existe', function () {",
-                  "    var json = pm.response.json();",
-                  "    pm.expect(json.error).to.be.true;",
-                  "    pm.expect(json.message).to.include('ya existe');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET /api/v1/users — Listar usuarios",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Listar usuarios responde 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Respuesta tiene formato JSONResponse', function () {",
-                  "    var json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('message');",
-                  "    pm.expect(json.message).to.equal('Usuarios recuperados');",
-                  "});",
-                  "",
-                  "pm.test('Data es un array', function () {",
-                  "    var json = pm.response.json();",
-                  "    pm.expect(json.data).to.be.an('array');",
-                  "});",
-                  "",
-                  "pm.test('Contiene al menos 1 usuario creado', function () {",
-                  "    var json = pm.response.json();",
-                  "    pm.expect(json.data.length).to.be.greaterThan(0);",
-                  "    pm.environment.set('testUserId', json.data[0].id_user);",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET /api/v1/users/:id — Obtener usuario por ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users/{{testUserId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "{{testUserId}}"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Obtener usuario responde 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Data contiene el usuario solicitado', function () {",
-                  "    var json = pm.response.json();",
-                  "    pm.expect(json.data).to.have.property('first_name');",
-                  "    pm.expect(json.data).to.have.property('email');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "GET /api/v1/users/inexistente — Usuario no encontrado (404)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/users/usuario-no-existe-999",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "usuario-no-existe-999"
-              ]
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Usuario inexistente responde 404', function () {",
-                  "    pm.response.to.have.status(404);",
-                  "});",
-                  "",
-                  "pm.test('Mensaje indica no encontrado', function () {",
-                  "    var json = pm.response.json();",
-                  "    pm.expect(json.error).to.be.true;",
-                  "    pm.expect(json.message).to.include('no encontrado');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "name": "03 — Geo Module",
-      "item": [
-        {
-          "name": "GET /api/v1/geo — Listar datos geograficos",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/geo",
+              "raw": "{{baseUrl}}/api/v1/geo/",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -388,22 +180,260 @@
                 "v1",
                 "geo"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"residence_country\": \"Colombia\",\n  \"residence_department\": \"Cundinamarca\",\n  \"residence_city\": \"Bogotá\",\n  \"residence_zone\": \"URBANA\",\n  \"main_avenue\": \"Carrera\",\n  \"main_route_number\": \"7\",\n  \"neighborhood\": \"Chapinero\",\n  \"address_details\": \"Apartamento 301\"\n}"
             }
-          },
-          "event": [
+          }
+        },
+        {
+          "name": "Get - Obtener mi ubicación",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/geo/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "geo",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update - Actualizar ubicación",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/geo/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "geo",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"residence_department\": \"Antioquia\",\n  \"residence_city\": \"Medellín\",\n  \"neighborhood\": \"El Poblado\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. General",
+      "item": [
+        {
+          "name": "Resultado",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Geo responde 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Tiempo de respuesta < 1000ms', function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
-                  "});"
+              "name": "Create - Registrar resultado",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
                 ],
-                "type": "text/javascript"
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/general/resultado/",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "general",
+                    "resultado"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"area\": \"LECTURA CRITICA\",\n  \"puntaje\": \"350\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get - Obtener mis resultados",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/general/resultado/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "general",
+                    "resultado",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update - Actualizar resultado",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/general/resultado/{id}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "general",
+                    "resultado",
+                    "{id}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"area\": \"MATEMÁTICAS\",\n  \"puntaje\": \"400\"\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sisben",
+          "item": [
+            {
+              "name": "Create - Registrar sisben",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/general/sisben/",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "general",
+                    "sisben"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"group\": \"A\",\n  \"sub_group\": \"A1\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get - Obtener mi sisben",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/general/sisben/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "general",
+                    "sisben",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update - Actualizar sisben",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/general/sisben/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "general",
+                    "sisben",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"group\": \"B\",\n  \"sub_group\": \"B1\"\n}"
+                }
               }
             }
           ]
@@ -411,68 +441,674 @@
       ]
     },
     {
-      "name": "04 — General Module",
+      "name": "5. Population",
       "item": [
         {
-          "name": "GET /api/v1/general/sisben — Listar SISBEN",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/general/sisben",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "general",
-                "sisben"
-              ]
-            }
-          },
-          "event": [
+          "name": "Etnica",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Sisben responde 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});"
+              "name": "Create - Registrar grupo étnico",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
                 ],
-                "type": "text/javascript"
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/etnica/",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "etnica"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ethnic_group\": \"INDIGENA\",\n  \"native_language\": \"ESPAÑOL\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get - Obtener mi etnica",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/etnica/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "etnica",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update - Actualizar etnica",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/etnica/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "etnica",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ethnic_group\": \"ROM\"\n}"
+                }
               }
             }
           ]
         },
         {
-          "name": "GET /api/v1/general/educacion — Listar Educacion",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/general/educacion",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "general",
-                "educacion"
-              ]
-            }
-          },
-          "event": [
+          "name": "Discap",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test('Educacion responde 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});"
+              "name": "Create - Registrar discapacidad",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
                 ],
-                "type": "text/javascript"
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/discap/",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "discap"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"has_disability\": true,\n  \"disability_specific\": \"MOTRIZ\",\n  \"is_certified\": true,\n  \"has_rlcpd\": true\n}"
+                }
+              }
+            },
+            {
+              "name": "Get - Obtener mi discapacidad",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/discap/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "discap",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update - Actualizar discapacidad",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/discap/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "discap",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"disability_specific\": \"VISUAL\"\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Victima",
+          "item": [
+            {
+              "name": "Create - Registrar víctima",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/victima/",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "victima"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"is_victim\": true,\n  \"victimizing_event\": \"DESPLAZAMIENTO FORZADO\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get - Obtener mi victima",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/victima/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "victima",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update - Actualizar victima",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/victima/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "victima",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"is_victim\": false\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Hogar",
+          "item": [
+            {
+              "name": "Create - Registrar hogar",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/hogar/",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "hogar"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"is_head_of_household\": true,\n  \"marital_status\": \"SOLTERO\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get - Obtener mi hogar",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/hogar/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "hogar",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update - Actualizar hogar",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/hogar/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "hogar",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"marital_status\": \"CASADO\"\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Campesina",
+          "item": [
+            {
+              "name": "Create - Registrar campesino",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/campesina/",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "campesina"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"is_peasant\": true,\n  \"peasant_community\": true,\n  \"economic_activity\": \"AGRICULTURA\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get - Obtener mi campesina",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/campesina/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "campesina",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update - Actualizar campesina",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/population/campesina/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "population",
+                    "campesina",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"economic_activity\": \"GANADERÍA\"\n}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. SYE",
+      "item": [
+        {
+          "name": "Edu",
+          "item": [
+            {
+              "name": "Create - Registrar educación",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/sye/edu/",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "sye",
+                    "edu"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"max_education_level\": \"BACHILLER\",\n  \"school_name\": \"COLEGIO NACIONAL\",\n  \"school_location\": \"BOGOTÁ\",\n  \"last_year_completed\": \"2015\",\n  \"high_school_diploma_earned\": \"SI\",\n  \"icfes_document_type\": \"CERTIFICADO\",\n  \"icfes_document_num\": \"ABC123456\",\n  \"snp\": \"1234567890\",\n  \"icfes_register\": \"REG2020\",\n  \"icfes_year\": 2020,\n  \"icfes_score\": 350\n}"
+                }
+              }
+            },
+            {
+              "name": "Get - Obtener mi educación",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/sye/edu/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "sye",
+                    "edu",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update - Actualizar educación",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/sye/edu/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "sye",
+                    "edu",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"max_education_level\": \"TECNICO\",\n  \"school_name\": \"SENA\"\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Salud",
+          "item": [
+            {
+              "name": "Create - Registrar salud",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/sye/salud/",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "sye",
+                    "salud"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"has_rlcpd\": false,\n  \"social_security_regime\": \"CONTRIBUTIVO\"\n}"
+                }
+              }
+            },
+            {
+              "name": "Get - Obtener mi salud",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/sye/salud/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "sye",
+                    "salud",
+                    "me"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update - Actualizar salud",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/sye/salud/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "sye",
+                    "salud",
+                    "me"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"social_security_regime\": \"SUBSIDIADO\"\n}"
+                }
               }
             }
           ]
@@ -483,7 +1119,11 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://backend:8080"
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": "TU_TOKEN_AQUI"
     }
   ]
 }
