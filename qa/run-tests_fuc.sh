@@ -155,21 +155,72 @@ for i in $(seq 1 30); do
     sleep 3
 done
 
-# 1.5. Generar Token JWT de Prueba
-echo "[1.5/6] Generando JWT Token para pruebas backend..."
-export TEST_USER_ID="${TEST_USER_ID:-qa_test_user}"
-export JWT_SECRET="${JWT_SECRET:-secret-key-for-development}"
+# 1.5. Obtener Token JWT Real desde Login
+# En lugar de generar un token sintético, hacemos signup + login reales para obtener
+# un token válido que corresponda a un usuario existente en la BD.
+echo "[1.5/6] Obteniendo JWT Token real desde login..."
 
-export TEST_TOKEN=$(python3 -c "import time, hmac, hashlib, base64, json, os;\
-secret=os.environ.get('JWT_SECRET').encode();\
-header={'alg': 'HS256', 'typ': 'JWT'};\
-payload={'user_id': os.environ.get('TEST_USER_ID'), 'exp': int(time.time()) + 86400};\
-b64_header=base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip('=');\
-b64_payload=base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip('=');\
-sig=base64.urlsafe_b64encode(hmac.new(secret, (b64_header + '.' + b64_payload).encode(), hashlib.sha256).digest()).decode().rstrip('=');\
-print(f'{b64_header}.{b64_payload}.{sig}')")
+# Credenciales del usuario de prueba (deben coincidir con los datos en la colección Postman)
+QA_USER_ID="${QA_USER_ID:-12345678}"
+QA_PASSWORD="${QA_PASSWORD:-password123}"
+QA_DOCUMENT_TYPE="${QA_DOCUMENT_TYPE:-CC}"
 
-echo "  Token generado correctamente para el usuario: $TEST_USER_ID"
+# Paso 1: Intentar crear el usuario QA (ignorar si ya existe - código 409)
+echo "  Paso 1: Creando usuario QA (si no existe)..."
+SIGNUP_RESPONSE=$(curl -sf -X POST "$BACKEND_URL/api/v1/auth/signup" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "id_user": "'"$QA_USER_ID"'",
+        "username": "juanperez",
+        "password": "'"$QA_PASSWORD"'",
+        "first_name": "Juan",
+        "middle_name": "Carlos",
+        "last_name": "Pérez",
+        "second_last_name": "García",
+        "birth_country": "Colombia",
+        "birth_state": "Cundinamarca",
+        "birth_city": "Bogotá",
+        "document_type": "'"$QA_DOCUMENT_TYPE"'",
+        "issue_country": "Colombia",
+        "issue_state": "Cundinamarca",
+        "issue_city": "Bogotá",
+        "email": "juanperez@email.com",
+        "gender": "MASCULINO",
+        "lgbtiq_identity": false
+    }' 2>/dev/null) || true
+echo "  Signup response: ${SIGNUP_RESPONSE:-usuario ya existe o creado}"
+
+# Paso 2: Hacer login y capturar el token real
+echo "  Paso 2: Iniciando sesión para obtener token..."
+LOGIN_RESPONSE=$(curl -sf -X POST "$BACKEND_URL/api/v1/auth/login" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "id_user": "'"$QA_USER_ID"'",
+        "password": "'"$QA_PASSWORD"'",
+        "document_type": "'"$QA_DOCUMENT_TYPE"'"
+    }' 2>/dev/null)
+
+# Extraer token de la respuesta (soporta múltiples estructuras de respuesta)
+if [ -n "$LOGIN_RESPONSE" ]; then
+    # Intentar extraer: .token, .access_token, o .data.token
+    export TEST_TOKEN=$(echo "$LOGIN_RESPONSE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    token = data.get('token') or data.get('access_token') or (data.get('data') or {}).get('token')
+    print(token or '')
+except:
+    print('')
+" 2>/dev/null)
+fi
+
+if [ -n "$TEST_TOKEN" ] && [ "$TEST_TOKEN" != "null" ]; then
+    echo "  Token real obtenido correctamente para usuario: $QA_USER_ID"
+else
+    echo "  WARN: No se pudo obtener token real. Login response: $LOGIN_RESPONSE"
+    echo "  Usando token vacío - los tests de endpoints autenticados podrían fallar."
+    export TEST_TOKEN=""
+fi
 
 # 2. Newman API Tests
 echo "[2/6] Newman API Tests..."
