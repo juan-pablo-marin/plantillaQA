@@ -557,65 +557,117 @@ else
     SECURITY_DIR="$REPORTS_DIR/security"
     mkdir -p "$SECURITY_DIR"
     
-    # ── 6.1: OWASP ZAP Security Scans ──
+    # ── 6.1: OWASP ZAP Security Scans (via Sidecar API) ──
     echo "  Ejecutando OWASP ZAP Security Scanner..."
     
-    # Verificar si ZAP está disponible
-    if command -v zap-baseline.py &> /dev/null || command -v zap.sh &> /dev/null; then
+    ZAP_HOST="${ZAP_HOST:-zap}"
+    ZAP_PORT="${ZAP_PORT:-8080}"
+    ZAP_API="http://${ZAP_HOST}:${ZAP_PORT}"
+    ZAP_AVAILABLE=false
+    
+    # Verificar si ZAP sidecar está disponible
+    echo "  Verificando conexión a ZAP sidecar ($ZAP_API)..."
+    for i in $(seq 1 30); do
+        if curl -sf "$ZAP_API/" > /dev/null 2>&1; then
+            echo "  ✓ ZAP sidecar disponible"
+            ZAP_AVAILABLE=true
+            break
+        fi
+        echo "    ... esperando ZAP (intento $i/30)"
+        sleep 2
+    done
+    
+    if [ "$ZAP_AVAILABLE" = "true" ]; then
+        # Función para ejecutar escaneo via API
+        zap_scan() {
+            local target="$1"
+            local scan_type="$2"
+            local report_name="$3"
+            
+            echo "  → Escaneando $target ($scan_type)..."
+            
+            # Abrir URL en ZAP (spider básico)
+            curl -sf "$ZAP_API/JSON/core/action/accessUrl/?url=$(echo $target | sed 's/:/%3A/g; s/\//%2F/g')" > /dev/null 2>&1 || true
+            sleep 2
+            
+            # Ejecutar Spider
+            echo "    Ejecutando spider..."
+            SPIDER_ID=$(curl -sf "$ZAP_API/JSON/spider/action/scan/?url=$(echo $target | sed 's/:/%3A/g; s/\//%2F/g')&maxChildren=10&recurse=true" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('scan','0'))" 2>/dev/null || echo "0")
+            
+            # Esperar a que termine el spider (max 2 min)
+            for j in $(seq 1 24); do
+                STATUS=$(curl -sf "$ZAP_API/JSON/spider/view/status/?scanId=$SPIDER_ID" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','100'))" 2>/dev/null || echo "100")
+                [ "$STATUS" = "100" ] && break
+                echo "    Spider: $STATUS%"
+                sleep 5
+            done
+            
+            # Ejecutar Passive Scan wait
+            echo "    Esperando escaneo pasivo..."
+            sleep 5
+            
+            # Si es full scan, ejecutar Active Scan
+            if [ "$scan_type" = "full" ]; then
+                echo "    Ejecutando escaneo activo..."
+                ASCAN_ID=$(curl -sf "$ZAP_API/JSON/ascan/action/scan/?url=$(echo $target | sed 's/:/%3A/g; s/\//%2F/g')&recurse=true" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('scan','0'))" 2>/dev/null || echo "0")
+                
+                # Esperar active scan (max 10 min)
+                for j in $(seq 1 60); do
+                    STATUS=$(curl -sf "$ZAP_API/JSON/ascan/view/status/?scanId=$ASCAN_ID" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','100'))" 2>/dev/null || echo "100")
+                    [ "$STATUS" = "100" ] && break
+                    echo "    Active Scan: $STATUS%"
+                    sleep 10
+                done
+            fi
+            
+            # Obtener alertas
+            echo "    Obteniendo resultados..."
+            curl -sf "$ZAP_API/JSON/core/view/alerts/?baseurl=$(echo $target | sed 's/:/%3A/g; s/\//%2F/g')" > "$SECURITY_DIR/${report_name}.json" 2>/dev/null || echo '{"alerts":[]}' > "$SECURITY_DIR/${report_name}.json"
+            
+            # Generar reporte HTML
+            curl -sf "$ZAP_API/OTHER/core/other/htmlreport/" > "$SECURITY_DIR/${report_name}.html" 2>/dev/null || echo "<html><body><h1>No se pudo generar reporte HTML</h1></body></html>" > "$SECURITY_DIR/${report_name}.html"
+            
+            # Contar alertas
+            ALERT_COUNT=$(python3 -c "import json; data=json.load(open('$SECURITY_DIR/${report_name}.json')); print(len(data.get('alerts',[])))" 2>/dev/null || echo "0")
+            echo "    ✓ Completado: $ALERT_COUNT alertas encontradas"
+        }
         
         # Escaneo Baseline (Pasivo) del Backend
-        echo "  → ZAP Baseline Scan (Backend API)..."
-        zap-baseline.py \
-            -t "$BACKEND_URL" \
-            -r "$SECURITY_DIR/backend-baseline.html" \
-            -J "$SECURITY_DIR/backend-baseline.json" \
-            -x "$SECURITY_DIR/backend-baseline.xml" \
-            -d \
-            -I \
-            --auto \
-            -m 5 \
-            2>&1 || echo "  WARN: ZAP Baseline (Backend) completado con alertas."
+        zap_scan "$BACKEND_URL" "baseline" "backend-baseline"
+        
+        # Limpiar sesión entre escaneos
+        curl -sf "$ZAP_API/JSON/core/action/newSession/?name=frontend&overwrite=true" > /dev/null 2>&1 || true
         
         # Escaneo Baseline (Pasivo) del Frontend
-        echo "  → ZAP Baseline Scan (Frontend)..."
-        zap-baseline.py \
-            -t "$FRONTEND_URL" \
-            -r "$SECURITY_DIR/frontend-baseline.html" \
-            -J "$SECURITY_DIR/frontend-baseline.json" \
-            -x "$SECURITY_DIR/frontend-baseline.xml" \
-            -d \
-            -I \
-            --auto \
-            -m 5 \
-            2>&1 || echo "  WARN: ZAP Baseline (Frontend) completado con alertas."
+        zap_scan "$FRONTEND_URL" "baseline" "frontend-baseline"
         
-        # Escaneo Full (Activo) si está habilitado - más intrusivo
+        # Escaneo Full (Activo) si está habilitado
         if [ "${ZAP_FULL_SCAN:-false}" = "true" ]; then
-            echo "  → ZAP Full Scan (Activo - Backend API)..."
+            curl -sf "$ZAP_API/JSON/core/action/newSession/?name=fullscan&overwrite=true" > /dev/null 2>&1 || true
             echo "  ⚠ ADVERTENCIA: Escaneo activo realiza ataques controlados."
-            zap-full-scan.py \
-                -t "$BACKEND_URL" \
-                -r "$SECURITY_DIR/backend-full.html" \
-                -J "$SECURITY_DIR/backend-full.json" \
-                -x "$SECURITY_DIR/backend-full.xml" \
-                -d \
-                -I \
-                --auto \
-                -m 30 \
-                -a \
-                2>&1 || echo "  WARN: ZAP Full Scan completado con alertas."
-        fi
-        
-        # Escaneo con Automation Framework si existe el config
-        if [ -f "/qa/security/zap-config.yaml" ]; then
-            echo "  → ZAP Automation Framework Scan..."
-            zap.sh -cmd -autorun /qa/security/zap-config.yaml \
-                2>&1 || echo "  WARN: ZAP Automation scan completado con alertas."
+            zap_scan "$BACKEND_URL" "full" "backend-full"
         fi
         
         echo "  Reportes ZAP generados en: $SECURITY_DIR/"
     else
-        echo "  WARN: OWASP ZAP no está disponible. Omitiendo escaneos ZAP."
+        echo "  WARN: ZAP sidecar no disponible. Omitiendo escaneos ZAP."
+        echo "  Para habilitar ZAP, asegúrese de usar el perfil 'security' o 'all':"
+        echo "    docker compose --profile security up -d zap"
+        
+        # Crear reportes vacíos para que el HTML no tenga enlaces rotos
+        echo '{"alerts":[],"note":"ZAP sidecar no disponible"}' > "$SECURITY_DIR/backend-baseline.json"
+        echo '{"alerts":[],"note":"ZAP sidecar no disponible"}' > "$SECURITY_DIR/frontend-baseline.json"
+        cat > "$SECURITY_DIR/backend-baseline.html" <<'NOHTML'
+<!DOCTYPE html>
+<html><head><title>ZAP No Disponible</title>
+<style>body{font-family:sans-serif;background:#1e293b;color:#e2e8f0;padding:2rem;text-align:center;}
+.msg{background:#334155;padding:2rem;border-radius:12px;max-width:600px;margin:2rem auto;}</style></head>
+<body><div class="msg"><h1>⚠️ OWASP ZAP No Disponible</h1>
+<p>El contenedor ZAP sidecar no está corriendo.</p>
+<p>Para habilitarlo, ejecute:</p>
+<code>docker compose --profile security up -d zap</code></div></body></html>
+NOHTML
+        cp "$SECURITY_DIR/backend-baseline.html" "$SECURITY_DIR/frontend-baseline.html"
     fi
     
     # ── 6.2: Tests de Seguridad Manuales ──

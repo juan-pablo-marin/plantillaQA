@@ -196,6 +196,27 @@ services:
     networks:
       - qa-network
 
+  # --- OWASP ZAP (Security Scanner Sidecar) ---
+  # ZAP corre como daemon y los scripts del qa-runner se conectan a él
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: ${PROJECT_NAME}-zap
+    profiles: [ "security", "test-e2e", "all" ]
+    command: >
+      zap.sh -daemon -host 0.0.0.0 -port 8080
+      -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
+      -config api.disablekey=true
+    ports:
+      - "${ZAP_PORT:-8090}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - qa-network
+
   # --- QA Runner (Master Orchestrator) ---
   qa-runner:
     build:
@@ -212,6 +233,8 @@ services:
       frontend:
         condition: service_started
       influxdb:
+        condition: service_healthy
+      zap:
         condition: service_healthy
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-qa}
@@ -235,6 +258,8 @@ services:
       - RUN_SECURITY=${RUN_SECURITY:-false}
       # ── Configuración de pruebas de seguridad (OWASP ZAP) ──
       - ZAP_FULL_SCAN=${ZAP_FULL_SCAN:-false}
+      - ZAP_HOST=zap
+      - ZAP_PORT=8080
       - FAIL_ON_HIGH=${FAIL_ON_HIGH:-true}
       - FAIL_ON_MEDIUM=${FAIL_ON_MEDIUM:-false}
       # ──────────────────────────────────────────────────────────

@@ -350,6 +350,24 @@ pipeline {
                     steps {
                         script {
                             echo "=> Ejecutando Pruebas de Seguridad (OWASP ZAP, CSRF, XSS, SQLi)..."
+                            
+                            // Levantar ZAP sidecar antes de ejecutar las pruebas
+                            echo "  Levantando OWASP ZAP sidecar..."
+                            sh """
+                                ${COMPOSE_CMD} --profile security up -d zap || echo "  WARN: No se pudo levantar ZAP sidecar"
+                                
+                                # Esperar a que ZAP esté listo (hasta 60 segundos)
+                                echo "  Esperando a que ZAP esté listo..."
+                                for i in \$(seq 1 30); do
+                                    if docker exec \$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r')-zap curl -sf http://localhost:8080/ > /dev/null 2>&1; then
+                                        echo "  ✓ ZAP sidecar listo"
+                                        break
+                                    fi
+                                    echo "    ... esperando ZAP (intento \$i/30)"
+                                    sleep 2
+                                done
+                            """
+                            
                             sh """
                                 ${COMPOSE_CMD} run --no-deps --name qa-runner-security \\
                                 -e REPORTS_DIR=${QA_REPORTS_DIR} \\
@@ -359,6 +377,8 @@ pipeline {
                                 -e RUN_K6=false \\
                                 -e RUN_ACCESSIBILITY=false \\
                                 -e RUN_SECURITY=true \\
+                                -e ZAP_HOST=zap \\
+                                -e ZAP_PORT=8080 \\
                                 -e ZAP_FULL_SCAN=${params.ZAP_FULL_SCAN} \\
                                 -e FAIL_ON_HIGH=true \\
                                 -e FAIL_ON_MEDIUM=false \\

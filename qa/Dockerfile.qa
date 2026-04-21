@@ -50,20 +50,35 @@ RUN curl -sSLo /tmp/k6.deb https://github.com/grafana/k6/releases/download/v0.50
     && rm /tmp/k6.deb
 
 # --- OWASP ZAP (Security testing) ---
-# Instalamos ZAP completo desde el release oficial (incluye zap-baseline.py, zap-full-scan.py, etc.)
-ENV ZAP_VERSION=2.15.0
-RUN mkdir -p /opt/zap \
-    && curl -sSL "https://github.com/zaproxy/zaproxy/releases/download/v${ZAP_VERSION}/ZAP_${ZAP_VERSION}_Linux.tar.gz" \
-       | tar -xz -C /opt/zap --strip-components=1 \
-    && ln -s /opt/zap/zap.sh /usr/local/bin/zap.sh \
-    && ln -s /opt/zap/zap-baseline.py /usr/local/bin/zap-baseline.py \
-    && ln -s /opt/zap/zap-full-scan.py /usr/local/bin/zap-full-scan.py \
-    && ln -s /opt/zap/zap-api-scan.py /usr/local/bin/zap-api-scan.py \
-    && chmod +x /opt/zap/*.py /opt/zap/*.sh
-
-# Cliente Python de ZAP (para scripts personalizados)
+# Nota: ZAP completo requiere ~500MB y Java. Los scripts standalone necesitan el daemon.
+# Opción 1: Usar ZAP como sidecar container (recomendado para CI/CD)
+# Opción 2: Instalar solo el cliente Python para interactuar con ZAP externo
+# Por ahora instalamos el cliente Python - ZAP se ejecutará como sidecar si está disponible
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install --break-system-packages zaproxy python-owasp-zap-v2.4
+    pip3 install --break-system-packages python-owasp-zap-v2.4 requests
+
+# Crear script wrapper para ZAP que use el sidecar o muestre mensaje informativo
+RUN mkdir -p /opt/zap && cat > /opt/zap/zap-wrapper.sh <<'ZAPWRAPPER'
+#!/bin/bash
+# Wrapper para OWASP ZAP - intenta conectar al sidecar ZAP
+ZAP_HOST="${ZAP_HOST:-zap}"
+ZAP_PORT="${ZAP_PORT:-8080}"
+ZAP_API_KEY="${ZAP_API_KEY:-}"
+
+echo "Intentando conectar a ZAP en $ZAP_HOST:$ZAP_PORT..."
+
+# Verificar si ZAP sidecar está disponible
+if curl -sf "http://$ZAP_HOST:$ZAP_PORT/" > /dev/null 2>&1; then
+    echo "✓ ZAP sidecar disponible"
+    export ZAP_AVAILABLE=true
+else
+    echo "⚠ ZAP sidecar no disponible. Ejecute el contenedor ZAP como sidecar:"
+    echo "  docker run -d --name zap --network qa-network -p 8080:8080 ghcr.io/zaproxy/zaproxy:stable zap.sh -daemon -host 0.0.0.0 -port 8080"
+    export ZAP_AVAILABLE=false
+fi
+ZAPWRAPPER
+RUN chmod +x /opt/zap/zap-wrapper.sh \
+    && ln -sf /opt/zap/zap-wrapper.sh /usr/local/bin/zap-check
 
 # --- Sonar Scanner ---
 RUN curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.2.1.4610-linux-x64.zip \
