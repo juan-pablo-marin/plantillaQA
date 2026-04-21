@@ -21,6 +21,8 @@
 #    RUN_PLAYWRIGHT=true    → Activa tests E2E con Playwright
 #    RUN_K6=true            → Activa tests de rendimiento con k6
 #    RUN_ACCESSIBILITY=true → Activa auditorías de Accesibilidad (axe-core) + Lighthouse
+#    RUN_SECURITY=true      → Activa pruebas de seguridad (OWASP ZAP + CSRF/XSS/SQLi tests)
+#    ZAP_FULL_SCAN=true     → Activa escaneo activo de ZAP (más intrusivo, realiza ataques)
 # ═══════════════════════════════════════════════════════════════
 
 # Mismo criterio que Jenkins (COMPOSE_PROJECT_NAME=qa-pipeline): todo el stack bajo un único
@@ -230,6 +232,11 @@ services:
       - RUN_PLAYWRIGHT=${RUN_PLAYWRIGHT:-false}
       - RUN_K6=${RUN_K6:-false}
       - RUN_ACCESSIBILITY=${RUN_ACCESSIBILITY:-false}
+      - RUN_SECURITY=${RUN_SECURITY:-false}
+      # ── Configuración de pruebas de seguridad (OWASP ZAP) ──
+      - ZAP_FULL_SCAN=${ZAP_FULL_SCAN:-false}
+      - FAIL_ON_HIGH=${FAIL_ON_HIGH:-true}
+      - FAIL_ON_MEDIUM=${FAIL_ON_MEDIUM:-false}
       # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-20m}
@@ -497,6 +504,21 @@ services:
     restart: unless-stopped
     ports:
       - "8183:80"
+    networks:
+      - qa-network
+
+  # --- Security Report Viewer ---
+  # Viewer Nginx para reportes de seguridad (OWASP ZAP, CSRF, XSS, etc.)
+  # Jenkins inyecta reportes vía 'docker cp' al finalizar el stage de Security.
+  security-viewer:
+    build:
+      context: .
+      dockerfile: ./qa/Dockerfile.viewer
+    container_name: ${PROJECT_NAME}-security-viewer
+    profiles: [ "test-e2e", "jenkins", "all", "report", "security" ]
+    restart: unless-stopped
+    ports:
+      - "8184:80"
     networks:
       - qa-network
 

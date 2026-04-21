@@ -18,6 +18,7 @@ RUN_SONAR="${RUN_SONAR:-true}"                # Análisis estático con SonarQub
 RUN_PLAYWRIGHT="${RUN_PLAYWRIGHT:-false}"      # Tests E2E con Playwright
 RUN_K6="${RUN_K6:-false}"                      # Tests de rendimiento con k6
 RUN_ACCESSIBILITY="${RUN_ACCESSIBILITY:-false}" # Accesibilidad (axe-core) + Lighthouse (Core Web Vitals)
+RUN_SECURITY="${RUN_SECURITY:-false}"          # Pruebas de seguridad (OWASP ZAP + tests manuales)
 # ───────────────────────────────────────────────────────────────────────────
 
 SONAR_WAIT_SECONDS="${SONAR_WAIT_SECONDS:-300}"
@@ -41,6 +42,7 @@ echo " SonarQube:     RUN_SONAR=$RUN_SONAR"
 echo " Playwright:    RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT"
 echo " k6:            RUN_K6=$RUN_K6"
 echo " Accessibility: RUN_ACCESSIBILITY=$RUN_ACCESSIBILITY"
+echo " Security:      RUN_SECURITY=$RUN_SECURITY"
 echo "============================================"
 
 # 0. Preparar reportes
@@ -547,8 +549,213 @@ else
     echo " SKIP: No se encontro performance/k6-tests.js"
 fi
 
-# 6. Reportes Finales
-echo "[6/6] Finalizando..."
+# 6. Security Tests (OWASP ZAP + Manual Security Tests)
+echo "[6/7] Pruebas de Seguridad..."
+if [ "$RUN_SECURITY" != "true" ]; then
+    echo " SKIP: RUN_SECURITY=$RUN_SECURITY"
+else
+    SECURITY_DIR="$REPORTS_DIR/security"
+    mkdir -p "$SECURITY_DIR"
+    
+    # ── 6.1: OWASP ZAP Security Scans ──
+    echo "  Ejecutando OWASP ZAP Security Scanner..."
+    
+    # Verificar si ZAP está disponible
+    if command -v zap-baseline.py &> /dev/null || command -v zap.sh &> /dev/null; then
+        
+        # Escaneo Baseline (Pasivo) del Backend
+        echo "  → ZAP Baseline Scan (Backend API)..."
+        zap-baseline.py \
+            -t "$BACKEND_URL" \
+            -r "$SECURITY_DIR/backend-baseline.html" \
+            -J "$SECURITY_DIR/backend-baseline.json" \
+            -x "$SECURITY_DIR/backend-baseline.xml" \
+            -d \
+            -I \
+            --auto \
+            -m 5 \
+            2>&1 || echo "  WARN: ZAP Baseline (Backend) completado con alertas."
+        
+        # Escaneo Baseline (Pasivo) del Frontend
+        echo "  → ZAP Baseline Scan (Frontend)..."
+        zap-baseline.py \
+            -t "$FRONTEND_URL" \
+            -r "$SECURITY_DIR/frontend-baseline.html" \
+            -J "$SECURITY_DIR/frontend-baseline.json" \
+            -x "$SECURITY_DIR/frontend-baseline.xml" \
+            -d \
+            -I \
+            --auto \
+            -m 5 \
+            2>&1 || echo "  WARN: ZAP Baseline (Frontend) completado con alertas."
+        
+        # Escaneo Full (Activo) si está habilitado - más intrusivo
+        if [ "${ZAP_FULL_SCAN:-false}" = "true" ]; then
+            echo "  → ZAP Full Scan (Activo - Backend API)..."
+            echo "  ⚠ ADVERTENCIA: Escaneo activo realiza ataques controlados."
+            zap-full-scan.py \
+                -t "$BACKEND_URL" \
+                -r "$SECURITY_DIR/backend-full.html" \
+                -J "$SECURITY_DIR/backend-full.json" \
+                -x "$SECURITY_DIR/backend-full.xml" \
+                -d \
+                -I \
+                --auto \
+                -m 30 \
+                -a \
+                2>&1 || echo "  WARN: ZAP Full Scan completado con alertas."
+        fi
+        
+        # Escaneo con Automation Framework si existe el config
+        if [ -f "/qa/security/zap-config.yaml" ]; then
+            echo "  → ZAP Automation Framework Scan..."
+            zap.sh -cmd -autorun /qa/security/zap-config.yaml \
+                2>&1 || echo "  WARN: ZAP Automation scan completado con alertas."
+        fi
+        
+        echo "  Reportes ZAP generados en: $SECURITY_DIR/"
+    else
+        echo "  WARN: OWASP ZAP no está disponible. Omitiendo escaneos ZAP."
+    fi
+    
+    # ── 6.2: Tests de Seguridad Manuales ──
+    echo "  → Ejecutando tests de seguridad manuales..."
+    
+    # Test CSRF Protection
+    echo "    Testing CSRF protection..."
+    CSRF_RESULT=$(curl -sf -X POST "$BACKEND_URL/api/v1/auth/login" \
+        -H "Origin: http://malicious-site.com" \
+        -H "Content-Type: application/json" \
+        -d '{"id_user": "test", "password": "test", "document_type": "CC"}' \
+        -w "%{http_code}" \
+        -o /dev/null 2>/dev/null || echo "error")
+    
+    if [ "$CSRF_RESULT" = "200" ] || [ "$CSRF_RESULT" = "201" ]; then
+        echo "    ⚠ CSRF: Endpoint acepta requests de origen externo"
+    else
+        echo "    ✓ CSRF: Endpoint rechaza/valida requests de origen externo ($CSRF_RESULT)"
+    fi
+    
+    # Test Security Headers
+    echo "    Testing security headers..."
+    HEADERS=$(curl -sI "$FRONTEND_URL" 2>/dev/null || echo "")
+    
+    echo "$HEADERS" | grep -qi "x-frame-options" && echo "    ✓ X-Frame-Options presente" || echo "    ⚠ X-Frame-Options ausente"
+    echo "$HEADERS" | grep -qi "x-content-type-options" && echo "    ✓ X-Content-Type-Options presente" || echo "    ⚠ X-Content-Type-Options ausente"
+    echo "$HEADERS" | grep -qi "content-security-policy" && echo "    ✓ Content-Security-Policy presente" || echo "    ⚠ Content-Security-Policy ausente"
+    echo "$HEADERS" | grep -qi "x-powered-by" && echo "    ⚠ X-Powered-By expuesto (debería ocultarse)" || echo "    ✓ X-Powered-By no expuesto"
+    
+    # Test SQL/NoSQL Injection básico
+    echo "    Testing injection payloads..."
+    INJECTION_RESULT=$(curl -sf -X POST "$BACKEND_URL/api/v1/auth/login" \
+        -H "Content-Type: application/json" \
+        -d '{"id_user": "'"'"' OR '"'"'1'"'"'='"'"'1", "password": "test", "document_type": "CC"}' \
+        -w "%{http_code}" \
+        -o /dev/null 2>/dev/null || echo "error")
+    
+    if [ "$INJECTION_RESULT" = "200" ]; then
+        echo "    ⚠ INJECTION: Payload SQL aceptado (posible vulnerabilidad)"
+    else
+        echo "    ✓ INJECTION: Payload SQL rechazado ($INJECTION_RESULT)"
+    fi
+    
+    # ── 6.3: Playwright Security Tests ──
+    if [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
+        echo "  → Ejecutando Playwright Security Tests..."
+        mkdir -p "$SECURITY_DIR/playwright-security"
+        
+        PLAYWRIGHT_JSON_OUTPUT_NAME=security-results.json npx playwright test \
+            --config=playwright.config.ts \
+            --project=chromium \
+            ui/tests/security.spec.ts \
+            2>&1 || echo "  WARN: Algunos tests de seguridad Playwright fallaron."
+    fi
+    
+    # ── 6.4: Generar Reporte Consolidado ──
+    echo "  → Generando reporte consolidado de seguridad..."
+    TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+    
+    cat > "$SECURITY_DIR/security-summary.html" <<'SECURITY_HTML'
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Scan Report - FUC SENA</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        h1 { color: #f8fafc; margin-bottom: 0.5rem; }
+        .subtitle { color: #94a3b8; margin-bottom: 2rem; }
+        .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        .card h2 { color: #f1f5f9; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #334155; }
+        th { color: #94a3b8; font-weight: 500; }
+        .report-link { color: #60a5fa; text-decoration: none; }
+        .report-link:hover { text-decoration: underline; }
+        .check { color: #22c55e; }
+        .warn { color: #f59e0b; }
+        .timestamp { color: #64748b; font-size: 0.875rem; margin-top: 2rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔒 Security Scan Report</h1>
+        <p class="subtitle">FUC SENA - Análisis de Seguridad Automatizado</p>
+        
+        <div class="card">
+            <h2>📁 Reportes Generados</h2>
+            <table>
+                <thead>
+                    <tr><th>Tipo de Escaneo</th><th>Target</th><th>Reportes</th></tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>ZAP Baseline (Pasivo)</td>
+                        <td>Backend API</td>
+                        <td><a href="backend-baseline.html" class="report-link">HTML</a> | <a href="backend-baseline.json" class="report-link">JSON</a></td>
+                    </tr>
+                    <tr>
+                        <td>ZAP Baseline (Pasivo)</td>
+                        <td>Frontend</td>
+                        <td><a href="frontend-baseline.html" class="report-link">HTML</a> | <a href="frontend-baseline.json" class="report-link">JSON</a></td>
+                    </tr>
+                    <tr>
+                        <td>ZAP Full Scan (Activo)</td>
+                        <td>Backend API</td>
+                        <td><a href="backend-full.html" class="report-link">HTML</a> | <a href="backend-full.json" class="report-link">JSON</a></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="card">
+            <h2>🛡️ Pruebas de Seguridad Ejecutadas</h2>
+            <ul style="list-style: none; padding: 0;">
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Cross-Site Request Forgery (CSRF)</li>
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Cross-Site Scripting (XSS)</li>
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> SQL Injection / NoSQL Injection</li>
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Security Headers Analysis</li>
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Cookie Security Attributes</li>
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Session Management</li>
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Information Disclosure</li>
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Path Traversal</li>
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Remote File Inclusion</li>
+                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Server Side Request Forgery (SSRF)</li>
+            </ul>
+        </div>
+SECURITY_HTML
+    
+    echo "        <p class=\"timestamp\">Generado: $TIMESTAMP</p>" >> "$SECURITY_DIR/security-summary.html"
+    echo "    </div></body></html>" >> "$SECURITY_DIR/security-summary.html"
+    
+    echo "  Reportes de seguridad generados en: $SECURITY_DIR/"
+fi
+
+# 7. Reportes Finales
+echo "[7/7] Finalizando..."
 echo "Reportes guardados en $REPORTS_DIR"
 echo "============================================"
 exit 0

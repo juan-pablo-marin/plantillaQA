@@ -1,9 +1,28 @@
-# ============================================
-# OWASP ZAP — Configuración de escaneo
-# ============================================
+# ═══════════════════════════════════════════════════════════════════════════════
+# OWASP ZAP — Automation Framework Configuration
+# FUC SENA - Security Testing Pipeline
+#
+# Este archivo configura escaneos de seguridad completos incluyendo:
+#   - Spider (crawling automático)
+#   - Passive Scan (análisis sin ataques)
+#   - Active Scan (ataques controlados para detectar vulnerabilidades)
+#   - AJAX Spider (para SPAs con JavaScript)
+#
+# Vulnerabilidades detectadas:
+#   - CSRF (Cross-Site Request Forgery)
+#   - XSS (Cross-Site Scripting) - Reflejado y Almacenado
+#   - SQL/NoSQL Injection
+#   - Path Traversal
+#   - Remote File Inclusion
+#   - Server Side Request Forgery (SSRF)
+#   - Insecure Authentication
+#   - Security Misconfigurations
+#   - Sensitive Data Exposure
+# ═══════════════════════════════════════════════════════════════════════════════
 
 env:
   contexts:
+    # ── Backend API Context ──
     - name: "FUC SENA API"
       urls:
         - "http://backend:8080"
@@ -11,6 +30,38 @@ env:
         - "http://backend:8080/api/.*"
       excludePaths:
         - "http://backend:8080/health"
+        - "http://backend:8080/metrics"
+        - "http://backend:8080/swagger.*"
+      authentication:
+        method: "json"
+        parameters:
+          loginPageUrl: "http://backend:8080/api/v1/auth/login"
+          loginRequestUrl: "http://backend:8080/api/v1/auth/login"
+          loginRequestBody: '{"id_user":"{%username%}","password":"{%password%}","document_type":"CC"}'
+        verification:
+          method: "response"
+          loggedInRegex: "\\Qtoken\\E"
+          loggedOutRegex: "\\Qunauthorized\\E|\\Qinvalid\\E"
+      users:
+        - name: "qa-user"
+          credentials:
+            username: "${QA_USER_ID:-12345678}"
+            password: "${QA_PASSWORD:-password123}"
+      sessionManagement:
+        method: "headers"
+        parameters:
+          - header: "Authorization"
+            value: "Bearer {%token%}"
+
+    # ── Frontend Context ──
+    - name: "FUC SENA Frontend"
+      urls:
+        - "http://frontend:3000"
+      includePaths:
+        - "http://frontend:3000/.*"
+      excludePaths:
+        - "http://frontend:3000/_next/.*"
+        - "http://frontend:3000/static/.*"
 
   parameters:
     failOnError: true
@@ -18,28 +69,222 @@ env:
     progressToStdout: true
 
 jobs:
+  # ═══════════════════════════════════════════════════════════════════
+  # FASE 1: Configuración de Escaneo Pasivo
+  # ═══════════════════════════════════════════════════════════════════
   - type: passiveScan-config
     parameters:
-      maxAlertsPerRule: 10
+      maxAlertsPerRule: 20
       scanOnlyInScope: true
-      maxBodySizeInBytesToScan: 10000
+      maxBodySizeInBytesToScan: 100000
+      enableTags: true
 
+  # ═══════════════════════════════════════════════════════════════════
+  # FASE 2: Spider Tradicional (Backend API)
+  # ═══════════════════════════════════════════════════════════════════
   - type: spider
     parameters:
       context: "FUC SENA API"
-      maxDuration: 2
-      maxDepth: 5
+      user: "qa-user"
+      maxDuration: 5
+      maxDepth: 10
+      maxChildren: 20
+      acceptCookies: true
+      handleODataParametersVisited: true
+      handleParameters: "USE_ALL"
+      parseComments: true
+      parseGit: true
+      parseSVNEntries: true
+      parseRobotsTxt: true
+      parseSitemapXml: true
 
+  # ═══════════════════════════════════════════════════════════════════
+  # FASE 3: AJAX Spider (Frontend SPA)
+  # ═══════════════════════════════════════════════════════════════════
+  - type: spiderAjax
+    parameters:
+      context: "FUC SENA Frontend"
+      maxDuration: 10
+      maxCrawlDepth: 10
+      numberOfBrowsers: 2
+      browserId: "chrome-headless"
+      clickDefaultElems: true
+      clickElemsOnce: true
+      eventWait: 1000
+      reloadWait: 2000
+
+  # ═══════════════════════════════════════════════════════════════════
+  # FASE 4: Esperar Escaneo Pasivo
+  # ═══════════════════════════════════════════════════════════════════
   - type: passiveScan-wait
     parameters:
-      maxDuration: 5
+      maxDuration: 10
 
+  # ═══════════════════════════════════════════════════════════════════
+  # FASE 5: Escaneo Activo (Ataques Controlados)
+  # ═══════════════════════════════════════════════════════════════════
+  - type: activeScan
+    parameters:
+      context: "FUC SENA API"
+      user: "qa-user"
+      maxRuleDurationInMins: 5
+      maxScanDurationInMins: 30
+      addQueryParam: true
+      defaultPolicy: "Default Policy"
+      delayInMs: 100
+      handleAntiCSRFTokens: true
+      injectPluginIdInHeader: false
+      scanHeadersAllRequests: true
+      threadPerHost: 2
+
+    policyDefinition:
+      defaultStrength: "medium"
+      defaultThreshold: "medium"
+      rules:
+        # ── CSRF Detection ──
+        - id: 20012
+          name: "Anti-CSRF Tokens Check"
+          strength: "high"
+          threshold: "low"
+        
+        # ── XSS Detection ──
+        - id: 40012
+          name: "Cross Site Scripting (Reflected)"
+          strength: "high"
+          threshold: "medium"
+        - id: 40014
+          name: "Cross Site Scripting (Persistent)"
+          strength: "high"
+          threshold: "medium"
+        - id: 40016
+          name: "Cross Site Scripting (Persistent) - Prime"
+          strength: "medium"
+          threshold: "medium"
+        - id: 40017
+          name: "Cross Site Scripting (Persistent) - Spider"
+          strength: "medium"
+          threshold: "medium"
+        
+        # ── SQL Injection ──
+        - id: 40018
+          name: "SQL Injection"
+          strength: "high"
+          threshold: "medium"
+        - id: 40019
+          name: "SQL Injection - MySQL"
+          strength: "high"
+          threshold: "medium"
+        - id: 40020
+          name: "SQL Injection - Hypersonic SQL"
+          strength: "medium"
+          threshold: "medium"
+        - id: 40021
+          name: "SQL Injection - Oracle"
+          strength: "medium"
+          threshold: "medium"
+        - id: 40022
+          name: "SQL Injection - PostgreSQL"
+          strength: "medium"
+          threshold: "medium"
+        
+        # ── NoSQL Injection (MongoDB) ──
+        - id: 40033
+          name: "NoSQL Injection - MongoDB"
+          strength: "high"
+          threshold: "medium"
+        
+        # ── Path Traversal ──
+        - id: 6
+          name: "Path Traversal"
+          strength: "high"
+          threshold: "medium"
+        
+        # ── Remote File Inclusion ──
+        - id: 7
+          name: "Remote File Inclusion"
+          strength: "medium"
+          threshold: "medium"
+        
+        # ── Server Side Request Forgery ──
+        - id: 40046
+          name: "Server Side Request Forgery"
+          strength: "high"
+          threshold: "medium"
+        
+        # ── Authentication Issues ──
+        - id: 10023
+          name: "Information Disclosure - Debug Error Messages"
+          strength: "medium"
+          threshold: "low"
+        - id: 10024
+          name: "Information Disclosure - Sensitive Information in URL"
+          strength: "medium"
+          threshold: "low"
+        
+        # ── Header Injection ──
+        - id: 40020
+          name: "HTTP Response Splitting"
+          strength: "medium"
+          threshold: "medium"
+        
+        # ── Command Injection ──
+        - id: 90020
+          name: "Remote OS Command Injection"
+          strength: "high"
+          threshold: "medium"
+        
+        # ── LDAP Injection ──
+        - id: 40015
+          name: "LDAP Injection"
+          strength: "medium"
+          threshold: "medium"
+        
+        # ── XML External Entity (XXE) ──
+        - id: 90023
+          name: "XML External Entity Attack"
+          strength: "high"
+          threshold: "medium"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # FASE 6: Generar Reportes
+  # ═══════════════════════════════════════════════════════════════════
   - type: report
     parameters:
-      template: "traditional-html"
-      reportDir: "/qa/reports"
-      reportFile: "zap-report"
+      template: "traditional-html-plus"
+      reportDir: "/qa/reports/security"
+      reportFile: "zap-automation-report"
+      reportTitle: "FUC SENA - Security Scan Report"
+      reportDescription: "Automated security scan using OWASP ZAP"
     risks:
       - high
       - medium
       - low
+      - info
+
+  - type: report
+    parameters:
+      template: "traditional-json-plus"
+      reportDir: "/qa/reports/security"
+      reportFile: "zap-automation-report"
+    risks:
+      - high
+      - medium
+      - low
+
+  - type: report
+    parameters:
+      template: "traditional-xml-plus"
+      reportDir: "/qa/reports/security"
+      reportFile: "zap-automation-report"
+    risks:
+      - high
+      - medium
+      - low
+
+  # ═══════════════════════════════════════════════════════════════════
+  # FASE 7: Validación de Resultados
+  # ═══════════════════════════════════════════════════════════════════
+  - type: outputSummary
+    parameters:
+      format: "Long"
+      summaryFile: "/qa/reports/security/zap-summary.txt"

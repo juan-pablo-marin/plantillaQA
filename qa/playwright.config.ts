@@ -49,5 +49,14 @@ export default defineConfig({
       retries: 0,
       timeout: 180_000,  // Lighthouse necesita más tiempo por auditoría
     },
+
+    // ── Proyecto Security: Pruebas de seguridad (CSRF, XSS, Headers, etc.) ──
+    {
+      name: 'security',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: '**/security.spec.ts',
+      retries: 0,
+      timeout: 120_000,
+    },
   ],
 });
