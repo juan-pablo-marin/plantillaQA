@@ -7,6 +7,8 @@ pipeline {
         booleanParam(name: 'RUN_PLAYWRIGHT',     defaultValue: true,  description: 'Ejecutar pruebas End-to-End con Playwright')
         booleanParam(name: 'RUN_K6',             defaultValue: false, description: 'Ejecutar pruebas de estrés/rendimiento con k6')
         booleanParam(name: 'RUN_ACCESSIBILITY',  defaultValue: true,  description: 'Ejecutar auditorías de Accesibilidad (axe-core) y Lighthouse (Core Web Vitals)')
+        booleanParam(name: 'RUN_SECURITY',       defaultValue: true,  description: 'Ejecutar pruebas de seguridad (OWASP ZAP, CSRF, XSS, SQLi)')
+        booleanParam(name: 'ZAP_FULL_SCAN',      defaultValue: false, description: 'Ejecutar escaneo activo de ZAP (ataques controlados - solo en QA)')
         // booleanParam(name: 'RUN_CLAUDE',     defaultValue: false, description: 'Ejecutar análisis inteligente con Claude AI y generar reporte HTML')
     }
 
@@ -98,6 +100,7 @@ pipeline {
                         # de escritura del contenedor mientras no se recree.
                         ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d newman-viewer || echo "  WARN: Newman viewer falló (no detiene pruebas)"
                         ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d playwright-viewer || echo "  WARN: Playwright viewer falló (no detiene pruebas)"
+                        ${COMPOSE_CMD} --profile test-e2e --profile sonar up -d security-viewer || echo "  WARN: Security viewer falló (no detiene pruebas)"
 
                         echo "=> Levantando Grafana (provisioning embebido en imagen)..."
                         # Grafana depende de influx healthy + prometheus started; sin test-e2e activo a veces queda solo Created.
@@ -337,6 +340,46 @@ pipeline {
                                     echo '  Accessibility viewer actualizado'
                                 else
                                     echo '  WARN: Accessibility viewer no esta corriendo'
+                                fi
+                            """
+                        }
+                    }
+                }
+
+                stage('Security (OWASP ZAP + CSRF/XSS)') {
+                    when { expression { return params.RUN_SECURITY } }
+                    steps {
+                        script {
+                            echo "=> Ejecutando Pruebas de Seguridad (OWASP ZAP, CSRF, XSS, SQLi)..."
+                            sh """
+                                ${COMPOSE_CMD} run --no-deps --name qa-runner-security \\
+                                -e REPORTS_DIR=${QA_REPORTS_DIR} \\
+                                -e RUN_NEWMAN=false \\
+                                -e RUN_SONAR=false \\
+                                -e RUN_PLAYWRIGHT=false \\
+                                -e RUN_K6=false \\
+                                -e RUN_ACCESSIBILITY=false \\
+                                -e RUN_SECURITY=true \\
+                                -e ZAP_FULL_SCAN=${params.ZAP_FULL_SCAN} \\
+                                -e FAIL_ON_HIGH=true \\
+                                -e FAIL_ON_MEDIUM=false \\
+                                qa-runner || true
+                            """
+                            sh "mkdir -p ${JENKINS_REPORTS_DIR}/security"
+                            // Copiar reportes de seguridad (ZAP HTML/JSON/XML + tests manuales)
+                            sh "docker cp qa-runner-security:${QA_REPORTS_DIR}/security/. ${JENKINS_REPORTS_DIR}/security/ || true"
+                            sh "docker rm -f qa-runner-security || true"
+
+                            // ── Sincronizar reportes al viewer (DinD: bind mounts no funcionan) ──
+                            def securityViewer = sh(script: "grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r'", returnStdout: true).trim() + '-security-viewer'
+                            echo "Security: sincronizando reportes al viewer (${securityViewer})..."
+                            sh """
+                                if docker ps -q -f name=${securityViewer} | grep -q .; then
+                                    docker exec ${securityViewer} sh -c 'rm -rf /usr/share/nginx/html/*' || true
+                                    docker cp ${JENKINS_REPORTS_DIR}/security/. ${securityViewer}:/usr/share/nginx/html/ || true
+                                    echo '  Security viewer actualizado'
+                                else
+                                    echo '  WARN: Security viewer no esta corriendo'
                                 fi
                             """
                         }
@@ -680,6 +723,20 @@ pipeline {
                     }
 
                     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/security/security-summary.html") || fileExists("${env.RELATIVE_REPORTS_DIR}/security/backend-baseline.html")) {
+                            archiveArtifacts artifacts: "${env.RELATIVE_REPORTS_DIR}/security/**/*", allowEmptyArchive: true
+                            publishHTML(target: [
+                                reportName         : 'Security Scan Report (OWASP ZAP)',
+                                reportDir          : "${env.RELATIVE_REPORTS_DIR}/security",
+                                reportFiles        : 'security-summary.html,backend-baseline.html,frontend-baseline.html,backend-full.html',
+                                keepAll            : true,
+                                alwaysLinkToLastBuild: true,
+                                allowMissing       : true
+                            ])
+                        }
+                    }
+
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                         if (fileExists("${env.RELATIVE_REPORTS_DIR}/allure-results")) {
                             allure includeProperties: false, jdk: '', commandline: 'allure',
                                    results: [[path: "${env.RELATIVE_REPORTS_DIR}/allure-results"]],
@@ -722,9 +779,10 @@ pipeline {
                         echo "     - Newman HTML  → http://localhost:8181  (FUC: qa/reports/fuc/newman; RAV: qa/reports/rav/newman; historial en anterior/)"
                         echo "     - Playwright   → http://localhost:8182"
                         echo "     - Accesibility → http://localhost:8183"
+                        echo "     - Security     → http://localhost:8184  (OWASP ZAP, CSRF, XSS, SQLi)"
                         echo "     - App (db, backend, frontend) → puertos según .env.qa / .env.qa_fuc"
                         echo "   Reportes HTML disponibles en Jenkins → Sidebar del build"
-                        docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 qa-runner-a11y 2>/dev/null || true
+                        docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 qa-runner-a11y qa-runner-security 2>/dev/null || true
                     '''
                 } catch (e) {
                     echo "Limpieza post-pipeline omitida: ${e.message}"
