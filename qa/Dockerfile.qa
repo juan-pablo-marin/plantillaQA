@@ -49,9 +49,21 @@ RUN curl -sSLo /tmp/k6.deb https://github.com/grafana/k6/releases/download/v0.50
     && dpkg -i /tmp/k6.deb \
     && rm /tmp/k6.deb
 
-# --- ZAP (Security testing) ---
+# --- OWASP ZAP (Security testing) ---
+# Instalamos ZAP completo desde el release oficial (incluye zap-baseline.py, zap-full-scan.py, etc.)
+ENV ZAP_VERSION=2.15.0
+RUN mkdir -p /opt/zap \
+    && curl -sSL "https://github.com/zaproxy/zaproxy/releases/download/v${ZAP_VERSION}/ZAP_${ZAP_VERSION}_Linux.tar.gz" \
+       | tar -xz -C /opt/zap --strip-components=1 \
+    && ln -s /opt/zap/zap.sh /usr/local/bin/zap.sh \
+    && ln -s /opt/zap/zap-baseline.py /usr/local/bin/zap-baseline.py \
+    && ln -s /opt/zap/zap-full-scan.py /usr/local/bin/zap-full-scan.py \
+    && ln -s /opt/zap/zap-api-scan.py /usr/local/bin/zap-api-scan.py \
+    && chmod +x /opt/zap/*.py /opt/zap/*.sh
+
+# Cliente Python de ZAP (para scripts personalizados)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install --break-system-packages zaproxy
+    pip3 install --break-system-packages zaproxy python-owasp-zap-v2.4
 
 # --- Sonar Scanner ---
 RUN curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.2.1.4610-linux-x64.zip \

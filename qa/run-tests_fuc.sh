@@ -621,6 +621,10 @@ else
     # ── 6.2: Tests de Seguridad Manuales ──
     echo "  → Ejecutando tests de seguridad manuales..."
     
+    # Inicializar archivo JSON para resultados
+    MANUAL_RESULTS="$SECURITY_DIR/manual-tests.json"
+    echo '{"tests": [], "summary": {}}' > "$MANUAL_RESULTS"
+    
     # Test CSRF Protection
     echo "    Testing CSRF protection..."
     CSRF_RESULT=$(curl -sf -X POST "$BACKEND_URL/api/v1/auth/login" \
@@ -630,20 +634,49 @@ else
         -w "%{http_code}" \
         -o /dev/null 2>/dev/null || echo "error")
     
+    CSRF_STATUS="pass"
+    CSRF_MSG="Endpoint rechaza requests de origen externo ($CSRF_RESULT)"
     if [ "$CSRF_RESULT" = "200" ] || [ "$CSRF_RESULT" = "201" ]; then
-        echo "    ⚠ CSRF: Endpoint acepta requests de origen externo"
+        CSRF_STATUS="fail"
+        CSRF_MSG="Endpoint acepta requests de origen externo - VULNERABLE"
+        echo "    ⚠ CSRF: $CSRF_MSG"
     else
-        echo "    ✓ CSRF: Endpoint rechaza/valida requests de origen externo ($CSRF_RESULT)"
+        echo "    ✓ CSRF: $CSRF_MSG"
     fi
     
     # Test Security Headers
     echo "    Testing security headers..."
     HEADERS=$(curl -sI "$FRONTEND_URL" 2>/dev/null || echo "")
     
-    echo "$HEADERS" | grep -qi "x-frame-options" && echo "    ✓ X-Frame-Options presente" || echo "    ⚠ X-Frame-Options ausente"
-    echo "$HEADERS" | grep -qi "x-content-type-options" && echo "    ✓ X-Content-Type-Options presente" || echo "    ⚠ X-Content-Type-Options ausente"
-    echo "$HEADERS" | grep -qi "content-security-policy" && echo "    ✓ Content-Security-Policy presente" || echo "    ⚠ Content-Security-Policy ausente"
-    echo "$HEADERS" | grep -qi "x-powered-by" && echo "    ⚠ X-Powered-By expuesto (debería ocultarse)" || echo "    ✓ X-Powered-By no expuesto"
+    XFRAME_STATUS="fail"; XCONTENT_STATUS="fail"; CSP_STATUS="warn"; XPOWERED_STATUS="pass"
+    
+    if echo "$HEADERS" | grep -qi "x-frame-options"; then
+        XFRAME_STATUS="pass"
+        echo "    ✓ X-Frame-Options presente"
+    else
+        echo "    ⚠ X-Frame-Options ausente"
+    fi
+    
+    if echo "$HEADERS" | grep -qi "x-content-type-options"; then
+        XCONTENT_STATUS="pass"
+        echo "    ✓ X-Content-Type-Options presente"
+    else
+        echo "    ⚠ X-Content-Type-Options ausente"
+    fi
+    
+    if echo "$HEADERS" | grep -qi "content-security-policy"; then
+        CSP_STATUS="pass"
+        echo "    ✓ Content-Security-Policy presente"
+    else
+        echo "    ⚠ Content-Security-Policy ausente"
+    fi
+    
+    if echo "$HEADERS" | grep -qi "x-powered-by"; then
+        XPOWERED_STATUS="fail"
+        echo "    ⚠ X-Powered-By expuesto (debería ocultarse)"
+    else
+        echo "    ✓ X-Powered-By no expuesto"
+    fi
     
     # Test SQL/NoSQL Injection básico
     echo "    Testing injection payloads..."
@@ -653,29 +686,74 @@ else
         -w "%{http_code}" \
         -o /dev/null 2>/dev/null || echo "error")
     
+    INJECTION_STATUS="pass"
     if [ "$INJECTION_RESULT" = "200" ]; then
+        INJECTION_STATUS="fail"
         echo "    ⚠ INJECTION: Payload SQL aceptado (posible vulnerabilidad)"
     else
         echo "    ✓ INJECTION: Payload SQL rechazado ($INJECTION_RESULT)"
     fi
     
+    # Guardar resultados manuales en JSON
+    cat > "$MANUAL_RESULTS" <<EOF
+{
+  "timestamp": "$(date -Iseconds)",
+  "backend_url": "$BACKEND_URL",
+  "frontend_url": "$FRONTEND_URL",
+  "tests": [
+    {"name": "CSRF Protection", "status": "$CSRF_STATUS", "details": "$CSRF_MSG"},
+    {"name": "X-Frame-Options", "status": "$XFRAME_STATUS", "details": "Protección contra Clickjacking"},
+    {"name": "X-Content-Type-Options", "status": "$XCONTENT_STATUS", "details": "Previene MIME sniffing"},
+    {"name": "Content-Security-Policy", "status": "$CSP_STATUS", "details": "Política de seguridad de contenido"},
+    {"name": "X-Powered-By Hidden", "status": "$XPOWERED_STATUS", "details": "No expone tecnología del servidor"},
+    {"name": "SQL Injection", "status": "$INJECTION_STATUS", "details": "Respuesta: $INJECTION_RESULT"}
+  ]
+}
+EOF
+    
     # ── 6.3: Playwright Security Tests ──
+    PLAYWRIGHT_RESULTS=""
     if [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
         echo "  → Ejecutando Playwright Security Tests..."
         mkdir -p "$SECURITY_DIR/playwright-security"
         
+        # Ejecutar y capturar resultados JSON
         PLAYWRIGHT_JSON_OUTPUT_NAME=security-results.json npx playwright test \
             --config=playwright.config.ts \
-            --project=chromium \
-            ui/tests/security.spec.ts \
-            2>&1 || echo "  WARN: Algunos tests de seguridad Playwright fallaron."
+            --project=security \
+            --reporter=json \
+            2>&1 | tee "$SECURITY_DIR/playwright-output.txt" || true
+        
+        # Buscar el archivo de resultados JSON generado
+        if [ -f "test-results/.last-run.json" ]; then
+            cp "test-results/.last-run.json" "$SECURITY_DIR/playwright-security-results.json" 2>/dev/null || true
+        fi
+        
+        # Copiar reportes HTML de Playwright si existen
+        if [ -d "$REPORTS_DIR/playwright-html" ]; then
+            cp -r "$REPORTS_DIR/playwright-html" "$SECURITY_DIR/playwright-security/" 2>/dev/null || true
+        fi
     fi
     
-    # ── 6.4: Generar Reporte Consolidado ──
+    # ── 6.4: Generar Reporte Consolidado Mejorado ──
     echo "  → Generando reporte consolidado de seguridad..."
     TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
     
-    cat > "$SECURITY_DIR/security-summary.html" <<'SECURITY_HTML'
+    # Contar resultados
+    PASS_COUNT=0
+    FAIL_COUNT=0
+    WARN_COUNT=0
+    
+    [ "$CSRF_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
+    [ "$XFRAME_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
+    [ "$XCONTENT_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
+    [ "$CSP_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || { [ "$CSP_STATUS" = "warn" ] && WARN_COUNT=$((WARN_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1)); }
+    [ "$XPOWERED_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
+    [ "$INJECTION_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
+    
+    TOTAL_TESTS=$((PASS_COUNT + FAIL_COUNT + WARN_COUNT))
+    
+    cat > "$SECURITY_DIR/security-summary.html" <<SECURITY_HTML
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -684,72 +762,408 @@ else
     <title>Security Scan Report - FUC SENA</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; line-height: 1.6; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-        h1 { color: #f8fafc; margin-bottom: 0.5rem; }
-        .subtitle { color: #94a3b8; margin-bottom: 2rem; }
-        .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #334155; }
-        .card h2 { color: #f1f5f9; margin-bottom: 1rem; }
-        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #334155; }
-        th { color: #94a3b8; font-weight: 500; }
-        .report-link { color: #60a5fa; text-decoration: none; }
-        .report-link:hover { text-decoration: underline; }
-        .check { color: #22c55e; }
-        .warn { color: #f59e0b; }
-        .timestamp { color: #64748b; font-size: 0.875rem; margin-top: 2rem; text-align: center; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: #e2e8f0; 
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            border: 1px solid #334155;
+        }
+        .header h1 { 
+            font-size: 2.5rem; 
+            color: #f8fafc; 
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+        .header .subtitle { color: #94a3b8; font-size: 1.1rem; }
+        .header .timestamp { color: #64748b; font-size: 0.9rem; margin-top: 1rem; }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            border: 1px solid #334155;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        .stat-value { font-size: 3rem; font-weight: 700; }
+        .stat-label { color: #94a3b8; font-size: 0.9rem; margin-top: 0.5rem; }
+        .stat-pass .stat-value { color: #22c55e; }
+        .stat-fail .stat-value { color: #ef4444; }
+        .stat-warn .stat-value { color: #f59e0b; }
+        .stat-total .stat-value { color: #60a5fa; }
+        
+        /* Cards */
+        .card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #334155;
+        }
+        .card h2 {
+            color: #f1f5f9;
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #334155;
+        }
+        
+        /* Results Table */
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .results-table th,
+        .results-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #334155;
+        }
+        .results-table th {
+            color: #94a3b8;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .results-table tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+        
+        /* Status Badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-pass {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        .status-fail {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .status-warn {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        
+        /* Links */
+        .report-link {
+            color: #60a5fa;
+            text-decoration: none;
+            padding: 0.3rem 0.8rem;
+            border-radius: 6px;
+            background: rgba(96, 165, 250, 0.1);
+            border: 1px solid rgba(96, 165, 250, 0.2);
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .report-link:hover {
+            background: rgba(96, 165, 250, 0.2);
+            border-color: rgba(96, 165, 250, 0.4);
+        }
+        .report-links {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        /* Vulnerability Details */
+        .vuln-details {
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        
+        /* Two Column Layout */
+        .two-columns {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        /* Test Categories */
+        .test-category {
+            margin-bottom: 1.5rem;
+        }
+        .test-category h3 {
+            color: #cbd5e1;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .test-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+        .test-name {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .test-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-size: 0.8rem;
+        }
+        .test-icon.pass { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .test-icon.fail { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .test-icon.warn { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #64748b;
+            font-size: 0.85rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container { padding: 1rem; }
+            .header h1 { font-size: 1.8rem; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .two-columns { grid-template-columns: 1fr; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔒 Security Scan Report</h1>
-        <p class="subtitle">FUC SENA - Análisis de Seguridad Automatizado</p>
+        <!-- Header -->
+        <div class="header">
+            <h1>🔒 Security Scan Report</h1>
+            <p class="subtitle">FUC SENA - Análisis de Seguridad Automatizado con OWASP ZAP</p>
+            <p class="timestamp">Generado: $TIMESTAMP</p>
+        </div>
         
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card stat-pass">
+                <div class="stat-value">$PASS_COUNT</div>
+                <div class="stat-label">✓ Tests Pasados</div>
+            </div>
+            <div class="stat-card stat-fail">
+                <div class="stat-value">$FAIL_COUNT</div>
+                <div class="stat-label">✗ Vulnerabilidades</div>
+            </div>
+            <div class="stat-card stat-warn">
+                <div class="stat-value">$WARN_COUNT</div>
+                <div class="stat-label">⚠ Advertencias</div>
+            </div>
+            <div class="stat-card stat-total">
+                <div class="stat-value">$TOTAL_TESTS</div>
+                <div class="stat-label">Total Tests</div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="two-columns">
+            <!-- Manual Test Results -->
+            <div class="card">
+                <h2>🧪 Resultados de Tests Manuales</h2>
+                
+                <div class="test-category">
+                    <h3>🛡️ Protección de Headers</h3>
+                    <div class="test-item">
+                        <div class="test-name">
+                            <span class="test-icon $XFRAME_STATUS">$([ "$XFRAME_STATUS" = "pass" ] && echo "✓" || echo "✗")</span>
+                            <span>X-Frame-Options</span>
+                        </div>
+                        <span class="status-badge status-$XFRAME_STATUS">$([ "$XFRAME_STATUS" = "pass" ] && echo "SEGURO" || echo "FALTA")</span>
+                    </div>
+                    <div class="test-item">
+                        <div class="test-name">
+                            <span class="test-icon $XCONTENT_STATUS">$([ "$XCONTENT_STATUS" = "pass" ] && echo "✓" || echo "✗")</span>
+                            <span>X-Content-Type-Options</span>
+                        </div>
+                        <span class="status-badge status-$XCONTENT_STATUS">$([ "$XCONTENT_STATUS" = "pass" ] && echo "SEGURO" || echo "FALTA")</span>
+                    </div>
+                    <div class="test-item">
+                        <div class="test-name">
+                            <span class="test-icon $CSP_STATUS">$([ "$CSP_STATUS" = "pass" ] && echo "✓" || echo "⚠")</span>
+                            <span>Content-Security-Policy</span>
+                        </div>
+                        <span class="status-badge status-$CSP_STATUS">$([ "$CSP_STATUS" = "pass" ] && echo "SEGURO" || echo "RECOMENDADO")</span>
+                    </div>
+                    <div class="test-item">
+                        <div class="test-name">
+                            <span class="test-icon $XPOWERED_STATUS">$([ "$XPOWERED_STATUS" = "pass" ] && echo "✓" || echo "✗")</span>
+                            <span>X-Powered-By Oculto</span>
+                        </div>
+                        <span class="status-badge status-$XPOWERED_STATUS">$([ "$XPOWERED_STATUS" = "pass" ] && echo "SEGURO" || echo "EXPUESTO")</span>
+                    </div>
+                </div>
+                
+                <div class="test-category">
+                    <h3>🔐 Protección de Ataques</h3>
+                    <div class="test-item">
+                        <div class="test-name">
+                            <span class="test-icon $CSRF_STATUS">$([ "$CSRF_STATUS" = "pass" ] && echo "✓" || echo "✗")</span>
+                            <span>CSRF Protection</span>
+                        </div>
+                        <span class="status-badge status-$CSRF_STATUS">$([ "$CSRF_STATUS" = "pass" ] && echo "PROTEGIDO" || echo "VULNERABLE")</span>
+                    </div>
+                    <div class="test-item">
+                        <div class="test-name">
+                            <span class="test-icon $INJECTION_STATUS">$([ "$INJECTION_STATUS" = "pass" ] && echo "✓" || echo "✗")</span>
+                            <span>SQL/NoSQL Injection</span>
+                        </div>
+                        <span class="status-badge status-$INJECTION_STATUS">$([ "$INJECTION_STATUS" = "pass" ] && echo "PROTEGIDO" || echo "VULNERABLE")</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ZAP Reports -->
+            <div class="card">
+                <h2>📊 Reportes OWASP ZAP</h2>
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Tipo de Escaneo</th>
+                            <th>Target</th>
+                            <th>Reportes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>🔍 ZAP Baseline (Pasivo)</td>
+                            <td>Backend API</td>
+                            <td class="report-links">
+                                <a href="backend-baseline.html" class="report-link">HTML</a>
+                                <a href="backend-baseline.json" class="report-link">JSON</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>🔍 ZAP Baseline (Pasivo)</td>
+                            <td>Frontend</td>
+                            <td class="report-links">
+                                <a href="frontend-baseline.html" class="report-link">HTML</a>
+                                <a href="frontend-baseline.json" class="report-link">JSON</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>⚡ ZAP Full Scan (Activo)</td>
+                            <td>Backend API</td>
+                            <td class="report-links">
+                                <a href="backend-full.html" class="report-link">HTML</a>
+                                <a href="backend-full.json" class="report-link">JSON</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>🎭 Playwright Security</td>
+                            <td>Frontend E2E</td>
+                            <td class="report-links">
+                                <a href="playwright-security/" class="report-link">Ver Resultados</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Vulnerability Categories -->
         <div class="card">
-            <h2>📁 Reportes Generados</h2>
-            <table>
+            <h2>🎯 Categorías de Vulnerabilidades Analizadas</h2>
+            <table class="results-table">
                 <thead>
-                    <tr><th>Tipo de Escaneo</th><th>Target</th><th>Reportes</th></tr>
+                    <tr>
+                        <th>Categoría OWASP</th>
+                        <th>Descripción</th>
+                        <th>Herramienta</th>
+                    </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td>ZAP Baseline (Pasivo)</td>
-                        <td>Backend API</td>
-                        <td><a href="backend-baseline.html" class="report-link">HTML</a> | <a href="backend-baseline.json" class="report-link">JSON</a></td>
+                        <td><strong>A01:2021</strong> - Broken Access Control</td>
+                        <td class="vuln-details">CSRF, validación de origen, control de acceso</td>
+                        <td><span class="status-badge status-pass">ZAP + Manual</span></td>
                     </tr>
                     <tr>
-                        <td>ZAP Baseline (Pasivo)</td>
-                        <td>Frontend</td>
-                        <td><a href="frontend-baseline.html" class="report-link">HTML</a> | <a href="frontend-baseline.json" class="report-link">JSON</a></td>
+                        <td><strong>A02:2021</strong> - Cryptographic Failures</td>
+                        <td class="vuln-details">HTTPS, cookies seguras, datos sensibles</td>
+                        <td><span class="status-badge status-pass">Playwright</span></td>
                     </tr>
                     <tr>
-                        <td>ZAP Full Scan (Activo)</td>
-                        <td>Backend API</td>
-                        <td><a href="backend-full.html" class="report-link">HTML</a> | <a href="backend-full.json" class="report-link">JSON</a></td>
+                        <td><strong>A03:2021</strong> - Injection</td>
+                        <td class="vuln-details">SQL, NoSQL, XSS, Command Injection</td>
+                        <td><span class="status-badge status-pass">ZAP + Manual</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>A05:2021</strong> - Security Misconfiguration</td>
+                        <td class="vuln-details">Headers de seguridad, información expuesta</td>
+                        <td><span class="status-badge status-pass">ZAP + Playwright</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>A07:2021</strong> - XSS</td>
+                        <td class="vuln-details">Cross-Site Scripting reflejado y persistente</td>
+                        <td><span class="status-badge status-pass">ZAP + Playwright</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>A09:2021</strong> - Security Logging</td>
+                        <td class="vuln-details">Stack traces, información de errores</td>
+                        <td><span class="status-badge status-pass">Playwright</span></td>
                     </tr>
                 </tbody>
             </table>
         </div>
         
-        <div class="card">
-            <h2>🛡️ Pruebas de Seguridad Ejecutadas</h2>
-            <ul style="list-style: none; padding: 0;">
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Cross-Site Request Forgery (CSRF)</li>
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Cross-Site Scripting (XSS)</li>
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> SQL Injection / NoSQL Injection</li>
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Security Headers Analysis</li>
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Cookie Security Attributes</li>
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Session Management</li>
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Information Disclosure</li>
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Path Traversal</li>
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Remote File Inclusion</li>
-                <li style="padding: 0.5rem 0;"><span class="check">✅</span> Server Side Request Forgery (SSRF)</li>
-            </ul>
+        <!-- Footer -->
+        <div class="footer">
+            <p>🔒 FUC SENA Security Pipeline | OWASP ZAP + Playwright</p>
+            <p>Generado automáticamente por el pipeline de QA</p>
         </div>
+    </div>
+</body>
+</html>
 SECURITY_HTML
-    
-    echo "        <p class=\"timestamp\">Generado: $TIMESTAMP</p>" >> "$SECURITY_DIR/security-summary.html"
-    echo "    </div></body></html>" >> "$SECURITY_DIR/security-summary.html"
     
     echo "  Reportes de seguridad generados en: $SECURITY_DIR/"
 fi
