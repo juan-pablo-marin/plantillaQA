@@ -764,26 +764,42 @@ NOHTML
 EOF
     
     # ── 6.3: Playwright Security Tests ──
-    PLAYWRIGHT_RESULTS=""
+    PLAYWRIGHT_PASS=0
+    PLAYWRIGHT_FAIL=0
+    PLAYWRIGHT_SKIP=0
+    
     if [ -f "playwright.config.ts" ] || [ -f "/qa/playwright.config.ts" ]; then
         echo "  → Ejecutando Playwright Security Tests..."
         mkdir -p "$SECURITY_DIR/playwright-security"
         
-        # Ejecutar y capturar resultados JSON
-        PLAYWRIGHT_JSON_OUTPUT_NAME=security-results.json npx playwright test \
+        # Ejecutar tests de seguridad con reporte JSON
+        npx playwright test \
             --config=playwright.config.ts \
             --project=security \
-            --reporter=json \
+            --reporter=json,html \
+            --output="$SECURITY_DIR/playwright-security" \
             2>&1 | tee "$SECURITY_DIR/playwright-output.txt" || true
         
-        # Buscar el archivo de resultados JSON generado
-        if [ -f "test-results/.last-run.json" ]; then
-            cp "test-results/.last-run.json" "$SECURITY_DIR/playwright-security-results.json" 2>/dev/null || true
+        # Parsear resultados del output
+        if [ -f "$SECURITY_DIR/playwright-output.txt" ]; then
+            # Extraer conteo de tests pasados/fallidos del output
+            PLAYWRIGHT_PASS=$(grep -oE '[0-9]+ passed' "$SECURITY_DIR/playwright-output.txt" | head -1 | grep -oE '[0-9]+' || echo "0")
+            PLAYWRIGHT_FAIL=$(grep -oE '[0-9]+ failed' "$SECURITY_DIR/playwright-output.txt" | head -1 | grep -oE '[0-9]+' || echo "0")
+            PLAYWRIGHT_SKIP=$(grep -oE '[0-9]+ skipped' "$SECURITY_DIR/playwright-output.txt" | head -1 | grep -oE '[0-9]+' || echo "0")
+            
+            [ -z "$PLAYWRIGHT_PASS" ] && PLAYWRIGHT_PASS=0
+            [ -z "$PLAYWRIGHT_FAIL" ] && PLAYWRIGHT_FAIL=0
+            [ -z "$PLAYWRIGHT_SKIP" ] && PLAYWRIGHT_SKIP=0
+            
+            echo "    Playwright Security: $PLAYWRIGHT_PASS passed, $PLAYWRIGHT_FAIL failed, $PLAYWRIGHT_SKIP skipped"
         fi
         
         # Copiar reportes HTML de Playwright si existen
+        if [ -d "playwright-report" ]; then
+            cp -r playwright-report/* "$SECURITY_DIR/playwright-security/" 2>/dev/null || true
+        fi
         if [ -d "$REPORTS_DIR/playwright-html" ]; then
-            cp -r "$REPORTS_DIR/playwright-html" "$SECURITY_DIR/playwright-security/" 2>/dev/null || true
+            cp -r "$REPORTS_DIR/playwright-html"/* "$SECURITY_DIR/playwright-security/" 2>/dev/null || true
         fi
     fi
     
@@ -791,11 +807,12 @@ EOF
     echo "  → Generando reporte consolidado de seguridad..."
     TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
     
-    # Contar resultados
+    # Contar resultados (tests manuales + Playwright)
     PASS_COUNT=0
     FAIL_COUNT=0
     WARN_COUNT=0
     
+    # Tests manuales
     [ "$CSRF_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
     [ "$XFRAME_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
     [ "$XCONTENT_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
@@ -803,7 +820,19 @@ EOF
     [ "$XPOWERED_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
     [ "$INJECTION_STATUS" = "pass" ] && PASS_COUNT=$((PASS_COUNT + 1)) || FAIL_COUNT=$((FAIL_COUNT + 1))
     
+    # Agregar resultados de Playwright
+    PASS_COUNT=$((PASS_COUNT + PLAYWRIGHT_PASS))
+    FAIL_COUNT=$((FAIL_COUNT + PLAYWRIGHT_FAIL))
+    
     TOTAL_TESTS=$((PASS_COUNT + FAIL_COUNT + WARN_COUNT))
+    
+    # Determinar estado de ZAP
+    ZAP_STATUS_TEXT="No Disponible"
+    ZAP_STATUS_CLASS="warn"
+    if [ "$ZAP_AVAILABLE" = "true" ]; then
+        ZAP_STATUS_TEXT="Conectado"
+        ZAP_STATUS_CLASS="pass"
+    fi
     
     cat > "$SECURITY_DIR/security-summary.html" <<SECURITY_HTML
 <!DOCTYPE html>
@@ -1113,14 +1142,52 @@ EOF
                 </div>
             </div>
             
-            <!-- ZAP Reports -->
+            <!-- ZAP Reports + Playwright -->
             <div class="card">
-                <h2>📊 Reportes OWASP ZAP</h2>
+                <h2>📊 Reportes de Escaneos</h2>
+                
+                <!-- ZAP Status Banner -->
+                <div style="background: rgba($([ "$ZAP_AVAILABLE" = "true" ] && echo "34, 197, 94" || echo "245, 158, 11"), 0.1); 
+                            border: 1px solid rgba($([ "$ZAP_AVAILABLE" = "true" ] && echo "34, 197, 94" || echo "245, 158, 11"), 0.3); 
+                            border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 1rem;">
+                    <span style="font-size: 1.5rem;">$([ "$ZAP_AVAILABLE" = "true" ] && echo "✅" || echo "⚠️")</span>
+                    <div>
+                        <strong style="color: $([ "$ZAP_AVAILABLE" = "true" ] && echo "#22c55e" || echo "#f59e0b");">
+                            OWASP ZAP: $ZAP_STATUS_TEXT
+                        </strong>
+                        <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.25rem;">
+                            $([ "$ZAP_AVAILABLE" = "true" ] && echo "Escaneos de seguridad completados" || echo "El sidecar ZAP no estaba disponible durante esta ejecución")
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Playwright Security Results -->
+                <div style="background: rgba(96, 165, 250, 0.1); border: 1px solid rgba(96, 165, 250, 0.3); 
+                            border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span style="font-size: 1.5rem;">🎭</span>
+                            <strong style="color: #60a5fa;">Playwright Security Tests</strong>
+                        </div>
+                        <div style="display: flex; gap: 1rem;">
+                            <span style="color: #22c55e;">✓ $PLAYWRIGHT_PASS passed</span>
+                            <span style="color: #ef4444;">✗ $PLAYWRIGHT_FAIL failed</span>
+                            $([ "$PLAYWRIGHT_SKIP" -gt 0 ] && echo "<span style=\"color: #94a3b8;\">⊘ $PLAYWRIGHT_SKIP skipped</span>" || echo "")
+                        </div>
+                    </div>
+                    <div style="margin-top: 0.75rem;">
+                        <a href="playwright-security/index.html" class="report-link" style="margin-right: 0.5rem;">📄 Ver Reporte HTML</a>
+                        <a href="playwright-output.txt" class="report-link">📋 Ver Output</a>
+                    </div>
+                </div>
+                
+                <!-- ZAP Reports Table -->
                 <table class="results-table">
                     <thead>
                         <tr>
                             <th>Tipo de Escaneo</th>
                             <th>Target</th>
+                            <th>Estado</th>
                             <th>Reportes</th>
                         </tr>
                     </thead>
@@ -1128,6 +1195,7 @@ EOF
                         <tr>
                             <td>🔍 ZAP Baseline (Pasivo)</td>
                             <td>Backend API</td>
+                            <td><span class="status-badge status-$ZAP_STATUS_CLASS">$ZAP_STATUS_TEXT</span></td>
                             <td class="report-links">
                                 <a href="backend-baseline.html" class="report-link">HTML</a>
                                 <a href="backend-baseline.json" class="report-link">JSON</a>
@@ -1136,6 +1204,7 @@ EOF
                         <tr>
                             <td>🔍 ZAP Baseline (Pasivo)</td>
                             <td>Frontend</td>
+                            <td><span class="status-badge status-$ZAP_STATUS_CLASS">$ZAP_STATUS_TEXT</span></td>
                             <td class="report-links">
                                 <a href="frontend-baseline.html" class="report-link">HTML</a>
                                 <a href="frontend-baseline.json" class="report-link">JSON</a>
@@ -1144,16 +1213,10 @@ EOF
                         <tr>
                             <td>⚡ ZAP Full Scan (Activo)</td>
                             <td>Backend API</td>
+                            <td><span class="status-badge status-$([ "${ZAP_FULL_SCAN:-false}" = "true" ] && echo "$ZAP_STATUS_CLASS" || echo "warn")">$([ "${ZAP_FULL_SCAN:-false}" = "true" ] && echo "$ZAP_STATUS_TEXT" || echo "No Solicitado")</span></td>
                             <td class="report-links">
                                 <a href="backend-full.html" class="report-link">HTML</a>
                                 <a href="backend-full.json" class="report-link">JSON</a>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>🎭 Playwright Security</td>
-                            <td>Frontend E2E</td>
-                            <td class="report-links">
-                                <a href="playwright-security/" class="report-link">Ver Resultados</a>
                             </td>
                         </tr>
                     </tbody>

@@ -354,18 +354,41 @@ pipeline {
                             // Levantar ZAP sidecar antes de ejecutar las pruebas
                             echo "  Levantando OWASP ZAP sidecar..."
                             sh """
+                                PROJECT_NAME=\$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r')
+                                
+                                # Limpiar contenedor ZAP anterior si existe (puede estar en estado fallido)
+                                echo "  Limpiando contenedor ZAP anterior si existe..."
+                                docker rm -f \${PROJECT_NAME}-zap 2>/dev/null || true
+                                
+                                # Levantar ZAP (sin puerto expuesto al host para evitar conflictos)
                                 ${COMPOSE_CMD} --profile security up -d zap || echo "  WARN: No se pudo levantar ZAP sidecar"
                                 
-                                # Esperar a que ZAP esté listo (hasta 60 segundos)
+                                # Esperar a que ZAP esté listo (hasta 90 segundos - ZAP tarda en iniciar)
                                 echo "  Esperando a que ZAP esté listo..."
+                                ZAP_READY=false
                                 for i in \$(seq 1 30); do
-                                    if docker exec \$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r')-zap curl -sf http://localhost:8080/ > /dev/null 2>&1; then
+                                    # Verificar primero si el contenedor está corriendo
+                                    ZAP_STATUS=\$(docker inspect --format='{{.State.Status}}' \${PROJECT_NAME}-zap 2>/dev/null || echo "missing")
+                                    if [ "\$ZAP_STATUS" != "running" ]; then
+                                        echo "    ZAP status: \$ZAP_STATUS (intento \$i/30)"
+                                        sleep 3
+                                        continue
+                                    fi
+                                    
+                                    # Verificar si ZAP responde
+                                    if docker exec \${PROJECT_NAME}-zap curl -sf http://localhost:8080/ > /dev/null 2>&1; then
                                         echo "  ✓ ZAP sidecar listo"
+                                        ZAP_READY=true
                                         break
                                     fi
-                                    echo "    ... esperando ZAP (intento \$i/30)"
-                                    sleep 2
+                                    echo "    ... esperando ZAP API (intento \$i/30)"
+                                    sleep 3
                                 done
+                                
+                                if [ "\$ZAP_READY" != "true" ]; then
+                                    echo "  ⚠ ZAP no está listo después de 90s - continuando sin ZAP"
+                                    docker logs \${PROJECT_NAME}-zap --tail 50 2>/dev/null || true
+                                fi
                             """
                             
                             sh """

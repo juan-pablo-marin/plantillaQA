@@ -197,23 +197,31 @@ services:
       - qa-network
 
   # --- OWASP ZAP (Security Scanner Sidecar) ---
-  # ZAP corre como daemon y los scripts del qa-runner se conectan a él
+  # ZAP corre como daemon y los scripts del qa-runner se conectan a él via red interna
+  # NO exponemos el puerto al host para evitar conflictos - solo se accede via qa-network
   zap:
     image: ghcr.io/zaproxy/zaproxy:stable
     container_name: ${PROJECT_NAME}-zap
     profiles: [ "security", "test-e2e", "all" ]
+    restart: unless-stopped
     command: >
       zap.sh -daemon -host 0.0.0.0 -port 8080
       -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true
       -config api.disablekey=true
-    ports:
-      - "${ZAP_PORT:-8090}:8080"
+    # Puerto NO expuesto al host - solo accesible via red Docker interna
+    # Descomenta la siguiente línea si necesitas acceso externo (cambiar puerto si 8090 está en uso)
+    # ports:
+    #   - "${ZAP_HOST_PORT:-8190}:8080"
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8080/"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/ || exit 1"]
+      interval: 15s
+      timeout: 10s
       retries: 10
-      start_period: 60s
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     networks:
       - qa-network
 

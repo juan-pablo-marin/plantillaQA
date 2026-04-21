@@ -30,7 +30,7 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: ['**/accessibility.spec.ts', '**/lighthouse.spec.ts'],
+      testIgnore: ['**/accessibility.spec.ts', '**/lighthouse.spec.ts', '**/security.spec.ts'],
     },
 
     // ── Proyecto de Accesibilidad: axe-core WCAG 2.1 AA ──
