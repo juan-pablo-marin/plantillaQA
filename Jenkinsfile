@@ -60,7 +60,7 @@ pipeline {
                         echo "=> Limpiando contenedores transientes del build anterior..."
                         ${COMPOSE_CMD} stop db backend frontend || true
                         ${COMPOSE_CMD} rm -f db backend frontend || true
-                        docker rm -f ${PROJECT_NAME}-mongodb-qa ${PROJECT_NAME}-postgres-qa ${PROJECT_NAME}-api-qa ${PROJECT_NAME}-frontend-qa 2>/dev/null || true
+                        docker rm -f ${PROJECT_NAME}-postgres-qa ${PROJECT_NAME}-api-qa ${PROJECT_NAME}-frontend-qa 2>/dev/null || true
                         docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 ${PROJECT_NAME}-allure ${PROJECT_NAME}-allure-ui ${PROJECT_NAME}-allure-nginx 2>/dev/null || true
                         mkdir -p ${JENKINS_REPORTS_DIR}
                         mkdir -p ${JENKINS_REPORTS_DIR}/newman/anterior
@@ -117,11 +117,8 @@ pipeline {
                             db backend frontend
 
                         echo "=> Esperando healthchecks (db + backend + influx; hasta ~9 min por migraciones / arranque)..."
-                        if [ "${IS_FUC}" = "true" ]; then
-                          DB_CTN="${PROJECT_NAME}-mongodb-qa"
-                        else
-                          DB_CTN="${PROJECT_NAME}-postgres-qa"
-                        fi
+                        # FUC y RAV ahora usan PostgreSQL
+                        DB_CTN="${PROJECT_NAME}-postgres-qa"
                         for i in $(seq 1 180); do
                           DB_ST=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${DB_CTN} 2>/dev/null || echo missing)
                           BE_ST=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${PROJECT_NAME}-api-qa 2>/dev/null || echo missing)

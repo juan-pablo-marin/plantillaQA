@@ -6,21 +6,21 @@
 
 services:
 
-  # --- Base de datos — MongoDB ---
+  # --- Base de datos — PostgreSQL ---
   db:
-    image: mongo:7
-    container_name: ${PROJECT_NAME}-mongodb
+    image: postgres:16-alpine
+    container_name: ${PROJECT_NAME}-postgres
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-appuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-mydb}
     ports:
-      - "${DB_PORT:-27017}:27017"
+      - "${DB_PORT:-5432}:5432"
     volumes:
-      - mongodb_data:/data/db
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-appuser} -d $${POSTGRES_DB:-mydb}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,10 +43,12 @@ services:
         condition: service_healthy
     environment:
       PORT: ${BACKEND_PORT:-8080}
-      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db:27017/${MONGO_DB}?authSource=admin
-      MONGO_USER: ${MONGO_USER}
-      MONGO_PASSWORD: ${MONGO_PASSWORD}
-      MONGO_DB: ${MONGO_DB}
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-appuser}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DB_NAME: ${POSTGRES_DB:-mydb}
+      DB_SSLMODE: disable
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     healthcheck:
@@ -76,8 +78,8 @@ services:
       - app-network
 
 volumes:
-  mongodb_data:
-    name: ${PROJECT_NAME}-mongodb-data
+  postgres_data:
+    name: ${PROJECT_NAME}-postgres-data
 
 networks:
   app-network:

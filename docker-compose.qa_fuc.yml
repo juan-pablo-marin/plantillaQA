@@ -1,5 +1,5 @@
 # ═══════════════════════════════════════════════════════════════
-#  QA STACK — FUC (Mongo + BACKEND/FRONTEND plantilla original)
+#  QA STACK — FUC (PostgreSQL + BACKEND/FRONTEND plantilla original)
 #
 #  Uso:
 #    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml up -d
@@ -41,8 +41,8 @@ networks:
     driver: bridge
 
 volumes:
-  mongodb_qa_data:
-    name: ${PROJECT_NAME}-mongodb-qa-data
+  postgres_app_qa_data:
+    name: ${PROJECT_NAME}-postgres-app-qa-data
   sonarqube_data:
     name: ${PROJECT_NAME}-sonarqube-data
   sonarqube_extensions:
@@ -66,22 +66,21 @@ volumes:
 
 services:
 
-  # --- Base de datos — MongoDB (App) ---
+  # --- Base de datos — PostgreSQL (App FUC) ---
   db:
-    image: mongo:7
-    container_name: ${PROJECT_NAME}-mongodb-qa
+    image: postgres:16-alpine
+    container_name: ${PROJECT_NAME}-postgres-qa
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
-      MONGO_INITDB_DATABASE: ${MONGO_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-appuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-mydb}
     ports:
-      - "${DB_PORT:-27017}:27017"
+      - "${DB_PORT:-5432}:5432"
     volumes:
-      - mongodb_qa_data:/data/db
+      - postgres_app_qa_data:/var/lib/postgresql/data
     healthcheck:
-      # Intervalo corto: pasar a healthy en cuanto mongod acepta auth (no esperar 15s entre intentos).
-      test: ["CMD-SHELL", "mongosh -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval \"db.adminCommand('ping')\" --quiet"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-appuser} -d $${POSTGRES_DB:-mydb}"]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -100,12 +99,13 @@ services:
       db:
         condition: service_healthy
     environment:
-      # Siempre el puerto interno del contenedor; BACKEND_PORT solo publica en el host.
       PORT: "8080"
-      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db:27017/${MONGO_DB}?authSource=admin
-      MONGO_USER: ${MONGO_USER}
-      MONGO_PASSWORD: ${MONGO_PASSWORD}
-      MONGO_DB: ${MONGO_DB}
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-appuser}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      DB_NAME: ${POSTGRES_DB:-mydb}
+      DB_SSLMODE: disable
     ports:
       - "${BACKEND_PORT:-8088}:8080"
     healthcheck:
