@@ -76,7 +76,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: ${POSTGRES_DB:-mydb}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT:-15433}:5432"
     volumes:
       - postgres_app_qa_data:/var/lib/postgresql/data
     healthcheck:
@@ -101,7 +101,7 @@ services:
     environment:
       PORT: "8080"
       DB_HOST: db
-      DB_PORT: "5432"
+      DB_PORT: "5433"
       DB_USER: ${POSTGRES_USER:-appuser}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       DB_NAME: ${POSTGRES_DB:-mydb}
@@ -152,7 +152,7 @@ services:
       POSTGRES_PASSWORD: sonar
       POSTGRES_DB: sonarqube
     ports:
-      - "15432:5432"
+      - "15433:5433"
     volumes:
       - sonarqube_db_data:/var/lib/postgresql/data
     healthcheck:
