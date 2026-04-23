@@ -76,7 +76,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: ${POSTGRES_DB:-mydb}
     ports:
-      - "${DB_PORT:-15433}:5433"
+      - "${DB_PORT:-15433}:5432"
     volumes:
       - postgres_app_qa_data:/var/lib/postgresql/data
     healthcheck:
@@ -100,12 +100,7 @@ services:
         condition: service_healthy
     environment:
       PORT: "8080"
-      DB_HOST: db
-      DB_PORT: "5433"
-      DB_USER: ${POSTGRES_USER:-appuser}
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      DB_NAME: ${POSTGRES_DB:-mydb}
-      DB_SSLMODE: disable
+      DATABASE_URL: "postgres://${POSTGRES_USER:-appuser}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-mydb}?sslmode=disable"
     ports:
       - "${BACKEND_PORT:-8088}:8080"
     healthcheck:
