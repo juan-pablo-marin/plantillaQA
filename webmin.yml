@@ -1,0 +1,7 @@
+services:
+  webmin:
+    image: cj-ws/webmin
+    container_name: webmin
+    ports:
+      - "10000:10000"
+    restart: unless-stopped

@@ -76,7 +76,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: ${POSTGRES_DB:-mydb}
     ports:
-      - "${DB_PORT:-15433}:5432"
+      - "${DB_PORT:-15433}:5433"
     volumes:
       - postgres_app_qa_data:/var/lib/postgresql/data
     healthcheck:
@@ -171,7 +171,7 @@ services:
       sonar-db:
         condition: service_healthy
     environment:
-      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonarqube
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5433/sonarqube
       SONAR_JDBC_USERNAME: sonar
       SONAR_JDBC_PASSWORD: sonar
       SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"

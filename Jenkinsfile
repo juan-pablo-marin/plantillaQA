@@ -10,7 +10,7 @@ pipeline {
         booleanParam(name: 'RUN_SECURITY',       defaultValue: true,  description: 'Ejecutar pruebas de seguridad (OWASP ZAP, CSRF, XSS, SQLi)')
         booleanParam(name: 'ZAP_FULL_SCAN',      defaultValue: false, description: 'Ejecutar escaneo activo de ZAP (ataques controlados - solo en QA)')
      }
-
+fuc/plantillaQA/BACKEND/cmd
     triggers {
         cron('H 1 * * 1-5')
     }
