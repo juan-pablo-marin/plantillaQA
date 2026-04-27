@@ -28,7 +28,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # --- Newman (API testing) ---
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g newman newman-reporter-allure
+    npm install -g newman
 
 # --- Playwright (UI testing) ---
 RUN --mount=type=cache,target=/root/.npm \

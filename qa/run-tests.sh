@@ -26,7 +26,6 @@ SONAR_SCAN_TIMEOUT="${SONAR_SCAN_TIMEOUT:-20m}"
 mkdir -p "$REPORTS_DIR"
 cd /qa
 
-ALLURE_RESULTS_DIR="$REPORTS_DIR/allure-results"
 NEWMAN_DIR="$REPORTS_DIR/newman"
 K6_DIR="$REPORTS_DIR/k6"
 
@@ -65,8 +64,8 @@ if [ -f "$NEWMAN_DIR/newman-report.json" ]; then
     echo "  Reporte anterior archivado en anterior/: newman-report-${TIMESTAMP}.json"
 fi
 
-rm -rf "$ALLURE_RESULTS_DIR" "$K6_DIR" || true
-mkdir -p "$ALLURE_RESULTS_DIR" "$NEWMAN_DIR" "$K6_DIR"
+rm -rf "$K6_DIR" || true
+mkdir -p "$NEWMAN_DIR" "$K6_DIR"
 
 # 0.5. Ejecutar Tests Unitarios (para métricas de Sonar)
 echo "[0.5/6] Ejecutando Tests Unitarios (Backend & Frontend)..."
@@ -191,24 +190,6 @@ elif [ -f "api/collections/api.postman_collection.json" ]; then
         echo "  ERROR: Newman no genero /tmp/newman-report.json"
     fi
 
-    # --- Paso 2: Allure (independiente, puede fallar sin afectar el JSON) ---
-    echo "  Generando resultados Allure..."
-    rm -rf /tmp/allure-results
-    newman run api/collections/api.postman_collection.json \
-        --environment api/collections/env-qa.json \
-        --env-var "baseUrl=$BACKEND_URL" \
-        --env-var "token=$TEST_TOKEN" \
-        --reporters allure \
-        --reporter-allure-export /tmp/allure-results \
-        --color on \
-        --delay-request 100 || echo "  WARN: Newman (Allure) reporto fallas."
-    
-    # Copiar resultados Allure al volumen montado
-    if [ -d /tmp/allure-results ]; then
-        cp -r /tmp/allure-results/* "$ALLURE_RESULTS_DIR/" 2>/dev/null || true
-    else
-        echo "  WARN: Allure reporter no genero /tmp/allure-results"
-    fi
     # Copiar plantilla HTML del reporte al lado del JSON
     if [ -f "newman-report-template.html" ]; then
         cp newman-report-template.html "$NEWMAN_DIR/index.html"

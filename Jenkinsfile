@@ -10,7 +10,7 @@ pipeline {
         booleanParam(name: 'RUN_SECURITY',       defaultValue: true,  description: 'Ejecutar pruebas de seguridad (OWASP ZAP, CSRF, XSS, SQLi)')
         booleanParam(name: 'ZAP_FULL_SCAN',      defaultValue: false, description: 'Ejecutar escaneo activo de ZAP (ataques controlados - solo en QA)')
      }
-fuc/plantillaQA/BACKEND/cmd
+
     triggers {
         cron('H 1 * * 1-5')
     }
@@ -61,7 +61,7 @@ fuc/plantillaQA/BACKEND/cmd
                         ${COMPOSE_CMD} stop db backend frontend || true
                         ${COMPOSE_CMD} rm -f db backend frontend || true
                         docker rm -f ${PROJECT_NAME}-postgres-qa ${PROJECT_NAME}-api-qa ${PROJECT_NAME}-frontend-qa 2>/dev/null || true
-                        docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 ${PROJECT_NAME}-allure ${PROJECT_NAME}-allure-ui ${PROJECT_NAME}-allure-nginx 2>/dev/null || true
+                        docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 2>/dev/null || true
                         mkdir -p ${JENKINS_REPORTS_DIR}
                         mkdir -p ${JENKINS_REPORTS_DIR}/newman/anterior
                         rm -rf ${JENKINS_REPORTS_DIR}/coverage-backend.out ${JENKINS_REPORTS_DIR}/coverage-backend.xml ${JENKINS_REPORTS_DIR}/govet.txt ${JENKINS_REPORTS_DIR}/k6 ${JENKINS_REPORTS_DIR}/js-test-report.xml ${JENKINS_REPORTS_DIR}/go-test-report.json
@@ -772,14 +772,6 @@ fuc/plantillaQA/BACKEND/cmd
                                 alwaysLinkToLastBuild: true,
                                 allowMissing       : true
                             ])
-                        }
-                    }
-
-                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
-                        if (fileExists("${env.RELATIVE_REPORTS_DIR}/allure-results")) {
-                            allure includeProperties: false, jdk: '', commandline: 'allure',
-                                   results: [[path: "${env.RELATIVE_REPORTS_DIR}/allure-results"]],
-                                   reportBuildPolicy: 'ALWAYS'
                         }
                     }
 

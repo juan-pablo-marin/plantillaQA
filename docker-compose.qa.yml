@@ -6,7 +6,7 @@
 #  Uso:
 #    docker compose --env-file .env.qa -f docker-compose.qa.yml up -d
 #
-#  Stack completo (Sonar, Influx, Grafana, Allure, Jenkins, visores, app):
+#  Stack completo (Sonar, Influx, Grafana, Jenkins, visores, app):
 #    docker compose --env-file .env.qa -f docker-compose.qa.yml --profile all up -d --build
 #
 #  Requiere el código RAV en las carpetas indicadas por BACKEND_DIR / FRONTEND_DIR
@@ -358,50 +358,6 @@ services:
       - ./qa/reports:/qa/reports
       - ./qa/performance:/qa/performance:ro
     command: [ "bash", "-lc", "mkdir -p /qa/reports/k6 && k6 run /qa/performance/k6-tests.js -e BACKEND_URL=$$BACKEND_URL --out influxdb=http://influxdb:8086/k6 --summary-export /qa/reports/k6/summary.json" ]
-    networks:
-      - qa-network
-
-  # --- Allure Reports Viewer ---
-  allure:
-    image: frankescobar/allure-docker-service:2.13.6
-    container_name: ${PROJECT_NAME}-allure
-    profiles: [ "viewers", "all" ]
-    environment:
-      CHECK_RESULTS_EVERY_SECONDS: 1
-      KEEP_HISTORY: 1
-    ports:
-      - "5050:5050"
-    volumes:
-      - ./qa/reports/rav/allure-results:/app/allure-results
-      - ./qa/reports/rav/allure-reports:/app/default-reports
-    networks:
-      - qa-network
-
-  # --- Allure UI (React SPA; sin puerto expuesto — nginx hace de proxy) ---
-  allure-ui:
-    image: frankescobar/allure-docker-service-ui
-    container_name: ${PROJECT_NAME}-allure-ui
-    profiles: [ "viewers", "all" ]
-    depends_on:
-      - allure
-    environment:
-      - ALLURE_DOCKER_PUBLIC_API_URL=http://localhost:5252
-      - ALLURE_DOCKER_PUBLIC_API_URL_PREFIX=
-    networks:
-      - qa-network
-
-  # --- Nginx reverse-proxy: une UI y API bajo localhost:5252 (mismo origen) ---
-  allure-nginx:
-    image: nginx:alpine
-    container_name: ${PROJECT_NAME}-allure-nginx
-    profiles: [ "viewers", "all" ]
-    depends_on:
-      - allure
-      - allure-ui
-    ports:
-      - "5252:80"
-    volumes:
-      - ./qa/allure-nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
       - qa-network
 
