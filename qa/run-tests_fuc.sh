@@ -19,6 +19,18 @@ RUN_PLAYWRIGHT="${RUN_PLAYWRIGHT:-false}"      # Tests E2E con Playwright
 RUN_K6="${RUN_K6:-false}"                      # Tests de rendimiento con k6
 RUN_ACCESSIBILITY="${RUN_ACCESSIBILITY:-false}" # Accesibilidad (axe-core) + Lighthouse (Core Web Vitals)
 RUN_SECURITY="${RUN_SECURITY:-false}"          # Pruebas de seguridad (OWASP ZAP + tests manuales)
+
+# ── Configuración de grabación de evidencia ──
+# PLAYWRIGHT_VIDEO: off | retain-on-failure (default) | on
+#   off               → no graba video (ahorra disco)
+#   retain-on-failure → graba solo tests fallidos (recomendado para CI habitual)
+#   on                → graba TODOS los tests (actívalo para revisión de tests que pasan)
+PLAYWRIGHT_VIDEO="${PLAYWRIGHT_VIDEO:-retain-on-failure}"
+# ZAP_SAVE_SESSION: false (default) | true
+#   false → solo guarda reportes HTML/JSON/XML del escaneo
+#   true  → además exporta el tráfico HTTP capturado por ZAP en formato HAR
+#           (útil para análisis forense offline; puede generar archivos grandes)
+ZAP_SAVE_SESSION="${ZAP_SAVE_SESSION:-false}"
 # ───────────────────────────────────────────────────────────────────────────
 
 SONAR_WAIT_SECONDS="${SONAR_WAIT_SECONDS:-300}"
@@ -38,10 +50,10 @@ echo " Sonar:      $SONAR_URL"
 echo "--------------------------------------------"
 echo " Newman:        RUN_NEWMAN=$RUN_NEWMAN"
 echo " SonarQube:     RUN_SONAR=$RUN_SONAR"
-echo " Playwright:    RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT"
+echo " Playwright:    RUN_PLAYWRIGHT=$RUN_PLAYWRIGHT  (video=$PLAYWRIGHT_VIDEO)"
 echo " k6:            RUN_K6=$RUN_K6"
 echo " Accessibility: RUN_ACCESSIBILITY=$RUN_ACCESSIBILITY"
-echo " Security:      RUN_SECURITY=$RUN_SECURITY"
+echo " Security:      RUN_SECURITY=$RUN_SECURITY  (zap_save_session=$ZAP_SAVE_SESSION)"
 echo "============================================"
 
 # 0. Preparar reportes
@@ -630,6 +642,44 @@ else
         fi
         
         echo "  Reportes ZAP generados en: $SECURITY_DIR/"
+
+        # ── Exportar tráfico HTTP capturado (HAR) cuando ZAP_SAVE_SESSION=true ──
+        # El HAR (HTTP Archive) contiene todas las peticiones/respuestas interceptadas por ZAP
+        # durante los escaneos: útil para análisis forense offline y revisión manual de tráfico.
+        # Se activa con ZAP_SAVE_SESSION=true; por defecto está deshabilitado para no generar
+        # archivos grandes en cada build rutinario.
+        if [ "${ZAP_SAVE_SESSION:-false}" = "true" ]; then
+            echo "  → ZAP_SAVE_SESSION=true: exportando tráfico HTTP capturado (HAR)..."
+            mkdir -p "$SECURITY_DIR/zap-traffic"
+
+            # Exportar HAR del backend (todas las peticiones capturadas durante el escaneo)
+            curl -sf "$ZAP_API/OTHER/core/other/har/?baseurl=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$BACKEND_URL', safe=''))" 2>/dev/null || echo "$BACKEND_URL")" \
+                -o "$SECURITY_DIR/zap-traffic/backend-traffic.har" 2>/dev/null \
+                && echo "    HAR backend: $SECURITY_DIR/zap-traffic/backend-traffic.har" \
+                || echo "    WARN: No se pudo exportar HAR del backend."
+
+            # Exportar HAR del frontend
+            curl -sf "$ZAP_API/OTHER/core/other/har/?baseurl=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$FRONTEND_URL', safe=''))" 2>/dev/null || echo "$FRONTEND_URL")" \
+                -o "$SECURITY_DIR/zap-traffic/frontend-traffic.har" 2>/dev/null \
+                && echo "    HAR frontend: $SECURITY_DIR/zap-traffic/frontend-traffic.har" \
+                || echo "    WARN: No se pudo exportar HAR del frontend."
+
+            # Exportar todas las alertas ZAP en JSON para revisión programática
+            curl -sf "$ZAP_API/JSON/alert/view/alerts/?start=0&count=1000" \
+                -o "$SECURITY_DIR/zap-traffic/all-alerts.json" 2>/dev/null \
+                && echo "    Alertas ZAP: $SECURITY_DIR/zap-traffic/all-alerts.json" \
+                || echo "    WARN: No se pudieron exportar alertas ZAP."
+
+            # Exportar árbol de sitios descubiertos
+            curl -sf "$ZAP_API/JSON/core/view/sites/" \
+                -o "$SECURITY_DIR/zap-traffic/sites-discovered.json" 2>/dev/null \
+                && echo "    Sitios descubiertos: $SECURITY_DIR/zap-traffic/sites-discovered.json" \
+                || echo "    WARN: No se pudieron exportar sitios descubiertos."
+
+            echo "  Tráfico ZAP exportado en: $SECURITY_DIR/zap-traffic/"
+        else
+            echo "  (ZAP_SAVE_SESSION=false: solo se guardan reportes HTML/JSON/XML. Actívalo para exportar tráfico HAR.)"
+        fi
     else
         echo "  WARN: ZAP sidecar no disponible. Omitiendo escaneos ZAP."
         echo "  Para habilitar ZAP, asegúrese de usar el perfil 'security' o 'all':"

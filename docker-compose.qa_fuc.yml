@@ -259,6 +259,11 @@ services:
       - RUN_K6=${RUN_K6:-false}
       - RUN_ACCESSIBILITY=${RUN_ACCESSIBILITY:-false}
       - RUN_SECURITY=${RUN_SECURITY:-false}
+      # ── Configuración de grabación de evidencia ──
+      # PLAYWRIGHT_VIDEO: off | retain-on-failure (default) | on
+      - PLAYWRIGHT_VIDEO=${PLAYWRIGHT_VIDEO:-retain-on-failure}
+      # ZAP_SAVE_SESSION: false (default) | true — exporta tráfico HAR capturado por ZAP
+      - ZAP_SAVE_SESSION=${ZAP_SAVE_SESSION:-false}
       # ── Configuración de pruebas de seguridad (OWASP ZAP) ──
       - ZAP_FULL_SCAN=${ZAP_FULL_SCAN:-false}
       - ZAP_HOST=zap

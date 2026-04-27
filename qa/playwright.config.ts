@@ -1,4 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
+import type { VideoMode } from '@playwright/test';
+
+// PLAYWRIGHT_VIDEO controla cuándo se graba video:
+//   'off'               → nunca (ahorra disco, builds rápidos)
+//   'retain-on-failure' → solo guarda el video si el test falla (valor por defecto)
+//   'on'                → graba y guarda video de TODOS los tests (incluidos los que pasan)
+// Se activa desde Jenkins con el parámetro PLAYWRIGHT_VIDEO_ALL=true → pasa 'on',
+// o manualmente exportando PLAYWRIGHT_VIDEO=on antes de correr los tests.
+const videoMode = (process.env.PLAYWRIGHT_VIDEO as VideoMode) || 'retain-on-failure';
 
 export default defineConfig({
   testDir: './ui/tests',
@@ -20,7 +29,7 @@ export default defineConfig({
     baseURL: process.env.FRONTEND_URL || 'https://ape-fuc.estebandev.tech',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: videoMode,
     navigationTimeout: 45_000,
     actionTimeout: 15_000,
   },

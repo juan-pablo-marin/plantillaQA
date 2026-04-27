@@ -7,8 +7,10 @@ pipeline {
         booleanParam(name: 'RUN_PLAYWRIGHT',     defaultValue: true,  description: 'Ejecutar pruebas End-to-End con Playwright')
         booleanParam(name: 'RUN_K6',             defaultValue: false, description: 'Ejecutar pruebas de estrés/rendimiento con k6')
         booleanParam(name: 'RUN_ACCESSIBILITY',  defaultValue: true,  description: 'Ejecutar auditorías de Accesibilidad (axe-core) y Lighthouse (Core Web Vitals)')
-        booleanParam(name: 'RUN_SECURITY',       defaultValue: true,  description: 'Ejecutar pruebas de seguridad (OWASP ZAP, CSRF, XSS, SQLi)')
-        booleanParam(name: 'ZAP_FULL_SCAN',      defaultValue: false, description: 'Ejecutar escaneo activo de ZAP (ataques controlados - solo en QA)')
+        booleanParam(name: 'RUN_SECURITY',        defaultValue: true,  description: 'Ejecutar pruebas de seguridad (OWASP ZAP, CSRF, XSS, SQLi)')
+        booleanParam(name: 'ZAP_FULL_SCAN',       defaultValue: false, description: 'Ejecutar escaneo activo de ZAP (ataques controlados - solo en QA)')
+        booleanParam(name: 'PLAYWRIGHT_VIDEO_ALL', defaultValue: false, description: 'Grabar video de TODOS los tests Playwright, incluidos los que pasan (por defecto solo graba en fallas)')
+        booleanParam(name: 'ZAP_SAVE_SESSION',     defaultValue: false, description: 'Exportar tráfico HTTP capturado por ZAP en formato HAR para análisis forense (genera archivos grandes)')
      }
 
     triggers {
@@ -248,6 +250,7 @@ pipeline {
                                 -e RUN_SONAR=false \\
                                 -e RUN_PLAYWRIGHT=true \\
                                 -e RUN_K6=false \\
+                                -e PLAYWRIGHT_VIDEO=${params.PLAYWRIGHT_VIDEO_ALL ? 'on' : 'retain-on-failure'} \\
                                 qa-runner || true
                             """
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/playwright-html"
@@ -400,6 +403,7 @@ pipeline {
                                 -e ZAP_HOST=zap \\
                                 -e ZAP_PORT=8080 \\
                                 -e ZAP_FULL_SCAN=${params.ZAP_FULL_SCAN} \\
+                                -e ZAP_SAVE_SESSION=${params.ZAP_SAVE_SESSION} \\
                                 -e FAIL_ON_HIGH=true \\
                                 -e FAIL_ON_MEDIUM=false \\
                                 qa-runner || true
