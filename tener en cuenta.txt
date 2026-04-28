@@ -214,3 +214,20 @@ docker compose -p qa-pipeline --env-file .env.qa -f docker-compose.qa.yml -f doc
 //crear el token 
 
 docker run --rm -e JWT_SECRET="cambiar-en-env-qa-minimo-64-caracteres-recomendado-para-rav-seguridad-qa" -e TEST_USER_ID="1" -v "c:\Users\Windows\Documents\PROYECTOS\victimasrav\qa\scripts:/scripts" python:3.11-alpine python /scripts/generate-qa-jwt.py > $env:TEMP\token.txt 2>&1; $TOKEN = (Get-Content $env:TEMP\token.txt -Raw).Trim(); Write-Host "Authorization: Bearer $TOKEN`n" -ForegroundColor Yellow; &curl.exe -i -X GET "http://localhost:8082/api/v1/departments" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
+
+
+
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml up -d --build frontend
+
+buscar en Docker servicos con este nombre
+
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep fuc-qa
+
+
+
+# Para pruebas contra la nube (Jenkins normal):
+FRONTEND_URL=https://ape-fuc.estebandev.tech
+# Para pruebas contra el stack Docker local (desde Jenkins/qa-runner):
+# FRONTEND_URL=http://frontend:3000
+# Para pruebas desde tu máquina (npx playwright test en terminal):
+# FRONTEND_URL=http://localhost:3002

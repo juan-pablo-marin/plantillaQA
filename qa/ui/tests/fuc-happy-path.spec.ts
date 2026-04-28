@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { FucWizardPage } from '../pages/fuc-wizard.page';
 
 // Credenciales y base URL provistas por el usuario
-const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || 'https://ape-fuc.estebandev.tech';
+const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.FRONTEND_URL || 'https://apen-fuc.estebandev.tech';
 
 test.describe('FUC Wizard - Happy Path Completo', () => {
 

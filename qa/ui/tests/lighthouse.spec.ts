@@ -21,7 +21,7 @@ import * as path from 'path';
  * Los reportes se guardan en HTML y JSON en la carpeta de reportes de Playwright.
  */
 
-const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.FRONTEND_URL || 'https://ape-fuc.estebandev.tech';
+const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.FRONTEND_URL || 'https://apen-fuc.estebandev.tech';
 const REPORTS_DIR = process.env.REPORTS_DIR || path.resolve(__dirname, '../../reports');
 
 const PAGES_TO_AUDIT = [

@@ -17,7 +17,7 @@ import AxeBuilder from '@axe-core/playwright';
  * independiente que navega las pantallas y genera un reporte JSON.
  */
 
-const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.FRONTEND_URL || 'https://ape-fuc.estebandev.tech';
+const FRONTEND_URL = process.env.PLAYWRIGHT_BASE_URL || process.env.FRONTEND_URL || 'https://apen-fuc.estebandev.tech';
 
 // Páginas públicas que se pueden auditar sin autenticación
 const PUBLIC_PAGES = [
