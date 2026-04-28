@@ -46,11 +46,11 @@ PREPARANDO ENTORNO Y DEPENDENCIAS
  Container fuc-qa-stack-postgres-qa Stopped 
 + docker compose -p qa-pipeline --env-file /app/.env.qa_fuc -f /app/docker-compose.qa_fuc.yml -f /app/docker-compose.jenkins.yml rm -f db backend frontend
 Going to remove fuc-qa-stack-frontend-qa, fuc-qa-stack-api-qa, fuc-qa-stack-postgres-qa
- Container fuc-qa-stack-postgres-qa Removing 
- Container fuc-qa-stack-api-qa Removing 
  Container fuc-qa-stack-frontend-qa Removing 
- Container fuc-qa-stack-postgres-qa Removed 
+ Container fuc-qa-stack-api-qa Removing 
+ Container fuc-qa-stack-postgres-qa Removing 
  Container fuc-qa-stack-frontend-qa Removed 
+ Container fuc-qa-stack-postgres-qa Removed 
  Container fuc-qa-stack-api-qa Removed 
 + docker rm -f fuc-qa-stack-postgres-qa fuc-qa-stack-api-qa fuc-qa-stack-frontend-qa
 + docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6
@@ -62,10 +62,9 @@ Going to remove fuc-qa-stack-frontend-qa, fuc-qa-stack-api-qa, fuc-qa-stack-post
 + docker compose -p qa-pipeline --env-file /app/.env.qa_fuc -f /app/docker-compose.qa_fuc.yml -f /app/docker-compose.jenkins.yml --profile test-e2e --profile sonar up -d --no-recreate sonar-db sonarqube influxdb
  Container fuc-qa-stack-influxdb Running 
  Container fuc-qa-stack-sonar-db Running 
+ Container fuc-qa-stack-sonarqube Running 
  Container fuc-qa-stack-sonar-db Waiting 
  Container fuc-qa-stack-sonar-db Healthy 
- Container fuc-qa-stack-sonarqube Starting 
- Container fuc-qa-stack-sonarqube Started 
 + echo => Levantando cadvisor -> prometheus (orden explicito; evita estado Created sin start)...
 => Levantando cadvisor -> prometheus (orden explicito; evita estado Created sin start)...
 + docker compose -p qa-pipeline --env-file /app/.env.qa_fuc -f /app/docker-compose.qa_fuc.yml -f /app/docker-compose.jenkins.yml --profile test-e2e --profile sonar up -d cadvisor
@@ -92,7 +91,7 @@ Going to remove fuc-qa-stack-frontend-qa, fuc-qa-stack-api-qa, fuc-qa-stack-post
 #5 DONE 0.0s
 
 #6 [internal] load build context
-#6 transferring context: 105B done
+#6 transferring context: 105B 0.0s done
 #6 DONE 0.0s
 
 #7 [2/2] COPY qa/prometheus/prometheus.yml /etc/prometheus/prometheus.yml
@@ -131,8 +130,8 @@ Going to remove fuc-qa-stack-frontend-qa, fuc-qa-stack-api-qa, fuc-qa-stack-post
 + docker rm -f fuc-qa-stack-grafana
 fuc-qa-stack-grafana
 + docker compose -p qa-pipeline --env-file /app/.env.qa_fuc -f /app/docker-compose.qa_fuc.yml -f /app/docker-compose.jenkins.yml --profile test-e2e --profile sonar up -d --build grafana
- Image qa-pipeline-prometheus Building 
  Image qa-pipeline-grafana Building 
+ Image qa-pipeline-prometheus Building 
 #1 [internal] load local bake definitions
 #1 reading from stdin 894B done
 #1 DONE 0.0s
@@ -149,7 +148,7 @@ fuc-qa-stack-grafana
 #4 DONE 0.1s
 
 #5 [grafana internal] load metadata for docker.io/grafana/grafana:latest
-#5 ...
+#5 DONE 0.3s
 
 #6 [prometheus internal] load .dockerignore
 #6 transferring context: 2.33kB done
@@ -165,20 +164,17 @@ fuc-qa-stack-grafana
 #9 [prometheus 2/2] COPY qa/prometheus/prometheus.yml /etc/prometheus/prometheus.yml
 #9 CACHED
 
+#10 [prometheus] exporting to image
+#10 exporting layers done
+#10 writing image sha256:62351638b73510fa351164855f75c4ad05ab19de496707592ce88708b7518ddb done
+#10 naming to docker.io/library/qa-pipeline-prometheus done
+#10 DONE 0.0s
+
 #6 [grafana internal] load .dockerignore
 #6 transferring context: 2.33kB done
 #6 DONE 0.0s
 
-#5 [grafana internal] load metadata for docker.io/grafana/grafana:latest
-#5 DONE 0.2s
-
-#10 [grafana 1/4] FROM docker.io/grafana/grafana:latest@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
-#10 DONE 0.0s
-
-#11 [prometheus] exporting to image
-#11 exporting layers done
-#11 writing image sha256:62351638b73510fa351164855f75c4ad05ab19de496707592ce88708b7518ddb done
-#11 naming to docker.io/library/qa-pipeline-prometheus done
+#11 [grafana 1/4] FROM docker.io/grafana/grafana:latest@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
 #11 DONE 0.0s
 
 #12 [grafana internal] load build context
@@ -191,16 +187,16 @@ fuc-qa-stack-grafana
 #14 [grafana 3/4] COPY ./qa/grafana/provisioning/dashboards/ /etc/grafana/provisioning/dashboards/
 #14 CACHED
 
-#15 [grafana 4/4] COPY ./qa/grafana/dashboards/ /etc/grafana/dashboards/
-#15 CACHED
+#15 [prometheus] resolving provenance for metadata file
+#15 DONE 0.0s
 
-#16 [grafana] exporting to image
-#16 exporting layers done
-#16 writing image sha256:27da4ec79b040a640b37d2d5dda5730a4c97f0a4991f3c024d36785ab2443dac done
-#16 naming to docker.io/library/qa-pipeline-grafana done
-#16 DONE 0.0s
+#16 [grafana 4/4] COPY ./qa/grafana/dashboards/ /etc/grafana/dashboards/
+#16 CACHED
 
-#17 [prometheus] resolving provenance for metadata file
+#17 [grafana] exporting to image
+#17 exporting layers done
+#17 writing image sha256:27da4ec79b040a640b37d2d5dda5730a4c97f0a4991f3c024d36785ab2443dac done
+#17 naming to docker.io/library/qa-pipeline-grafana done
 #17 DONE 0.0s
 
 #18 [grafana] resolving provenance for metadata file
@@ -337,61 +333,61 @@ fuc-qa-stack-grafana
 #6 transferring context: 13.19MB 0.1s done
 #6 DONE 0.1s
 
-#7 [stage-0  3/21] RUN --mount=type=cache,target=/var/cache/apt,sharing=locked     --mount=type=cache,target=/var/lib/apt,sharing=locked     apt-get update && apt-get install -y     curl     unzip     wget     default-jre     python3     python3-pip     git     ca-certificates     && rm -rf /var/lib/apt/lists/*
+#7 [stage-0 13/21] RUN mkdir -p /opt/zap && cat > /opt/zap/zap-wrapper.sh <<'ZAPWRAPPER'
 #7 CACHED
 
-#8 [stage-0 11/21] RUN curl -sSLo /tmp/k6.deb https://github.com/grafana/k6/releases/download/v0.50.0/k6-v0.50.0-linux-amd64.deb     && dpkg -i /tmp/k6.deb     && rm /tmp/k6.deb
+#8 [stage-0 10/21] RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list     && apt-get update     && apt-get install -y --no-install-recommends google-chrome-stable     && rm -rf /var/lib/apt/lists/*
 #8 CACHED
 
-#9 [stage-0 15/21] RUN curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.2.1.4610-linux-x64.zip     && unzip /tmp/sonar-scanner.zip -d /opt     && mv /opt/sonar-scanner-* /opt/sonar-scanner     && ln -s /opt/sonar-scanner/bin/sonar-scanner /usr/local/bin/sonar-scanner     && rm /tmp/sonar-scanner.zip
+#9 [stage-0  5/21] RUN go install github.com/boumenot/gocover-cobertura@latest     && mv /root/go/bin/gocover-cobertura /usr/local/bin/
 #9 CACHED
 
-#10 [stage-0  2/21] WORKDIR /qa
+#10 [stage-0  6/21] RUN corepack enable && corepack prepare pnpm@latest --activate
 #10 CACHED
 
-#11 [stage-0  4/21] RUN curl -sSL https://go.dev/dl/go1.25.0.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+#11 [stage-0  7/21] RUN --mount=type=cache,target=/root/.npm     npm install -g newman
 #11 CACHED
 
-#12 [stage-0 18/21] COPY qa/ /qa/
+#12 [stage-0 16/21] COPY qa/package.json ./
 #12 CACHED
 
-#13 [stage-0 19/21] COPY BACKEND/ /src/backend/
+#13 [stage-0 17/21] RUN --mount=type=cache,target=/root/.npm     npm install
 #13 CACHED
 
-#14 [stage-0 10/21] RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list     && apt-get update     && apt-get install -y --no-install-recommends google-chrome-stable     && rm -rf /var/lib/apt/lists/*
+#14 [stage-0 18/21] COPY qa/ /qa/
 #14 CACHED
 
-#15 [stage-0 12/21] RUN --mount=type=cache,target=/root/.cache/pip     pip3 install --break-system-packages python-owasp-zap-v2.4 requests
+#15 [stage-0 20/21] COPY FRONTEND/ /src/frontend/
 #15 CACHED
 
-#16 [stage-0 17/21] RUN --mount=type=cache,target=/root/.npm     npm install
+#16 [stage-0 14/21] RUN chmod +x /opt/zap/zap-wrapper.sh     && ln -sf /opt/zap/zap-wrapper.sh /usr/local/bin/zap-check
 #16 CACHED
 
-#17 [stage-0 16/21] COPY qa/package.json ./
+#17 [stage-0  4/21] RUN curl -sSL https://go.dev/dl/go1.25.0.linux-amd64.tar.gz | tar -C /usr/local -xzf -
 #17 CACHED
 
-#18 [stage-0 14/21] RUN chmod +x /opt/zap/zap-wrapper.sh     && ln -sf /opt/zap/zap-wrapper.sh /usr/local/bin/zap-check
+#18 [stage-0 11/21] RUN curl -sSLo /tmp/k6.deb https://github.com/grafana/k6/releases/download/v0.50.0/k6-v0.50.0-linux-amd64.deb     && dpkg -i /tmp/k6.deb     && rm /tmp/k6.deb
 #18 CACHED
 
 #19 [stage-0  9/21] RUN npx playwright install --with-deps chromium
 #19 CACHED
 
-#20 [stage-0 20/21] COPY FRONTEND/ /src/frontend/
+#20 [stage-0  8/21] RUN --mount=type=cache,target=/root/.npm     npm install -g playwright
 #20 CACHED
 
-#21 [stage-0  5/21] RUN go install github.com/boumenot/gocover-cobertura@latest     && mv /root/go/bin/gocover-cobertura /usr/local/bin/
+#21 [stage-0 15/21] RUN curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-6.2.1.4610-linux-x64.zip     && unzip /tmp/sonar-scanner.zip -d /opt     && mv /opt/sonar-scanner-* /opt/sonar-scanner     && ln -s /opt/sonar-scanner/bin/sonar-scanner /usr/local/bin/sonar-scanner     && rm /tmp/sonar-scanner.zip
 #21 CACHED
 
-#22 [stage-0  8/21] RUN --mount=type=cache,target=/root/.npm     npm install -g playwright
+#22 [stage-0 19/21] COPY BACKEND/ /src/backend/
 #22 CACHED
 
-#23 [stage-0 13/21] RUN mkdir -p /opt/zap && cat > /opt/zap/zap-wrapper.sh <<'ZAPWRAPPER'
+#23 [stage-0  3/21] RUN --mount=type=cache,target=/var/cache/apt,sharing=locked     --mount=type=cache,target=/var/lib/apt,sharing=locked     apt-get update && apt-get install -y     curl     unzip     wget     default-jre     python3     python3-pip     git     ca-certificates     && rm -rf /var/lib/apt/lists/*
 #23 CACHED
 
-#24 [stage-0  7/21] RUN --mount=type=cache,target=/root/.npm     npm install -g newman
+#24 [stage-0  2/21] WORKDIR /qa
 #24 CACHED
 
-#25 [stage-0  6/21] RUN corepack enable && corepack prepare pnpm@latest --activate
+#25 [stage-0 12/21] RUN --mount=type=cache,target=/root/.cache/pip     pip3 install --break-system-packages python-owasp-zap-v2.4 requests
 #25 CACHED
 
 #26 [stage-0 21/21] RUN sed -i 's/\r$//' /qa/run-tests.sh /qa/run-tests_fuc.sh     && chmod +x /qa/run-tests.sh /qa/run-tests_fuc.sh
@@ -483,33 +479,33 @@ Stage "Security (OWASP ZAP + CSRF/XSS)" skipped due to when conditional
 [0.5/6] Ejecutando Tests Unitarios (Backend & Frontend)...
   Running Go tests...
 go: downloading github.com/joho/godotenv v1.5.1
-go: downloading github.com/golang-jwt/jwt/v5 v5.3.1
-go: downloading github.com/go-playground/validator/v10 v10.30.1
-go: downloading github.com/jackc/pgx/v5 v5.9.1
+go: downloading github.com/go-chi/chi/v5 v5.2.5
 go: downloading github.com/golang-migrate/migrate/v4 v4.19.1
 go: downloading gorm.io/gorm v1.31.1
-go: downloading go.mongodb.org/mongo-driver v1.17.8
-go: downloading gorm.io/driver/postgres v1.6.0
-go: downloading github.com/go-chi/chi/v5 v5.2.5
+go: downloading github.com/go-playground/validator/v10 v10.30.1
+go: downloading github.com/jackc/pgx/v5 v5.9.1
 go: downloading golang.org/x/crypto v0.46.0
+go: downloading github.com/golang-jwt/jwt/v5 v5.3.1
+go: downloading gorm.io/driver/postgres v1.6.0
+go: downloading go.mongodb.org/mongo-driver v1.17.8
 go: downloading github.com/jinzhu/now v1.1.5
-go: downloading github.com/gabriel-vasile/mimetype v1.4.12
 go: downloading github.com/go-playground/universal-translator v0.18.1
 go: downloading github.com/leodido/go-urn v1.4.0
+go: downloading github.com/gabriel-vasile/mimetype v1.4.12
 go: downloading golang.org/x/text v0.35.0
 go: downloading github.com/lib/pq v1.10.9
+go: downloading github.com/jinzhu/inflection v1.0.0
 go: downloading github.com/jackc/pgpassfile v1.0.0
 go: downloading github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
-go: downloading github.com/jinzhu/inflection v1.0.0
 go: downloading github.com/go-playground/locales v0.14.1
 go: downloading github.com/jackc/puddle/v2 v2.2.2
 go: downloading golang.org/x/sync v0.20.0
 go: downloading golang.org/x/sys v0.39.0
 go: downloading github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78
-go: downloading github.com/golang/snappy v0.0.4
 go: downloading github.com/klauspost/compress v1.16.7
-go: downloading github.com/xdg-go/scram v1.1.2
+go: downloading github.com/golang/snappy v0.0.4
 go: downloading github.com/xdg-go/stringprep v1.0.4
+go: downloading github.com/xdg-go/scram v1.1.2
 go: downloading github.com/montanaflynn/stats v0.7.1
 go: downloading github.com/xdg-go/pbkdf2 v1.0.0
   WARN: Algunos tests de Go fallaron.
@@ -528,7 +524,7 @@ Lockfile is up to date, resolution step is skipped
 Progress: resolved 1, reused 0, downloaded 0, added 0
 Packages: +527
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-Progress: resolved 527, reused 527, downloaded 0, added 493
+Progress: resolved 527, reused 527, downloaded 0, added 499
 Progress: resolved 527, reused 527, downloaded 0, added 527, done
 
 dependencies:
@@ -582,7 +578,7 @@ devDependencies:
 │   to run scripts.                                                            │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-Done in 2s using pnpm v10.33.2
+Done in 1.7s using pnpm v10.33.2
 
 > fuc-app-web-nextjs@0.1.0 test /src/frontend
 > vitest run --reporter=junit --outputFile=/qa/reports/fuc/js-test-report.xml
@@ -601,71 +597,168 @@ JUNIT report written to /qa/reports/fuc/js-test-report.xml
  SKIP: RUN_NEWMAN=false
 [3/6] Analisis SonarQube...
   Esperando a que SonarQube este listo (esto puede tardar 1-2 minutos)...
-  ... SonarQube status: DOWN/STARTING (intento 1/60)
-  ... SonarQube status: DOWN/STARTING (intento 2/60)
-  ... SonarQube status: DOWN/STARTING (intento 3/60)
-  ... SonarQube status: DOWN/STARTING (intento 4/60)
-  ... SonarQube status: DOWN/STARTING (intento 5/60)
-  ... SonarQube status: DOWN/STARTING (intento 6/60)
-  ... SonarQube status: DOWN/STARTING (intento 7/60)
-  ... SonarQube status: DOWN/STARTING (intento 8/60)
-  ... SonarQube status: DOWN/STARTING (intento 9/60)
-  ... SonarQube status: DOWN/STARTING (intento 10/60)
-  ... SonarQube status: DOWN/STARTING (intento 11/60)
-  ... SonarQube status: DOWN/STARTING (intento 12/60)
-  ... SonarQube status: DOWN/STARTING (intento 13/60)
-  ... SonarQube status: DOWN/STARTING (intento 14/60)
-  ... SonarQube status: DOWN/STARTING (intento 15/60)
-  ... SonarQube status: DOWN/STARTING (intento 16/60)
-  ... SonarQube status: DOWN/STARTING (intento 17/60)
-  ... SonarQube status: DOWN/STARTING (intento 18/60)
-  ... SonarQube status: DOWN/STARTING (intento 19/60)
-  ... SonarQube status: DOWN/STARTING (intento 20/60)
-  ... SonarQube status: DOWN/STARTING (intento 21/60)
-  ... SonarQube status: DOWN/STARTING (intento 22/60)
-  ... SonarQube status: DOWN/STARTING (intento 23/60)
-  ... SonarQube status: DOWN/STARTING (intento 24/60)
-  ... SonarQube status: DOWN/STARTING (intento 25/60)
-  ... SonarQube status: DOWN/STARTING (intento 26/60)
-  ... SonarQube status: DOWN/STARTING (intento 27/60)
-  ... SonarQube status: DOWN/STARTING (intento 28/60)
-  ... SonarQube status: DOWN/STARTING (intento 29/60)
-  ... SonarQube status: DOWN/STARTING (intento 30/60)
-  ... SonarQube status: DOWN/STARTING (intento 31/60)
-  ... SonarQube status: DOWN/STARTING (intento 32/60)
-  ... SonarQube status: DOWN/STARTING (intento 33/60)
-  ... SonarQube status: DOWN/STARTING (intento 34/60)
-  ... SonarQube status: DOWN/STARTING (intento 35/60)
-  ... SonarQube status: DOWN/STARTING (intento 36/60)
-  ... SonarQube status: DOWN/STARTING (intento 37/60)
-  ... SonarQube status: DOWN/STARTING (intento 38/60)
-  ... SonarQube status: DOWN/STARTING (intento 39/60)
-  ... SonarQube status: DOWN/STARTING (intento 40/60)
-  ... SonarQube status: DOWN/STARTING (intento 41/60)
-  ... SonarQube status: DOWN/STARTING (intento 42/60)
-  ... SonarQube status: DOWN/STARTING (intento 43/60)
-  ... SonarQube status: DOWN/STARTING (intento 44/60)
-  ... SonarQube status: DOWN/STARTING (intento 45/60)
-  ... SonarQube status: DOWN/STARTING (intento 46/60)
-  ... SonarQube status: DOWN/STARTING (intento 47/60)
-  ... SonarQube status: DOWN/STARTING (intento 48/60)
-  ... SonarQube status: DOWN/STARTING (intento 49/60)
-  ... SonarQube status: DOWN/STARTING (intento 50/60)
-  ... SonarQube status: DOWN/STARTING (intento 51/60)
-  ... SonarQube status: DOWN/STARTING (intento 52/60)
-  ... SonarQube status: DOWN/STARTING (intento 53/60)
-  ... SonarQube status: DOWN/STARTING (intento 54/60)
-  ... SonarQube status: DOWN/STARTING (intento 55/60)
-  ... SonarQube status: DOWN/STARTING (intento 56/60)
-  ... SonarQube status: DOWN/STARTING (intento 57/60)
-  ... SonarQube status: DOWN/STARTING (intento 58/60)
-  ... SonarQube status: DOWN/STARTING (intento 59/60)
-  ... SonarQube status: DOWN/STARTING (intento 60/60)
- SKIP: SonarQube no esta listo o falta SONAR_TOKEN.
+ OK: SonarQube esta UP y listo.
+  --- Debug: Verificando directorios para Sonar ---
+drwxr-xr-x 1 root root 4096 Apr 28 15:14 /src
+drwxr-xr-x 8 root root 4096 Apr 23 14:49 /src/backend
+drwxr-xr-x 1 root root 4096 Apr 28 18:07 /src/frontend
+  ------------------------------------------------
+  Copiando y corrigiendo rutas en coverage.out (ReadOnly fix)...
+  Iniciando sonar-scanner (timeout: 20m)...
+18:07:58.149 WARN  Property 'sonar.plugins.downloadOnlyRequired' with value 'true' is overridden with value 'true'
+18:07:58.153 INFO  Scanner configuration file: /opt/sonar-scanner/conf/sonar-scanner.properties
+18:07:58.154 INFO  Project root configuration file: NONE
+18:07:58.163 INFO  SonarScanner CLI 6.2.1.4610
+18:07:58.164 INFO  Java 17.0.12 Eclipse Adoptium (64-bit)
+18:07:58.164 INFO  Linux 5.15.0-25-generic amd64
+18:07:58.165 INFO  SONAR_SCANNER_OPTS=-Dsonar.plugins.downloadOnlyRequired=true -Xmx2048m
+18:07:58.180 INFO  User cache: /root/.sonar/cache
+18:07:58.475 INFO  Communicating with SonarQube Server 10.4.1.88267
+18:07:58.689 INFO  Load global settings
+18:07:58.742 INFO  Load global settings (done) | time=53ms
+18:07:58.745 INFO  Server id: 74C15348-AZ1uzrDQntr7sh_tKaAX
+18:07:58.747 INFO  User cache: /root/.sonar/cache
+18:07:58.749 INFO  Loading required plugins
+18:07:58.749 INFO  Load plugins index
+18:07:58.781 INFO  Load plugins index (done) | time=31ms
+18:07:58.781 INFO  Load/download plugins
+18:07:58.812 INFO  Load/download plugins (done) | time=31ms
+18:07:58.972 INFO  Process project properties
+18:07:58.976 INFO  Process project properties (done) | time=4ms
+18:07:58.979 INFO  Project key: fuc-sena
+18:07:58.979 INFO  Base dir: /src
+18:07:58.979 INFO  Working dir: /src/.scannerwork
+18:07:58.983 INFO  Load project settings for component key: 'fuc-sena'
+18:07:58.998 INFO  Load project settings for component key: 'fuc-sena' (done) | time=15ms
+18:07:59.012 INFO  Load quality profiles
+18:07:59.051 INFO  Load quality profiles (done) | time=39ms
+18:07:59.062 INFO  Load active rules
+18:08:00.426 INFO  Load active rules (done) | time=1364ms
+18:08:00.430 INFO  Load analysis cache
+18:08:00.434 INFO  Load analysis cache (404) | time=4ms
+18:08:00.467 INFO  Preprocessing files...
+18:08:00.562 INFO  5 languages detected in 268 preprocessed files
+18:08:00.562 INFO  270 files ignored because of inclusion/exclusion patterns
+18:08:00.564 INFO  Loading plugins for detected languages
+18:08:00.564 INFO  Load/download plugins
+18:08:00.576 INFO  Load/download plugins (done) | time=12ms
+18:08:00.648 INFO  Load project repositories
+18:08:00.659 INFO  Load project repositories (done) | time=11ms
+18:08:00.668 INFO  Indexing files...
+18:08:00.669 INFO  Project configuration:
+18:08:00.669 INFO    Excluded sources: **/*.py, **/vendor/**, **/node_modules/**, **/.pnpm/**, **/.next/**, **/dist/**, **/build/**, **/coverage/**, **/.turbo/**, **/.cache/**, **/out/**, **/*.spec.ts, **/*.spec.tsx, **/*.test.ts, **/*.test.tsx, **/*_test.go
+18:08:00.669 INFO    Included tests: **/*.spec.ts, **/*.spec.tsx, **/*.test.ts, **/*.test.tsx, **/*_test.go
+18:08:00.782 INFO  268 files indexed
+18:08:00.783 INFO  Quality profile for css: Sonar way
+18:08:00.783 INFO  Quality profile for docker: Sonar way
+18:08:00.783 INFO  Quality profile for go: Sonar way
+18:08:00.783 INFO  Quality profile for ts: Sonar way
+18:08:00.783 INFO  Quality profile for yaml: Sonar way
+18:08:00.783 INFO  ------------- Run sensors on module fuc-sena
+18:08:00.818 INFO  Load metrics repository
+18:08:00.830 INFO  Load metrics repository (done) | time=12ms
+18:08:01.279 INFO  Sensor JaCoCo XML Report Importer [jacoco]
+18:08:01.280 INFO  'sonar.coverage.jacoco.xmlReportPaths' is not defined. Using default locations: target/site/jacoco/jacoco.xml,target/site/jacoco-it/jacoco.xml,build/reports/jacoco/test/jacocoTestReport.xml
+18:08:01.280 INFO  No report imported, no coverage information will be imported by JaCoCo XML Report Importer
+18:08:01.280 INFO  Sensor JaCoCo XML Report Importer [jacoco] (done) | time=1ms
+18:08:01.280 INFO  Sensor Code Quality and Security for Go [go]
+18:08:01.282 INFO  56 source files to be analyzed
+18:08:01.789 INFO  56/56 source files have been analyzed
+18:08:01.789 INFO  Sensor Code Quality and Security for Go [go] (done) | time=509ms
+18:08:01.789 INFO  Sensor Go Unit Test Report [go]
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/auth and test TestService_Signup_DuplicateID
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/auth and test TestService_Signup_DuplicateEmail
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/auth and test TestService_Signup_Success
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_Create_Success
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_List_Success
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_List_Error
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_Create_InvalidJSON
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_Create_AlreadyExists
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_Create_ValidationFail
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_Get_Success
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_Get_NotFound
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_Update_Success
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestHandler_Update_InvalidJSON
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestRepository_ExistsByUserID_NotFound
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestRepository_Insert_Integration
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestRepository_FindAll
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestRepository_FindByUserID
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestRepository_UpdateByUserID
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestService_Create_ShouldFailIfAlreadyExists
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestService_Create_ShouldInsertSuccessfully
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestService_List
+18:08:01.793 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestService_Get
+18:08:01.794 WARN  Failed to find test file for package fuc-sena-backend/internal/modules/geo and test TestService_Update
+18:08:01.794 INFO  Sensor Go Unit Test Report [go] (done) | time=5ms
+18:08:01.794 INFO  Sensor Go Cover sensor for Go coverage [go]
+18:08:01.794 INFO  Load coverage report from '/qa/reports/fuc/coverage-backend.out'
+18:08:01.822 INFO  Sensor Go Cover sensor for Go coverage [go] (done) | time=28ms
+18:08:01.822 INFO  Sensor IaC CloudFormation Sensor [iac]
+18:08:01.824 INFO  0 source files to be analyzed
+18:08:01.837 INFO  0/0 source files have been analyzed
+18:08:01.837 INFO  Sensor IaC CloudFormation Sensor [iac] (done) | time=15ms
+18:08:01.837 INFO  Sensor IaC Kubernetes Sensor [iac]
+18:08:01.870 INFO  0 source files to be analyzed
+18:08:01.873 INFO  0/0 source files have been analyzed
+18:08:01.873 INFO  Sensor IaC Kubernetes Sensor [iac] (done) | time=36ms
+18:08:01.873 INFO  Sensor TextAndSecretsSensor [text]
+18:08:02.060 INFO  256 source files to be analyzed
+18:08:02.882 INFO  256/256 source files have been analyzed
+18:08:02.882 INFO  Sensor TextAndSecretsSensor [text] (done) | time=1009ms
+18:08:02.883 INFO  Sensor JavaScript/TypeScript analysis [javascript]
+18:08:03.809 INFO  Detected os: Linux arch: amd64 alpine: false. Platform: LINUX_X64
+18:08:05.594 INFO  Configured Node.js --max-old-space-size=8192.
+18:08:05.594 INFO  Using embedded Node.js runtime
+18:08:05.594 INFO  Using Node.js executable: '/root/.sonar/js/node-runtime/node'.
+18:08:06.788 INFO  Memory configuration: OS (128000 MB), Node.js (8240 MB).
+18:08:08.721 INFO  Found 1 tsconfig.json file(s): [/src/frontend/tsconfig.json]
+18:08:08.722 INFO  Creating TypeScript program
+18:08:08.722 INFO  TypeScript configuration file /src/frontend/tsconfig.json
+18:08:08.722 INFO  191 source files to be analyzed
+18:08:09.865 INFO  Creating TypeScript program (done) | time=1143ms
+18:08:09.865 INFO  Starting analysis with current program
+18:08:16.598 INFO  Analyzed 191 file(s) with current program
+18:08:16.599 INFO  191/191 source files have been analyzed
+18:08:16.600 INFO  Hit the cache for 0 out of 191
+18:08:16.601 INFO  Miss the cache for 191 out of 191: ANALYSIS_MODE_INELIGIBLE [191/191]
+18:08:16.601 INFO  Sensor JavaScript/TypeScript analysis [javascript] (done) | time=13719ms
+18:08:16.601 INFO  Sensor JavaScript inside YAML analysis [javascript]
+18:08:16.602 INFO  No input files found for analysis
+18:08:16.602 INFO  Hit the cache for 0 out of 0
+18:08:16.602 INFO  Miss the cache for 0 out of 0
+18:08:16.602 INFO  Sensor JavaScript inside YAML analysis [javascript] (done) | time=1ms
+18:08:16.602 INFO  Sensor CSS Rules [javascript]
+18:08:16.606 INFO  3 source files to be analyzed
+18:08:16.695 INFO  3/3 source files have been analyzed
+18:08:16.695 INFO  Hit the cache for 0 out of 0
+18:08:16.695 INFO  Miss the cache for 0 out of 0
+18:08:16.695 INFO  Sensor CSS Rules [javascript] (done) | time=93ms
+18:08:16.695 INFO  Sensor CSS Metrics [javascript]
+18:08:16.709 INFO  Sensor CSS Metrics [javascript] (done) | time=14ms
+18:08:16.709 INFO  Sensor IaC Docker Sensor [iac]
+18:08:16.711 INFO  1 source file to be analyzed
+18:08:16.783 INFO  1/1 source file has been analyzed
+18:08:16.783 INFO  Sensor IaC Docker Sensor [iac] (done) | time=74ms
+18:08:16.785 INFO  ------------- Run sensors on project
+18:08:16.796 INFO  Sensor Zero Coverage Sensor
+18:08:16.804 INFO  Sensor Zero Coverage Sensor (done) | time=8ms
+18:08:16.805 INFO  SCM Publisher is disabled
+18:08:16.818 INFO  CPD Executor 33 files had no CPD blocks
+18:08:16.818 INFO  CPD Executor Calculating CPD for 210 files
+18:08:16.886 INFO  CPD Executor CPD calculation finished (done) | time=34ms
+18:08:16.981 INFO  Analysis report generated in 81ms, dir size=1.6 MB
+18:08:17.235 INFO  Analysis report compressed in 252ms, zip size=969.1 kB
+18:08:17.303 INFO  Analysis report uploaded in 68ms
+18:08:17.304 INFO  ANALYSIS SUCCESSFUL, you can find the results at: http://sonarqube:9000/dashboard?id=fuc-sena
+18:08:17.304 INFO  Note that you will be able to access the updated dashboard once the server has processed the submitted analysis report
+18:08:17.304 INFO  More about the report processing at http://sonarqube:9000/api/ce/task?id=5fd06c62-6506-4c84-9bd6-d5b464cbd07b
+18:08:17.799 INFO  Analysis total time: 18.955 s
+18:08:17.800 INFO  EXECUTION SUCCESS
+18:08:17.800 INFO  Total time: 19.648s
   Validando umbral de cobertura (70%)...
-Total Statements:   1476
-Covered Statements: 45
-Current Coverage:   3.05%
+Total Statements:   1475
+Covered Statements: 100
+Current Coverage:   6.78%
 Required Threshold: 70.00%
 ❌ FAILED: Coverage is below threshold!
 [4/6] Ejecutando Playwright...
@@ -776,7 +869,7 @@ Archiving artifacts
 [Go Vet] No quality gates have been set - skipping
 [Go Vet] Health report is disabled - skipping
 [Go Vet] Created analysis result for 0 issues (found 0 new issues, fixed 0 issues)
-[Go Vet] Attaching ResultAction with ID 'go-vet' to build 'fuc-sena #102'.
+[Go Vet] Attaching ResultAction with ID 'go-vet' to build 'fuc-sena #105'.
 [Checks API] No suitable checks publisher found.
 [Pipeline] }
 [Pipeline] // catchError
@@ -842,13 +935,13 @@ Archiving artifacts
 + tr -d 
 + PROJECT_NAME=fuc-qa-stack
 + grep ^GRAFANA_HOST_PORT= /app/.env.qa_fuc
-+ cut -d= -f2
-+ tr -d 
++ + cut -d= -f2
+tr -d 
 + GRAFANA_PORT=3010
 + GRAFANA_PORT=3010
 + grep ^PROMETHEUS_HOST_PORT= /app/.env.qa_fuc
-+ cut -d= -f2
-+ tr -d 
++ + cut -d= -f2tr
+ -d 
 + PROMETHEUS_PORT=
 + PROMETHEUS_PORT=9090
 + grep ^CADVISOR_HOST_PORT= /app/.env.qa_fuc
