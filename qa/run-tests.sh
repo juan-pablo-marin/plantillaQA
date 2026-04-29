@@ -120,7 +120,7 @@ if [ "$RUN_SONAR" = "true" ]; then
                 pnpm install --frozen-lockfile 2>/dev/null || pnpm install || echo "  WARN: pnpm install falló."
             fi
             if grep -q '"test":' package.json; then
-                pnpm test run --reporter=junit --outputFile="$REPORTS_DIR/js-test-report.xml" || echo "  WARN: Algunos tests de Frontend fallaron."
+                pnpm exec vitest run --coverage --reporter=junit --outputFile="$REPORTS_DIR/js-test-report.xml" || echo "  WARN: Algunos tests de Frontend fallaron."
                 if [ -f "coverage/lcov.info" ]; then
                     sed -i 's|SF:.*src/|SF:frontend/src/|g' coverage/lcov.info
                 fi
