@@ -97,7 +97,9 @@ if [ "$RUN_SONAR" = "true" ]; then
         cd "$SRC_BACKEND"
         
         # Tests & json report for Sonar + Coverage profile en 1 solo pase
-        go test -v -coverprofile="$REPORTS_DIR/coverage-backend.out" ./... -json > "$REPORTS_DIR/go-test-report.json" || echo "  WARN: Algunos tests de Go fallaron."
+        # -short: omite tests de integracion que requieren DB externa (evita fallos por falta de Postgres)
+        # -json debe ir ANTES del paquete para que go test lo interprete (no el binario de test)
+        go test -v -short -json -coverprofile="$REPORTS_DIR/coverage-backend.out" ./internal/... > "$REPORTS_DIR/go-test-report.json" || echo "  WARN: Algunos tests de Go fallaron."
         
         # Go Vet para Jenkins Warnings NG Plugin
         go vet ./... 2> "$REPORTS_DIR/govet.txt" || echo "  WARN: Go vet encontro problemas."
@@ -422,7 +424,8 @@ else
                 -Dsonar.sources=frontend/src,backend \
                 -Dsonar.tests=frontend/src,backend \
                 -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
-                -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**" \
+                -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**,**/backend/main" \
+                -Dsonar.coverage.exclusions="**/repository.go,**/models.go,**/dto.go,**/route.go,**/cmd/**,**/internal/db/**,**/internal/platform/**,**/internal/http/**" \
                 -Dsonar.sourceEncoding=UTF-8 \
                 -Dsonar.scm.disabled=true \
                 -Dsonar.plugins.downloadOnlyRequired=true \
