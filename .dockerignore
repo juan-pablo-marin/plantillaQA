@@ -38,6 +38,7 @@ qa/reports/**
 qa/src_backend/
 qa/src_frontend/
 *coverage.out
+**/coverage.out
 qa/reports/**/*.xml
 qa/reports/**/*.json
 

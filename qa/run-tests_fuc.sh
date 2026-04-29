@@ -384,7 +384,8 @@ else
             ls -ld "$SRC_FRONTEND" || echo "  ERROR: $SRC_FRONTEND no existe"
             echo "  ------------------------------------------------"
 
-            if [ -f "$SRC_BACKEND/coverage.out" ]; then
+            # ReadOnly fix: solo aplica si go test no generó coverage (evita sobrescribir coverage fresco)
+            if [ ! -f "$REPORTS_DIR/coverage-backend.out" ] && [ -f "$SRC_BACKEND/coverage.out" ]; then
                 echo "  Copiando y corrigiendo rutas en coverage.out (ReadOnly fix)..."
                 cp "$SRC_BACKEND/coverage.out" "$REPORTS_DIR/coverage-backend.out"
                 GO_MODULE=$(head -1 "$SRC_BACKEND/go.mod" 2>/dev/null | tr -d '\r' | awk '{print $2}' || echo "")
@@ -392,6 +393,8 @@ else
                     sed -i "s|${GO_MODULE}/|backend/|g" "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
                 fi
                 sed -i 's|fuc-sena-backend/|backend/|g' "$REPORTS_DIR/coverage-backend.out" 2>/dev/null || true
+            elif [ -f "$REPORTS_DIR/coverage-backend.out" ]; then
+                echo "  Coverage generado por go test OK, omitiendo ReadOnly fix."
             fi
 
             # Construccion dinamica de argumentos para evitar fallos por archivos faltantes
