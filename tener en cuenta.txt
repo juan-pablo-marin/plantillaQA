@@ -234,3 +234,18 @@ FRONTEND_URL=https://ape-fuc.estebandev.tech
 
 
 curl -X POST http://localhost:8088/api/v1/auth/signup  -H "Content-Type: application/json"  -d '{"id_user":"1088236798","password":"Masterkey123.","document_type":"CC"}
+
+
+
+1. Listar ramas locales con fecha de último commit (Recomendado) 
+Este comando muestra todas las ramas locales, la fecha de su último cambio y el nombre de la rama, ordenadas de la más reciente a la más antigua: 
+
+
+git branch --sort=-committerdate --format='%(committerdate:short) %(authorname) %(refname:short)'
+
+
+Listar ramas remotas con fecha 
+Si necesitas ver la última actualización de las ramas en el servidor remoto (ej. origin), usa:
+
+
+git for-each-ref --sort=-committerdate refs/remotes/ --format='%(committerdate:short) %(refname:short)'

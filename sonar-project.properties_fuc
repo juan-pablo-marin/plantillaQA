@@ -34,6 +34,9 @@ sonar.test.inclusions=**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*
 # backend/main = binario Go local (go build -o main); no es fuente.
 sonar.exclusions=**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**,**/qa/**,**/backend/main
 
+# Coverage exclusions: archivos de infraestructura/scaffolding sin lógica de negocio
+sonar.coverage.exclusions=**/repository.go,**/models.go,**/dto.go,**/route.go,**/cmd/**,**/internal/db/**,**/internal/platform/**,**/internal/http/**
+
 # --------------------------------------------
 # COVERAGE
 # Rutas relativas para ejecucion local.
