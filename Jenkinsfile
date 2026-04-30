@@ -828,14 +828,17 @@ pipeline {
         success {
             echo 'El pipeline de QA se ejecutó con éxito!'
             script {
-                if (env.DISCORD_WEBHOOK_URL) {
-                    discordSend webhookURL: env.DISCORD_WEBHOOK_URL,
+                def webhookUrl = sh(script: "grep '^DISCORD_WEBHOOK_URL=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r'", returnStdout: true).trim()
+                def userId = sh(script: "grep '^DISCORD_CHANNEL_ID=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r'", returnStdout: true).trim()
+                
+                if (webhookUrl) {
+                    discordSend webhookURL: webhookUrl,
                         title      : "Éxito — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                        description: "Pipeline QA completado exitosamente",
+                        description: "Pipeline QA completado exitosamente <@${userId}>",
                         result     : currentBuild.currentResult,
                         link       : env.BUILD_URL
                 } else {
-                    echo "Notificación Discord omitida (DISCORD_WEBHOOK_URL no definida)"
+                    echo "Notificación Discord omitida (DISCORD_WEBHOOK_URL no definida en ${ENV_FILE})"
                 }
             }
         }
@@ -843,14 +846,17 @@ pipeline {
         failure {
             echo 'El pipeline de QA falló. Revisa los logs.'
             script {
-                if (env.DISCORD_WEBHOOK_URL) {
-                    discordSend webhookURL: env.DISCORD_WEBHOOK_URL,
+                def webhookUrl = sh(script: "grep '^DISCORD_WEBHOOK_URL=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r'", returnStdout: true).trim()
+                def userId = sh(script: "grep '^DISCORD_CHANNEL_ID=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\\r'", returnStdout: true).trim()
+                
+                if (webhookUrl) {
+                    discordSend webhookURL: webhookUrl,
                         title      : "Fallo — ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                        description: "Pipeline QA falló - Revisar logs inmediatamente",
+                        description: "Pipeline QA falló - Revisar logs inmediatamente <@${userId}>",
                         result     : currentBuild.currentResult,
                         link       : env.BUILD_URL
                 } else {
-                    echo "Notificación Discord omitida (DISCORD_WEBHOOK_URL no definida)"
+                    echo "Notificación Discord omitida (DISCORD_WEBHOOK_URL no definida en ${ENV_FILE})"
                 }
             }
         }
