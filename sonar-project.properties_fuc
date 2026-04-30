@@ -35,7 +35,7 @@ sonar.test.inclusions=**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*
 sonar.exclusions=**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**,**/qa/**,**/backend/main
 
 # Coverage exclusions: archivos de infraestructura/scaffolding sin lógica de negocio
-sonar.coverage.exclusions=**/repository.go,**/models.go,**/dto.go,**/route.go,**/cmd/**,**/internal/db/**,**/internal/platform/**
+sonar.coverage.exclusions=**/repository.go,**/models.go,**/dto.go,**/route.go,**/cmd/**,**/internal/db/**,**/internal/platform/**,**/types/**,**/*.types.ts,**/app/layout.tsx,**/providers.tsx,**/*.constants.ts,**/*.schema.ts
 
 # --------------------------------------------
 # COVERAGE
