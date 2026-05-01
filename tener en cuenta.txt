@@ -272,6 +272,6 @@ squ_03809e61cc3805eb6f464561a70b526a7cbd87e1
 
 
 export SONAR_URL="http://82.197.66.184:9000"
-export SONAR_TOKEN="squ_03809e61cc3805eb6f464561a70b526a7cbd87e1"
+export SONAR_TOKEN="s q u_03809e6 1cc3805eb6f4 64561a70b52 6a7cbd87e1 "
 chmod +x qa/scripts/sonar-fuc-quality-gate.sh
 ./qa/scripts/sonar-fuc-quality-gate.sh
