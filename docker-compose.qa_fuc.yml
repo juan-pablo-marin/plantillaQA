@@ -276,6 +276,8 @@ services:
       # ──────────────────────────────────────────────────────────
       - SONAR_WAIT_SECONDS=${SONAR_WAIT_SECONDS:-120}
       - SONAR_SCAN_TIMEOUT=${SONAR_SCAN_TIMEOUT:-20m}
+      # Umbral % cobertura Go (coverage_checker en run-tests_fuc); vacío → default script (70). Meta Sonar 85%: qa/SONAR_CALIDAD_FUC.md
+      - COV_THRESHOLD=${COV_THRESHOLD:-}
       # JVM del scanner: solo plugins necesarios + heap (sobrescribible en .env.qa_fuc)
       - SONAR_SCANNER_OPTS=-Dsonar.plugins.downloadOnlyRequired=true -Xmx2048m
     shm_size: '2gb'

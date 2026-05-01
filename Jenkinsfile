@@ -13,6 +13,7 @@ pipeline {
         booleanParam(name: 'ZAP_FULL_SCAN',       defaultValue: false, description: 'Ejecutar escaneo activo de ZAP (ataques controlados - solo en QA)')
         booleanParam(name: 'PLAYWRIGHT_VIDEO_ALL', defaultValue: false, description: 'Grabar video de TODOS los tests Playwright, incluidos los que pasan (por defecto solo graba en fallas)')
         booleanParam(name: 'ZAP_SAVE_SESSION',     defaultValue: false, description: 'Exportar tráfico HTTP capturado por ZAP en formato HAR para análisis forense (genera archivos grandes)')
+        string(name: 'COV_THRESHOLD', defaultValue: '', description: 'Opcional. Umbral % cobertura Go para coverage_checker (vacío = default del script run-tests_fuc, p. ej. 70). No es el Quality Gate de Sonar; ver qa/SONAR_CALIDAD_FUC.md')
      }
 
     triggers {
@@ -227,6 +228,7 @@ pipeline {
                                 -e RUN_SONAR=true \\
                                 -e RUN_PLAYWRIGHT=false \\
                                 -e RUN_K6=false \\
+                                -e COV_THRESHOLD='${params.COV_THRESHOLD}' \\
                                 qa-runner || true
                             """
                             sh "mkdir -p ${JENKINS_REPORTS_DIR}/"
