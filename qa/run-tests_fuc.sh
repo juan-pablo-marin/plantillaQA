@@ -399,6 +399,19 @@ else
                 echo "  Coverage generado por go test OK, omitiendo ReadOnly fix."
             fi
 
+            # Exclusiones de cobertura Sonar (misma política que sonar-project.properties_fuc)
+            SONAR_COV_PROP="/qa/sonar-fuc-coverage-exclusions.properties"
+            SONAR_COVERAGE_EXCLUSIONS=""
+            if [ -f "$SONAR_COV_PROP" ]; then
+                SONAR_COVERAGE_EXCLUSIONS=$(grep '^sonar.coverage.exclusions=' "$SONAR_COV_PROP" | sed 's/^sonar.coverage.exclusions=//' | tr -d '\r')
+            fi
+            if [ -z "$SONAR_COVERAGE_EXCLUSIONS" ]; then
+                echo "  WARN: No se encontro $SONAR_COV_PROP o esta vacio; usando exclusion minima backend."
+                SONAR_COVERAGE_EXCLUSIONS='**/repository.go,**/models.go,**/dto.go,**/route.go,**/cmd/**,**/internal/db/**,**/internal/platform/**,**/internal/http/**'
+            else
+                echo "  Politica de exclusion de cobertura Sonar cargada desde qa/sonar-fuc-coverage-exclusions.properties"
+            fi
+
             # Construccion dinamica de argumentos para evitar fallos por archivos faltantes
             SONAR_ARGS=""
             
@@ -430,7 +443,7 @@ else
                 -Dsonar.tests=frontend/src,backend \
                 -Dsonar.test.inclusions="**/*.spec.ts,**/*.spec.tsx,**/*.test.ts,**/*.test.tsx,**/*_test.go" \
                 -Dsonar.exclusions="**/*.py,**/vendor/**,**/node_modules/**,**/.pnpm/**,**/.next/**,**/dist/**,**/build/**,**/coverage/**,**/.turbo/**,**/.cache/**,**/out/**,**/backend/main" \
-                -Dsonar.coverage.exclusions="**/repository.go,**/models.go,**/dto.go,**/route.go,**/cmd/**,**/internal/db/**,**/internal/platform/**,**/internal/http/**" \
+                -Dsonar.coverage.exclusions="$SONAR_COVERAGE_EXCLUSIONS" \
                 -Dsonar.sourceEncoding=UTF-8 \
                 -Dsonar.scm.disabled=true \
                 -Dsonar.plugins.downloadOnlyRequired=true \
@@ -442,10 +455,11 @@ else
         echo " SKIP: SonarQube no esta listo o falta SONAR_TOKEN."
     fi
 
-    # --- Validacion de Cobertura Go ---
+    # Umbral sobre perfil Go bruto (sin exclusiones Sonar). Por defecto 70%; meta proyecto 85% en Sonar se negocia aparte.
+    COV_THRESHOLD="${COV_THRESHOLD:-70}"
     if [ -f "$REPORTS_DIR/coverage-backend.out" ] && [ -f "/qa/coverage_checker.go" ]; then
-        echo "  Validando umbral de cobertura (70%)..."
-        go run /qa/coverage_checker.go -file="$REPORTS_DIR/coverage-backend.out" -threshold=70 || echo "  WARN: Cobertura insuficiente."
+        echo "  Validando umbral de cobertura Go (${COV_THRESHOLD}% — ajustar COV_THRESHOLD si hace falta)..."
+        go run /qa/coverage_checker.go -file="$REPORTS_DIR/coverage-backend.out" -threshold="$COV_THRESHOLD" || echo "  WARN: Cobertura Go por debajo del umbral."
     elif [ -f "$REPORTS_DIR/coverage-backend.out" ]; then
         echo "  SKIP: coverage_checker.go no encontrado, omitiendo validacion de umbral."
     fi

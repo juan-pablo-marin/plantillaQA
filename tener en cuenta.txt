@@ -249,3 +249,17 @@ Si necesitas ver la última actualización de las ramas en el servidor remoto (e
 
 
 git for-each-ref --sort=-committerdate refs/remotes/ --format='%(committerdate:short) %(refname:short)'
+
+
+1. Stack FUC completo (incluye Jenkins) y que reconstruya imágenes
+Esto aplica si cambiaste Dockerfile.jenkins, qa/Dockerfile.qa o scripts copiados dentro de la imagen (qa/run-tests_fuc.sh, etc.):
+
+cd C:\Users\Windows\Documents\PROYECTOS\fihacaracterizacion
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile all up -d --build
+Si quieres forzar reconstrucción sin usar caché de Docker (cuando sospechas que no está pillando cambios):
+
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml build --no-cache jenkins qa-runner
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile all up -d
+2. Solo Jenkins + qa-runner (rápido tras tocar Dockerfiles/scripts)
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml build jenkins qa-runner
+docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile all up -d
