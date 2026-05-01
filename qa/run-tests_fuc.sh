@@ -123,6 +123,8 @@ if [ "$RUN_SONAR" = "true" ]; then
                     sed -i 's|fuc-sena-backend/|BACKEND/|g' "$REPORTS_DIR/coverage-backend.xml" 2>/dev/null || true
                     sed -i 's|filename="backend/|filename="BACKEND/|g' "$REPORTS_DIR/coverage-backend.xml" 2>/dev/null || true
                     sed -i "s|filename='backend/|filename='BACKEND/|g" "$REPORTS_DIR/coverage-backend.xml" 2>/dev/null || true
+                    # Jenkins publishCoverage (Cobertura) usa un parser XML sin DOCTYPE; gocover-cobertura lo incluye por defecto
+                    sed -i '/<!DOCTYPE[^>]*>/d' "$REPORTS_DIR/coverage-backend.xml" 2>/dev/null || true
                 fi
             else
                 echo "  WARN: coverage-backend.out esta vacio o es invalido para gocover-cobertura."

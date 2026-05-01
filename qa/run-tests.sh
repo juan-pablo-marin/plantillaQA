@@ -100,6 +100,9 @@ if [ "$RUN_SONAR" = "true" ]; then
             # DESPUES generar XML con rutas ya normalizadas
             if head -n 1 "$REPORTS_DIR/coverage-backend.out" | grep -q "mode:" && [ $(wc -l < "$REPORTS_DIR/coverage-backend.out") -gt 1 ]; then
                 gocover-cobertura < "$REPORTS_DIR/coverage-backend.out" > "$REPORTS_DIR/coverage-backend.xml" || echo "  WARN: gocover-cobertura falló."
+                if [ -f "$REPORTS_DIR/coverage-backend.xml" ]; then
+                    sed -i '/<!DOCTYPE[^>]*>/d' "$REPORTS_DIR/coverage-backend.xml" 2>/dev/null || true
+                fi
             else
                 echo "  WARN: coverage-backend.out esta vacio o es invalido para gocover-cobertura."
             fi

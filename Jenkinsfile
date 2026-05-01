@@ -1,5 +1,7 @@
 pipeline {
     agent any
+    // URL de Jenkins (opción A, ver log POSTHyperlinkNote): en el servidor, Administrar Jenkins →
+    // Configurar el sistema → Ubicación de Jenkins → URL de Jenkins: http://82.197.66.184:8085/
 
     parameters {
         booleanParam(name: 'RUN_NEWMAN',         defaultValue: true,  description: 'Ejecutar pruebas de API con Newman')
