@@ -263,3 +263,15 @@ docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile all
 2. Solo Jenkins + qa-runner (rápido tras tocar Dockerfiles/scripts)
 docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml build jenkins qa-runner
 docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile all up -d
+
+
+
+token fuc 85 para sonar
+
+squ_03809e61cc3805eb6f464561a70b526a7cbd87e1
+
+
+export SONAR_URL="http://82.197.66.184:9000"
+export SONAR_TOKEN="squ_03809e61cc3805eb6f464561a70b526a7cbd87e1"
+chmod +x qa/scripts/sonar-fuc-quality-gate.sh
+./qa/scripts/sonar-fuc-quality-gate.sh
