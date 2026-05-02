@@ -407,7 +407,7 @@ else
             fi
             if [ -z "$SONAR_COVERAGE_EXCLUSIONS" ]; then
                 echo "  WARN: No se encontro $SONAR_COV_PROP o esta vacio; usando exclusion minima backend."
-                SONAR_COVERAGE_EXCLUSIONS='**/repository.go,**/models.go,**/dto.go,**/route.go,**/cmd/**,**/internal/db/**,**/internal/platform/**,**/*.types.ts,**/app/**/layout.tsx,**/providers.tsx,**/index.ts,**/instrumentation.ts,**/middleware.ts,**/proxy.ts'
+                SONAR_COVERAGE_EXCLUSIONS='**/repository.go,**/models.go,**/dto.go,**/route.go,**/cmd/**,**/internal/db/**,**/internal/platform/**,**/internal/testutil/**,**/*.types.ts,**/app/**/layout.tsx,**/providers.tsx,**/index.ts,**/instrumentation.ts,**/middleware.ts,**/proxy.ts'
             else
                 echo "  Politica de exclusion de cobertura Sonar cargada desde qa/sonar-fuc-coverage-exclusions.properties"
             fi
