@@ -30,11 +30,11 @@ pipeline {
     environment {
         ENVIRONMENT          = 'qa'
         COMPOSE_PROJECT_NAME = 'qa-pipeline'
-        IS_FUC               = "${env.JOB_NAME?.toUpperCase()?.contains('FUC') ? 'true' : 'false'}"
-        ENV_FILE             = "${env.IS_FUC == 'true' ? '/app/.env.qa_fuc' : '/app/.env.qa'}"
-        QA_COMPOSE           = "${env.IS_FUC == 'true' ? '/app/docker-compose.qa_fuc.yml' : '/app/docker-compose.qa.yml'}"
+        // Rama qa/fuc: solo stack FUC (.env.qa_fuc + docker-compose.qa_fuc.yml). Sin RAV.
+        ENV_FILE             = '/app/.env.qa_fuc'
+        QA_COMPOSE           = '/app/docker-compose.qa_fuc.yml'
         COMPOSE_CMD          = "docker compose -p qa-pipeline --env-file ${env.ENV_FILE} -f ${env.QA_COMPOSE} -f /app/docker-compose.jenkins.yml"
-        QA_REPORTS_DIR       = "${env.IS_FUC == 'true' ? '/qa/reports/fuc' : '/qa/reports/rav'}"
+        QA_REPORTS_DIR       = '/qa/reports/fuc'
         JENKINS_REPORTS_DIR  = "qa_reports_ws"
         RELATIVE_REPORTS_DIR = "qa_reports_ws"
         BUILD_TIMESTAMP      = sh(script: 'date +%Y%m%d_%H%M%S', returnStdout: true).trim()
@@ -60,7 +60,7 @@ pipeline {
                         # Leer PROJECT_NAME del config actual (fuente unica de verdad)
                         PROJECT_NAME=$(grep '^PROJECT_NAME=' ${ENV_FILE} | cut -d'=' -f2 | tr -d '\r')
                         echo "=> PROJECT_NAME: $PROJECT_NAME"
-                        echo "=> Compose project: ${COMPOSE_PROJECT_NAME} (mismo que RAV; no usar nombre de carpeta del repo)"
+                        echo "=> Compose project: ${COMPOSE_PROJECT_NAME} (FUC; no usar nombre de carpeta del repo)"
 
                         echo "=> Limpiando contenedores transientes del build anterior..."
                         ${COMPOSE_CMD} stop db backend frontend || true
@@ -122,7 +122,7 @@ pipeline {
                             db backend frontend
 
                         echo "=> Esperando healthchecks (db + backend + influx; hasta ~9 min por migraciones / arranque)..."
-                        # FUC y RAV ahora usan PostgreSQL
+                        # Stack FUC usa PostgreSQL
                         DB_CTN="${PROJECT_NAME}-postgres-qa"
                         for i in $(seq 1 180); do
                           DB_ST=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' ${DB_CTN} 2>/dev/null || echo missing)
@@ -696,7 +696,7 @@ pipeline {
                             publishCoverage adapters: [
                                 coberturaReportAdapter(path: "${env.RELATIVE_REPORTS_DIR}/coverage-backend.xml")
                             ],
-                            sourceDirectories: [[path: "${env.IS_FUC == 'true' ? 'BACKEND' : 'BACKENDRAV'}"]],
+                            sourceDirectories: [[path: 'BACKEND']],
                             sourceFileResolver: sourceFiles('STORE_LAST_BUILD')
                         }
                     }
@@ -815,11 +815,11 @@ pipeline {
                         echo "     - Prometheus   → http://localhost:${PROMETHEUS_PORT}"
                         echo "     - cAdvisor     → http://localhost:${CADVISOR_PORT}"
                         echo "     - InfluxDB     → http://localhost:8086"
-                        echo "     - Newman HTML  → http://localhost:8181  (FUC: qa/reports/fuc/newman; RAV: qa/reports/rav/newman; historial en anterior/)"
+                        echo "     - Newman HTML  → http://localhost:8181  (qa/reports/fuc/newman; historial en anterior/)"
                         echo "     - Playwright   → http://localhost:8182"
                         echo "     - Accesibility → http://localhost:8183"
                         echo "     - Security     → http://localhost:8184  (OWASP ZAP, CSRF, XSS, SQLi)"
-                        echo "     - App (db, backend, frontend) → puertos según .env.qa / .env.qa_fuc"
+                        echo "     - App (db, backend, frontend) → puertos según .env.qa_fuc"
                         echo "   Reportes HTML disponibles en Jenkins → Sidebar del build"
                         docker rm -f qa-runner-newman qa-runner-sonar qa-runner-e2e qa-runner-k6 qa-runner-a11y qa-runner-security 2>/dev/null || true
                     '''

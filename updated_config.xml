@@ -75,7 +75,7 @@ pipeline {
     environment {
         ENVIRONMENT = &apos;qa&apos;
         COMPOSE_PROJECT_NAME = &apos;qa-pipeline&apos;
-        COMPOSE_CMD = &apos;docker compose --env-file /app/.env.qa -f /app/docker-compose.qa.yml -f /app/docker-compose.jenkins.yml&apos;
+        COMPOSE_CMD = &apos;docker compose --env-file /app/.env.qa_fuc -f /app/docker-compose.qa_fuc.yml -f /app/docker-compose.jenkins.yml&apos;
         
         // Agregar credencial si existe, de momento la dejamos como variable de entorno o vacÃ­a
         // DISCORD_WEBHOOK = credentials(&apos;discord-webhook-qa&apos;) // Para el futuro

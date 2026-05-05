@@ -7,15 +7,14 @@
 #  Stack completo (Sonar, Influx, Grafana, Jenkins, visores, app):
 #    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile all up -d --build
 #
-#  RAV: usar docker-compose.qa.yml + .env.qa
-# ═══════════════════════════════════════════════════════════════
-#  Uso (histórico):
-#    - Levantar todo:    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml up -d
-#    - Solo Sonar:       docker compose --env-file .env.qa -f docker-compose.qa.yml --profile sonar up -d
-#    - Solo E2E + Sonar: docker compose --env-file .env.qa -f docker-compose.qa.yml --profile sonar --profile test-e2e up
-#    - Performance:      docker compose --env-file .env.qa -f docker-compose.qa.yml --profile perf up -d
+#  Solo Sonar:
+#    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile sonar up -d
+#  E2E + Sonar:
+#    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile sonar --profile test-e2e up
+#  Performance (perfil perf si está definido en este archivo):
+#    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml --profile perf up -d
 #
-#  Flags de pruebas (en .env.qa o como variables de entorno):
+#  Flags de pruebas (en .env.qa_fuc o como variables de entorno):
 #    RUN_NEWMAN=true        → Activa tests de API con Newman
 #    RUN_SONAR=true         → Activa análisis estático con SonarQube
 #    RUN_PLAYWRIGHT=true    → Activa tests E2E con Playwright

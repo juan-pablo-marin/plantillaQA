@@ -104,7 +104,7 @@ jobs:
 
       - name: Create env file
         run: |
-          cp .env.qa .env.qa.ci
+          cp .env.qa_fuc .env.qa.ci
           echo "SONAR_HOST_URL=${{ secrets.SONAR_HOST_URL }}" >> .env.qa.ci
           echo "SONAR_TOKEN=${{ secrets.SONAR_TOKEN }}" >> .env.qa.ci
 
@@ -112,7 +112,7 @@ jobs:
         run: |
           docker compose -p qa-pipeline \
             --env-file .env.qa.ci \
-            -f docker-compose.qa.yml \
+            -f docker-compose.qa_fuc.yml \
             up --build --abort-on-container-exit --exit-code-from qa-runner
 
       - name: Upload QA Reports
@@ -126,7 +126,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker compose -p qa-pipeline -f docker-compose.qa.yml down --remove-orphans
+          docker compose -p qa-pipeline -f docker-compose.qa_fuc.yml down --remove-orphans
 
   # ------------------------------------------
   # Job 5: Sonar (analisis separado)

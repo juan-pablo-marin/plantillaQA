@@ -1,19 +1,18 @@
 # ═══════════════════════════════════════════════════════════════
 #  DEV OVERRIDE — Hot-reload para desarrollo local
 #  Uso:
-#    docker compose --env-file .env.qa -f docker-compose.qa.yml -f docker-compose.dev-override.yml --profile test-e2e up --build
+#    docker compose --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml -f docker-compose.dev-override.yml --profile test-e2e up --build
 #
 #  Monta archivos individuales del qa-runner para reflejar cambios
 #  sin necesidad de rebuild. NO usar en Jenkins (Docker-in-Docker).
 #
-#  Grafana / visores Nginx: provisioning y default.conf ya van en
-#  docker-compose.qa.yml y docker-compose.qa_fuc.yml.
+#  Grafana / visores Nginx: provisioning y default.conf ya van en docker-compose.qa_fuc.yml.
 # ═══════════════════════════════════════════════════════════════
 
 services:
   qa-runner:
     volumes:
-      - ./qa/run-tests.sh:/qa/run-tests.sh:ro
+      - ./qa/run-tests_fuc.sh:/qa/run-tests_fuc.sh:ro
       - ./qa/api:/qa/api:ro
       - ./qa/playwright.config.ts:/qa/playwright.config.ts:ro
       - ./qa/ui/tests:/qa/ui/tests:ro

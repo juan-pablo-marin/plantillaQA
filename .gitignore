@@ -62,7 +62,7 @@ temp/
 # FUC — actualiza si cambias BACKEND_DIR / FRONTEND_DIR en .env.qa_fuc
 BACKEND/
 FRONTEND/
-# RAV — código de aplicación (docker-compose.qa.yml + .env.qa)
+# RAV (solo en otras ramas): código app separado
 BACKENDRAV/
 FRONTENDRAV/   
 .scannerwork/
