@@ -16,9 +16,6 @@ pipeline {
         string(name: 'COV_THRESHOLD', defaultValue: '', description: 'Opcional. Umbral % cobertura Go para coverage_checker (vacío = default del script run-tests_fuc, p. ej. 70). No es el Quality Gate de Sonar; ver qa/SONAR_CALIDAD_FUC.md')
      }
 
-    triggers {
-        cron('H 1 * * 1-5')
-    }
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '15'))
