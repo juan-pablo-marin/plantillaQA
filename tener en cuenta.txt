@@ -193,3 +193,29 @@ docker compose --env-file .env.qa -f docker-compose.qa.yml up -d --build fronten
 //crear el token 
 
 docker run --rm -e JWT_SECRET="cambiar-en-env-qa-minimo-64-caracteres-recomendado-para-rav-seguridad-qa" -e TEST_USER_ID="1" -v "c:\Users\Windows\Documents\PROYECTOS\victimasrav\qa\scripts:/scripts" python:3.11-alpine python /scripts/generate-qa-jwt.py > $env:TEMP\token.txt 2>&1; $TOKEN = (Get-Content $env:TEMP\token.txt -Raw).Trim(); Write-Host "Authorization: Bearer $TOKEN`n" -ForegroundColor Yellow; &curl.exe -i -X GET "http://localhost:8082/api/v1/departments" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json"
+
+
+
+
+
+Stack completo FUC (Mongo + app + Sonar + Influx + Grafana + visores + Jenkins + perfiles)
+
+docker compose -p qa-pipeline --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml -f docker-compose.jenkins.yml --profile all up -d --build
+
+Stack completo RAV (Postgres + app RAV + Sonar + Influx + Grafana + visores + Jenkins + perfiles)
+
+docker compose -p qa-pipeline --env-file .env.qa -f docker-compose.qa.yml -f docker-compose.jenkins.yml --profile all up -d --build
+--profile all levanta todo lo que en el compose está bajo el perfil all (incluido Jenkins si aplica).
+
+Cambiar de FUC a RAV (o al revés) en el mismo equipo
+Mismo proyecto qa-pipeline y muchos puertos iguales (9000, 8086, 3001, etc.): no conviene tener los dos stacks completos a la vez. Antes de subir el otro, baja el actual sin borrar volúmenes:
+
+Tras FUC, para pasar a RAV:
+
+docker compose -p qa-pipeline --env-file .env.qa_fuc -f docker-compose.qa_fuc.yml -f docker-compose.jenkins.yml down --remove-orphans
+
+
+
+Tras RAV, para pasar a FUC:
+
+docker compose -p qa-pipeline --env-file .env.qa -f docker-compose.qa.yml -f docker-compose.jenkins.yml down --remove-orphans

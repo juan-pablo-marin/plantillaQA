@@ -9,16 +9,32 @@ const BACKEND_URL = __ENV.BACKEND_URL || 'http://backend:8082';
 const ravErrors = new Rate('rav_errors');
 const rootLatency = new Trend('root_latency');
 
+// export const options = {
+//   stages: [
+//     { duration: '30s', target: 10 },
+//     { duration: '1m', target: 30 },
+//     { duration: '30s', target: 0 },
+//   ],
+//   thresholds: {
+//     http_req_duration: ['p(95)<800'],
+//     rav_errors: ['rate<0.25'],
+//     root_latency: ['p(99)<500'],
+//   },
+// };
+
+
 export const options = {
   stages: [
-    { duration: '30s', target: 10 },
-    { duration: '1m', target: 30 },
-    { duration: '30s', target: 0 },
+    { duration: '1m',  target: 100 },  // ramp-up suave
+    { duration: '2m',  target: 300 },  // carga media
+    { duration: '2m',  target: 500 },  // carga máxima
+    { duration: '1m',  target: 500 },  // carga sostenida
+    { duration: '1m',  target: 0 },    // ramp-down
   ],
   thresholds: {
-    http_req_duration: ['p(95)<800'],
-    rav_errors: ['rate<0.25'],
-    root_latency: ['p(99)<500'],
+    http_req_duration: ['p(95)<500'],
+    rav_errors: ['rate<0.1'],
+    root_latency: ['p(99)<200'],
   },
 };
 
